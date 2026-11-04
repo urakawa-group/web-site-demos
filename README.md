@@ -6,6 +6,8 @@ kinetics, reactors and instruments, explained by playing with them.
 Each demo is one self-contained web page. Open it, move the sliders, watch what
 happens. Nothing to install, no account, no build step.
 
+**Live: <https://urakawa-group.github.io/web-site-demos/>**
+
 ## Demos
 
 | demo | field | what it shows |
@@ -23,8 +25,9 @@ assets/fonts/                       fonts shared by all pages (Source Sans 3, OF
 `<field>` is the subject area (`spectroscopy`, `kinetics`, `reactors`,
 `sorption`, ...), `<demo>` a short lowercase name with hyphens (`mes`,
 `plug-flow`). A demo can be opened straight from disk by double-clicking its
-`index.html`. Once GitHub Pages is switched on for this repository, every demo
-also gets its own address:
+`index.html`. GitHub Pages serves `main` as it is (no build, `.nojekyll`
+switches Jekyll off), so a push to `main` is a release, usually live within a
+minute. Every demo has its own address:
 `https://urakawa-group.github.io/web-site-demos/demos/<field>/<demo>/`.
 Opened from disk in Firefox, the shared font may not load and the page falls
 back to Arial; over GitHub Pages it always loads.
