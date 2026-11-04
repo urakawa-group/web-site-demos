@@ -49,7 +49,7 @@ code { font-family: var(--t-code-ff); font-size: var(--t-code-size); color: var(
 
 .site-footer {
   font-size: var(--t-footer-size); color: var(--t-footer-color);
-  max-width: 1280px; margin: var(--space-6) auto 0; padding: var(--space-3) var(--space-5) var(--space-5);
+  max-width: 1760px; margin: var(--space-6) auto 0; padding: var(--space-3) var(--space-5) var(--space-5);
   border-top: 1px solid var(--line-soft);
 }
 .site-footer a { color: inherit; }
@@ -57,6 +57,7 @@ code { font-family: var(--t-code-ff); font-size: var(--t-code-size); color: var(
 /* ---------- page layout ---------- */
 .page { max-width: 760px; margin: 0 auto; padding: var(--space-5); }
 .page-wide { max-width: 1280px; margin: 0 auto; padding: var(--space-5); }
+.page-demo { max-width: 1760px; margin: 0 auto; padding: var(--space-5); }
 h1, .page-title {
   font-size: var(--t-page-title-size); font-weight: var(--t-page-title-weight); color: var(--t-page-title-color);
   line-height: var(--t-page-title-lh); letter-spacing: var(--t-page-title-ls); margin: 0 0 6px;
@@ -99,6 +100,31 @@ ol.refs .n { font-size: var(--t-cite-sup-size); font-weight: var(--t-cite-sup-we
 ol.refs .short { font-size: var(--t-ref-short-size); font-weight: var(--t-ref-short-weight); color: var(--t-ref-short-color); display: block; }
 ol.refs .full { font-size: var(--t-ref-full-size); color: var(--t-ref-full-color); line-height: var(--t-ref-full-lh); display: block; }
 ol.refs .loc { font-size: var(--t-ref-loc-size); color: var(--t-ref-loc-color); font-style: var(--t-ref-loc-fs); display: block; }
+
+/* ---------- demo: head with the case selector ---------- */
+.demo-head { display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-5); align-items: start; margin-bottom: var(--space-3); }
+.demo-head .lead { margin-bottom: 0; }
+[data-w="compact"] .demo-head { grid-template-columns: 1fr; gap: var(--space-3); }
+.case-select { position: relative; display: flex; flex-direction: column; gap: var(--space-1); padding-top: 4px; }
+.case-select-label { font-size: var(--t-control-size); color: var(--t-control-color); }
+#caseBtn {
+  font: inherit; font-size: var(--t-case-current-size); font-weight: var(--t-case-current-weight); color: var(--t-case-current-color);
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; text-align: left;
+  background: var(--accent-tint); border: 1px solid var(--accent); border-radius: var(--radius-sm);
+  padding: 8px 12px; min-height: 44px; cursor: pointer;
+}
+#caseBtn .caret { margin-left: auto; color: var(--accent); }
+#caseBtn .n, #caseMenu .n { color: var(--ink-300); font-weight: var(--t-control-weight); min-width: 1.2em; }
+#caseMenu {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 20; margin: 4px 0 0; padding: 4px 0; list-style: none;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-menu);
+}
+#caseMenu li {
+  display: flex; gap: var(--space-2); padding: 8px 12px; cursor: pointer;
+  font-size: var(--t-button-size); font-weight: var(--t-button-weight); color: var(--t-button-color);
+}
+#caseMenu li:hover, #caseMenu li:focus { background: var(--surface-hover); outline: none; }
+#caseMenu li[aria-selected="true"] { color: var(--accent); background: var(--accent-tint); }
 
 /* ---------- demo: controls ---------- */
 .case-picker { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
@@ -148,16 +174,30 @@ table.readout th:first-child, table.readout td:first-child { text-align: left; }
 table.readout th, table.readout td { padding: 5px 12px; border-bottom: 1px solid var(--line-soft); text-align: right; font-variant-numeric: tabular-nums; }
 .readout-wrap { overflow-x: auto; }
 
-.explain { display: grid; grid-template-columns: minmax(0, 760px) minmax(0, 1fr); gap: var(--space-5); margin-top: var(--space-5); }
-[data-w="compact"] .explain, [data-w="mid"] .explain { grid-template-columns: 1fr; }
-.formula { font-size: var(--t-lead-size); color: var(--ink-900); background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin: 0 0 var(--space-3); overflow-x: auto; }
-.formula i { font-style: italic; }
+.explain { display: grid; grid-template-columns: minmax(0, 760px) minmax(0, 1fr); gap: var(--space-6); margin-top: var(--space-5); }
+[data-w="compact"] .explain, [data-w="mid"] .explain { grid-template-columns: 1fr; gap: 0; }
+.refs-section { margin-top: var(--space-5); }
+
+/* equation callouts: header, the equation, what it does, its symbols */
+.eq-callout { background: var(--surface); border: 1px solid var(--line-soft); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: var(--space-3) var(--space-4); margin: 0 0 var(--space-3); }
+.eq-head { font-size: var(--t-panel-title-size); font-weight: var(--t-panel-title-weight); color: var(--t-panel-title-color); margin-bottom: var(--space-2); }
+.eq-math { font-size: var(--t-formula-size); color: var(--t-formula-color); line-height: var(--t-formula-lh); white-space: nowrap; overflow-x: auto; padding: var(--space-2) 0; }
+.eq-text { font-size: var(--t-panel-sub-size); color: var(--t-panel-sub-color); line-height: var(--t-panel-sub-lh); margin: var(--space-2) 0; }
+.eq-symbols { display: grid; grid-template-columns: max-content 1fr; gap: 3px var(--space-3); margin: 0; padding-top: var(--space-2); border-top: 1px solid var(--line-soft); font-size: var(--t-panel-sub-size); line-height: var(--t-panel-sub-lh); }
+.eq-symbols dt { color: var(--ink-900); }
+.eq-symbols dd { margin: 0; color: var(--t-panel-sub-color); }
+.frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; margin: 0 0.15em; line-height: 1.25; }
+.frac .num { padding: 0 0.2em 1px; border-bottom: 1px solid currentColor; }
+.frac .den { padding: 1px 0.2em 0; }
+.int { display: inline-flex; align-items: center; font-size: 1.5em; line-height: 1; margin: 0 0.12em; }
+.int .lims { display: inline-flex; flex-direction: column; justify-content: space-between; font-size: 0.55em; height: 2.3em; margin-left: 0.15em; line-height: 1; }
 
 /* ---------- presentation view: zoom plus the subtractions in tokens.js ---------- */
 html[data-view="presentation"] .site-header,
 html[data-view="presentation"] .site-footer,
 html[data-view="presentation"] .lead,
-html[data-view="presentation"] .explain { display: none; }
+html[data-view="presentation"] .explain,
+html[data-view="presentation"] .refs-section { display: none; }
 .present-bar { display: none; }
 html[data-view="presentation"] .present-bar {
   display: flex; gap: var(--space-2); align-items: center; position: fixed; right: 10px; bottom: 10px; z-index: 10;

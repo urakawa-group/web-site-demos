@@ -36,14 +36,14 @@ const IR_X = { from: 1800, to: 950, step: -5, label: 'wavenumber / cm⁻¹', tic
 
 const CASES = [
   {
-    id: 'instant', title: 'One Band, No Delay', T: 1, unit: 'T', x: MUTE_X,
+    id: 'instant', eq: ['square'], title: 'One Band, No Delay', T: 1, unit: 'T', x: MUTE_X,
     species: [{ key: 'b', label: 'B', color: 'data-b', band: [30, 10, 1], drive: 'stim', tau: 0, slider: true }],
     set: { noise: 0, cycles: 4, shape: 'square', k: 1, phi: 0, allPhi: false },
     text: `<p>The simplest response there is: one band that follows the stimulus at once. Phase-sensitive detection multiplies the averaged period by a sine of harmonic <i>k</i>, shifted by the phase angle <i>φ</i>, and integrates over one period [@handbook, Fig. 42.1, p. 969]. Anything constant over the period meets the sine with zero area and drops out, so the mean height of the band is gone and only its swing is left.</p>
       <p>An on/off square wave of height 1 is ½ plus odd sines, so at <i>k</i> = 1 the band comes out with amplitude 2/π ≈ 0.64, largest at <i>φ</i> = 0: no delay, <i>t</i><sub>con</sub> = 0. Try <i>k</i> = 3: amplitude 2/(3π) ≈ 0.21, still at <i>φ</i> = 0. Try <i>k</i> = 2: nothing, a square wave has no even harmonics [@handbook, Eq. 42.1, p. 970].</p>`,
   },
   {
-    id: 'lag', title: 'One Band, First-Order Delay', T: 1, unit: 'T', x: MUTE_X,
+    id: 'lag', eq: ['lag'], title: 'One Band, First-Order Delay', T: 1, unit: 'T', x: MUTE_X,
     species: [{ key: 'b', label: 'B', color: 'data-b', band: [30, 10, 1], drive: 'stim', tau: 0.08, slider: true }],
     set: { noise: 0, cycles: 4, shape: 'square', k: 1, phi: 0, allPhi: false },
     text: `<p>Now the band follows through one first-order step, d<i>y</i>/d<i>t</i> = (<i>u</i> − <i>y</i>)/<i>τ</i>. For a linear step like this the fundamental lags the stimulus by <i>δ</i> = arctan(<i>ωτ</i>) and shrinks by 1/√(1 + (<i>ωτ</i>)²), with <i>ω</i> = 2π/<i>T</i>. In the phase domain the maximum moves from 0 to <i>φ</i><sub>max</sub> = 360° − <i>δ</i>, and the time value reads that delay back as a time [@weyel, Eq. 2].</p>
@@ -90,7 +90,7 @@ const CASES = [
       <p>A falling band therefore reads a time value later by <i>T</i>/2 at <i>k</i> = 1. Read the sign before reading the time.</p>`,
   },
   {
-    id: 'harmonics', title: 'Square-Wave Harmonics', T: 1, unit: 'T', x: MUTE_X,
+    id: 'harmonics', eq: ['square'], title: 'Square-Wave Harmonics', T: 1, unit: 'T', x: MUTE_X,
     species: [
       { key: 'a', label: 'A', color: 'data-a', band: [20, 10, 1], drive: 'stim', tau: 0.15, slider: true },
       { key: 'b', label: 'B', color: 'data-b', band: [38, 10, 0.4], drive: 'stim', tau: 0.03, slider: true },
@@ -113,8 +113,71 @@ const CASES = [
   },
 ];
 
-const FORMULAS = `<p class="formula"><i>A<sub>k</sub></i>(<i>φ</i>) = (2/<i>T</i>) ∫<sub>0</sub><sup><i>T</i></sup> <i>A</i>(<i>t</i>) sin(<i>kωt</i> + <i>φ</i>) d<i>t</i>, &nbsp; <i>ω</i> = 2π/<i>T</i> &nbsp;[@handbook, Fig. 42.1, p. 969] [@weyel, Eq. 1]</p>
-  <p class="formula"><i>t</i><sub>con</sub> = (360° − <i>φ</i><sub>max</sub>) / 360° · <i>T</i> &nbsp;[@weyel, Eq. 2]; at harmonic <i>k</i> the period is <i>T</i>/<i>k</i>, and this page divides by <i>k</i> [@handbook, p. 970]</p>`;
+/* Formula boxes: fractions stacked, an integral with its limits stacked.
+   Running prose keeps the one-line form (2/π), as in IR-bands. */
+const frac = (num, den) => `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+const integral = (lo, hi) => `<span class="int">∫<span class="lims"><span>${hi}</span><span>${lo}</span></span></span>`;
+const sum = (lo, hi) => `<span class="int">Σ<span class="lims"><span>${hi}</span><span>${lo}</span></span></span>`;
+/**
+ * An equation callout: header, the equation, what it does, then its symbols.
+ * `cite` markers go in the explanation, so the box says where it comes from.
+ */
+const callout = ({ title, math, text, symbols }) => `<div class="eq-callout">
+  <div class="eq-head">${title}</div>
+  <div class="eq-math">${math}</div>
+  <p class="eq-text">${text}</p>
+  <dl class="eq-symbols">${symbols.map(([sym, what]) => `<dt>${sym}</dt><dd>${what}</dd>`).join('')}</dl>
+</div>`;
+
+const EQ = {
+  psd: callout({
+    title: 'Phase-Sensitive Detection',
+    math: `<i>A<sub>k</sub></i>(<i>φ</i>) = ${frac('2', '<i>T</i>')} ${integral('0', '<i>T</i>')} <i>A</i>(<i>t</i>) sin(<i>kωt</i> + <i>φ</i>) d<i>t</i>, &emsp; <i>ω</i> = ${frac('2π', '<i>T</i>')}`,
+    text: 'Multiplies the averaged period by a sine of the <i>k</i>-th harmonic, shifted by <i>φ</i>, and integrates over one period. Whatever is constant over the period integrates to zero and drops out [@handbook, Fig. 42.1, p. 969] [@weyel, Eq. 1].',
+    symbols: [
+      ['<i>A<sub>k</sub></i>(<i>φ</i>)', 'phase-resolved absorbance at harmonic <i>k</i> and phase angle <i>φ</i>, in the units of <i>A</i>'],
+      ['<i>A</i>(<i>t</i>)', 'absorbance of the averaged period at time <i>t</i>, at one spectral position'],
+      ['<i>T</i>', 'period of the stimulus'],
+      ['<i>t</i>', 'time within the period, 0 at switch-on'],
+      ['<i>k</i>', 'demodulation index, the harmonic: 1, 2, 3, …'],
+      ['<i>φ</i>', 'phase angle of the demodulation, in °; <i>φ</i><sup>PSD</sup> in the handbook'],
+      ['<i>ω</i>', 'angular frequency of the stimulus'],
+    ],
+  }),
+  tcon: callout({
+    title: 'Time Value',
+    math: `<i>t</i><sub>con</sub> = ${frac('360° − <i>φ</i><sub>max</sub>', '360°')} · ${frac('<i>T</i>', '<i>k</i>')}`,
+    text: 'Reads the phase angle of the maximum back as a delay after the stimulus [@weyel, Eq. 2]. At harmonic <i>k</i> the period is <i>T</i>/<i>k</i>, so this page divides by <i>k</i>; at <i>k</i> = 1 it is the equation as published [@handbook, p. 970].',
+    symbols: [
+      ['<i>t</i><sub>con</sub>', 'time value: how late the signal responds, between 0 and <i>T</i>/<i>k</i>'],
+      ['<i>φ</i><sub>max</sub>', 'phase angle at which <i>A<sub>k</sub></i>(<i>φ</i>) is largest, in °'],
+      ['<i>T</i>, <i>k</i>', 'period and harmonic, as above'],
+    ],
+  }),
+  lag: callout({
+    title: 'One First-Order Step',
+    math: `<i>δ</i> = arctan(<i>ωτ</i>), &emsp; ${frac('|<i>A</i><sub>1</sub>|', '|<i>A</i><sub>1</sub>|<sub><i>τ</i> = 0</sub>')} = ${frac('1', '√(1 + (<i>ωτ</i>)²)')}`,
+    text: 'A linear step d<i>y</i>/d<i>t</i> = (<i>u</i> − <i>y</i>)/<i>τ</i> driven at <i>ω</i> lags its input by <i>δ</i> and loses amplitude. Derived for this page, not taken from a source; the table checks it against the simulation.',
+    symbols: [
+      ['<i>δ</i>', 'phase lag of the response behind the stimulus, in rad'],
+      ['<i>τ</i>', 'time constant of the step'],
+      ['<i>u</i>, <i>y</i>', 'input and response of the step'],
+      ['|<i>A</i><sub>1</sub>|<sub><i>τ</i> = 0</sub>', 'amplitude of a response without delay (2/π for an on/off square wave of height 1)'],
+    ],
+  }),
+  square: callout({
+    title: 'A Square Wave as a Sum of Sines',
+    math: `SW(<i>t</i>) = ${frac('4', 'π')} <i>A</i><sub>SW</sub> ${sum('<i>n</i> = 1', '∞')} ${frac('sin[(2<i>n</i> − 1)<i>ωt</i>]', '2<i>n</i> − 1')}`,
+    text: 'An on/off stimulus contains the fundamental and every odd harmonic, each smaller by its order, and no even one [@handbook, Eq. 42.1, p. 970]. The on/off wave of this page is ½ + ½ SW(<i>t</i>) with <i>A</i><sub>SW</sub> = 1.',
+    symbols: [
+      ['SW(<i>t</i>)', 'square wave between −<i>A</i><sub>SW</sub> and +<i>A</i><sub>SW</sub>'],
+      ['<i>A</i><sub>SW</sub>', 'its amplitude'],
+      ['<i>n</i>', 'index of the term; term <i>n</i> is harmonic 2<i>n</i> − 1'],
+      ['<i>ω</i>', 'angular frequency of the stimulus, 2π/<i>T</i>'],
+    ],
+  }),
+};
+
 
 /* ---------------------------------------------------------------------------
    Engine
@@ -256,19 +319,29 @@ let S = null;
 
 const fmtT = (v, cs) => (cs.unit === 'T' ? `${v.toFixed(3)} T` : `${v.toFixed(1)} min`);
 const timeLabel = cs => (cs.unit === 'T' ? 'time / T' : 'time / min');
-function range(arrs, pad = 0.08, incl0 = true) {
-  let lo = incl0 ? 0 : Infinity, hi = incl0 ? 0 : -Infinity;
-  for (const a of arrs) for (const v of a) { if (v < lo) lo = v; if (v > hi) hi = v; }
-  if (hi - lo < 1e-9) { hi = lo + 1; }
-  const p = (hi - lo) * pad;
-  return [lo - p, hi + p];
+/**
+ * Fixed y limits per case. They depend on the case's bands only, never on a
+ * slider, the harmonic or φ, so nothing rescales while settings change or
+ * while φ is swept. A trace that leaves them (heavy noise) is clipped.
+ *   hAll:  tallest band, static ones included (time, fold, spectra)
+ *   hResp: tallest band that follows the stimulus (PSD can reach 2/π of it)
+ */
+function limits(cs) {
+  const banded = cs.species.filter(s => s.band);
+  const hAll = Math.max(1, ...banded.map(s => s.band[2]));
+  const hResp = Math.max(...banded.filter(s => s.drive !== 'static').map(s => s.band[2] * (1 - (s.base ?? 0))));
+  return {
+    time: [-0.12 * hAll, 1.16 * hAll],
+    spec: [-0.72 * Math.max(hResp, 0.05 * hAll), 1.12 * hAll],
+    phase: [-0.75 * hResp, 0.75 * hResp],
+  };
 }
 
 function drawTime() {
   const { cs, T, dt, n, held, raw, conc } = S;
   const shown = Math.min(n, (WARM + 3) * M), ts = Array.from({ length: shown }, (_, i) => i * dt);
   const traces = S.banded.map(s => raw[s.key].subarray(0, shown));
-  const yr = range([...traces, [0, 1]]);
+  const yr = limits(cs).time;
   const p = plot($('cTime'), {
     x: [0, shown * dt], y: yr, xlabel: timeLabel(cs), ylabel: 'band height / –',
     xticks: ticks(0, shown * dt, 5, v => String(+v.toFixed(2))), yticks: ticks(yr[0], yr[1], 4),
@@ -291,7 +364,7 @@ function drawFold() {
   const { cs, T, dt, held, conc } = S;
   const tp = Array.from({ length: M }, (_, j) => j * dt);
   const traces = S.banded.map(s => foldedAt(s.key));
-  const yr = range([...traces, [0, 1]]);
+  const yr = limits(cs).time;
   const tk = cs.unit === 'T' ? [[0, '0'], [0.25, 'T/4'], [0.5, 'T/2'], [0.75, '3T/4'], [1, 'T']] : ticks(0, T, 4);
   const p = plot($('cFold'), { x: [0, T], y: yr, xlabel: cs.unit === 'T' ? 'time in the period / T' : 'time in the period / min', ylabel: 'band height / –', xticks: tk, yticks: ticks(yr[0], yr[1], 4) });
   p.shadeX(0, T / 2, C['shade-on']); p.shadeX(T / 2, T, C['shade-off']);
@@ -315,7 +388,7 @@ function drawSpec() {
   const cur = psdAt(state.phi);
   const set = state.allPhi ? Array.from({ length: 18 }, (_, i) => psdAt(i * 10)) : [];
   const avg = state.allPhi ? [] : Array.from({ length: 12 }, (_, i) => Array.from(S.fold[i * (M / 12)]));
-  const yr = range([...set, ...avg, cur]);
+  const yr = limits(cs).spec;
   const p = plot($('cSpec'), { x: [cs.x.from, cs.x.to], y: yr, xlabel: cs.x.label, ylabel: 'absorbance / –', xticks: cs.x.ticks, yticks: ticks(yr[0], yr[1], 4) });
   p.hline(0);
   for (const s of avg) p.line(xs, s, C['data-faint'], CHART.lineFaint);
@@ -328,16 +401,16 @@ function drawSpec() {
 function drawPhase() {
   const ph = Array.from({ length: 73 }, (_, i) => i * 5);
   const rows = S.rows.filter(r => r.sp && r.sp.band);
-  const amp = Math.max(1e-6, ...rows.map(r => r.amp));
+  const yr = limits(S.cs).phase, amp = yr[1];
   const p = plot($('cPhase'), {
-    x: [0, 360], y: [-amp * 1.18, amp * 1.18], xlabel: 'phase angle φ / °', ylabel: 'phase-resolved absorbance / –',
-    xticks: [0, 90, 180, 270, 360].map(v => [v, String(v)]), yticks: ticks(-amp * 1.18, amp * 1.18, 4),
+    x: [0, 360], y: yr, xlabel: 'phase angle φ / °', ylabel: 'phase-resolved absorbance / –',
+    xticks: [0, 90, 180, 270, 360].map(v => [v, String(v)]), yticks: ticks(yr[0], yr[1], 4),
   });
   p.hline(0);
   p.vline(state.phi, C['data-highlight'], 1.5, [4, 3]);
   for (const r of rows) {
     p.line(ph, ph.map(f => r.I * Math.cos(f * Math.PI / 180) + r.Q * Math.sin(f * Math.PI / 180)), r.color);
-    if (!r.static && r.amp > 0.02 * amp) p.dot(r.phiMax, r.amp, r.color);
+    if (!r.static && r.amp > 0.01 * amp) p.dot(r.phiMax, r.amp, r.color);
   }
   p.axes();
 }
@@ -379,12 +452,13 @@ function setSeg(id, v) {
 
 function caseTexts() {
   const cs = CASES[state.caseIdx];
-  $('caseText').innerHTML = `<h2>${cs.title}</h2>${cs.text}<h2>The Two Equations</h2>${FORMULAS}`;
+  $('caseText').innerHTML = `<h2>${cs.title}</h2>${cs.text}`;
+  $('equations').innerHTML = `<h2>Equations</h2>${EQ.psd}${EQ.tcon}${(cs.eq ?? []).map(k => EQ[k]).join('')}`;
   $('subSpec').innerHTML = state.allPhi
     ? `<i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].`
     : `Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].`;
   $('subPhase').innerHTML = `<i>A<sub>k</sub></i>(<i>φ</i>) at each band maximum. The dot is <i>φ</i><sub>max</sub>, read as <i>t</i><sub>con</sub> in the table [@weyel, Eq. 2].`;
-  renderCitations([$('subSpec'), $('subPhase'), $('caseText')], $('refs'), SOURCES);
+  renderCitations([$('subSpec'), $('subPhase'), $('caseText'), $('equations')], $('refs'), SOURCES);
 }
 
 function tauControls() {
@@ -421,7 +495,8 @@ function selectCase(idx, push = true) {
   $('vNoise').textContent = sigmaFromSlider(state.noise).toFixed(3);
   $('vCycles').textContent = state.cycles;
   setSeg('shape', state.shape); setSeg('harm', state.k);
-  document.querySelectorAll('#cases button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === idx)));
+  $('caseBtn').innerHTML = `<span class="n">${idx + 1}</span>${cs.title}<span class="caret" aria-hidden="true">▾</span>`;
+  document.querySelectorAll('#caseMenu li').forEach((li, i) => li.setAttribute('aria-selected', String(i === idx)));
   tauControls(); legends(); caseTexts();
   if (push) {
     try { const u = new URL(location.href); u.searchParams.set('case', cs.id); history.replaceState(null, '', u); } catch { /* not essential */ }
@@ -429,8 +504,29 @@ function selectCase(idx, push = true) {
   update();
 }
 
-$('cases').innerHTML = CASES.map((c, i) => `<button type="button" data-i="${i}"><span class="n">${i + 1}</span>${c.title}</button>`).join('');
-$('cases').addEventListener('click', e => { const b = e.target.closest('button'); if (b) selectCase(+b.dataset.i); });
+/* the case selector: one button showing the current case, a menu on click */
+$('caseMenu').innerHTML = CASES.map((c, i) => `<li role="option" tabindex="-1" data-i="${i}"><span class="n">${i + 1}</span>${c.title}</li>`).join('');
+const menuOpen = () => !$('caseMenu').hidden;
+function openMenu(on) {
+  $('caseMenu').hidden = !on;
+  $('caseBtn').setAttribute('aria-expanded', String(on));
+  if (on) (document.querySelector('#caseMenu li[aria-selected="true"]') ?? document.querySelector('#caseMenu li')).focus();
+}
+$('caseBtn').addEventListener('click', () => openMenu(!menuOpen()));
+$('caseMenu').addEventListener('click', e => {
+  const li = e.target.closest('li');
+  if (!li) return;
+  openMenu(false); $('caseBtn').focus();
+  selectCase(+li.dataset.i);
+});
+$('caseMenu').addEventListener('keydown', e => {
+  const items = [...document.querySelectorAll('#caseMenu li')], i = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown') { e.preventDefault(); items[Math.min(items.length - 1, i + 1)].focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); items[Math.max(0, i - 1)].focus(); }
+  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.activeElement.click(); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); openMenu(false); $('caseBtn').focus(); }
+});
+document.addEventListener('click', e => { if (menuOpen() && !e.target.closest('#caseSelect')) openMenu(false); });
 $('noise').addEventListener('input', e => { state.noise = +e.target.value; $('vNoise').textContent = sigmaFromSlider(state.noise).toFixed(3); update(); });
 $('cycles').addEventListener('input', e => { state.cycles = +e.target.value; $('vCycles').textContent = state.cycles; update(); });
 $('phi').addEventListener('input', e => { state.phi = +e.target.value; draw(); });

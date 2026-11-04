@@ -18,9 +18,14 @@ should understand the idea by changing something and watching the response.
   variants are cases on that page, behind a case selector, ordered from the
   simplest (one signal, no delay, no noise) to the realistic one. A case
   explains one idea in at most 130 words.
-- **Short text above, explanation below.** A title, a lead of at most 50 words,
-  the case selector, the controls, the plots. The explanation and the reference
-  list go under the plots.
+- **Short text above, explanation below.** A title and a lead of at most 50
+  words on the left two thirds, the case selector on the right third beside
+  them (closed it shows the current case, a click opens the menu), then the
+  controls and the plots. Under the plots the explanation and the equations,
+  and last the reference list, full width.
+- **Plot limits are fixed per case.** They follow from the case's bands, never
+  from a slider, the harmonic or the phase angle, so nothing rescales while the
+  reader changes a setting or sweeps φ.
 
 ## How a demo is built
 

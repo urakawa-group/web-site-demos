@@ -162,9 +162,11 @@ export const TYPE_GROUPS = [
     roles: [
       { key: 'control',       label: 'Control label', usage: 'Name of a slider, select or switch', size: '14px', weight: 400, color: 'ink-500' },
       { key: 'control-value', label: 'Control value', usage: 'The current value beside a control label', size: '14px', weight: 600, color: 'ink-900' },
-      { key: 'button',        label: 'Button',        usage: 'Case selector, view switch, play', size: '14.5px', weight: 600, color: 'ink-700' },
+      { key: 'button',        label: 'Button',        usage: 'View switch, play, menu items', size: '14.5px', weight: 600, color: 'ink-700' },
+      { key: 'case-current',  label: 'Current case',  usage: 'The case selector closed: the case on screen, beside the title', size: '17px', weight: 600, color: 'accent' },
       { key: 'panel-title',   label: 'Panel title',   usage: 'Numbered: "1 · Time Domain"', size: '16px', weight: 600, color: 'ink-900' },
       { key: 'panel-sub',     label: 'Panel subtitle', usage: 'One line under a panel title: how to read the plot', size: '13.5px', weight: 400, color: 'ink-500', lh: '1.4' },
+      { key: 'formula',       label: 'Formula',       usage: 'The equation in an equation callout. Fractions stack, an integral carries its limits; running prose keeps 2/π on one line. The callout around it: header in panel-title, explanation and symbol list in panel-sub', size: '19px', weight: 400, color: 'ink-900', lh: '1.4' },
       { key: 'table',         label: 'Table',         usage: 'The readout table under the panels', size: '14px', weight: 400, color: 'ink-700' },
       { key: 'table-head',    label: 'Table header',  usage: 'Column names of a readout table', size: '13px', weight: 600, color: 'ink-500' },
     ],
@@ -225,11 +227,13 @@ export const SPACING = {
 
 export const SHADOWS = {
   'shadow-card': { value: '0 4px 16px rgba(30,72,92,0.12)', usage: 'A card, hovered (blue darkest at 12 %)' },
+  'shadow-menu': { value: '0 6px 20px rgba(30,72,92,0.18)', usage: 'An open menu: the case selector (blue darkest at 18 %)' },
 };
 
 export const PAGE_LAYOUT = {
   'Content column': { value: '760px max', usage: 'Prose: the landing page, the Impressum, the explanation under a demo. Never full-bleed text' },
-  'Demo width':     { value: '1280px max', usage: 'A demo page: controls and the panel grid' },
+  'Demo width':     { value: '1760px max', usage: 'A demo page: the plots get the width, prose inside it stays at 760px' },
+  'Demo head':      { value: '2 : 1', usage: 'Title and lead on the left two thirds, the case selector on the right third, top-aligned' },
   'Panel grid':     { value: '2 × 2 from mid', usage: 'Four panels, one column on a compact shell' },
   'Header':         { value: '56px band', usage: 'Accent-strong band, wordmark left, links right' },
 };
@@ -311,6 +315,7 @@ export const WRITING_RULES = [
   { rule: 'No em dashes', detail: 'A comma, a period or a separate sentence. The en dash is for ranges (967–978) and for a dimensionless unit (fraction / –).' },
   { rule: 'Title Case for headings', detail: 'Page titles, section and panel titles capitalise every major word and keep articles and short prepositions small: "Reading the Phase Domain". Everything inside a plot is lowercase.' },
   { rule: 'Axis labels read quantity / unit', detail: '"time / T", "wavenumber / cm⁻¹", "phase-resolved absorbance / –". Running text says "in cm⁻¹" instead.' },
+  { rule: 'Fractions stack in a formula box, not in prose', detail: 'A formula box sets 2/T, (360° − φ<sub>max</sub>)/360° and 1/√(1 + (ωτ)²) as stacked fractions; running text writes them on one line.' },
   { rule: 'Units in powers', detail: 'm² s⁻¹, mol m⁻³ s⁻¹, never m²/s.' },
   { rule: 'Unicode, not markup, for formulas in text', detail: 'CO₂, cm⁻¹, Cu²⁺, A₁. Only a letter subscript Unicode has no character for (t<sub>con</sub>, φ<sub>max</sub>) is written with &lt;sub&gt;. Never bare CO2 in visible text.' },
   { rule: 'Subscripts identify, superscripts state', detail: 'φ<sub>max</sub>, t<sub>con</sub>, A<sub>k</sub> name which one; φ<sup>PSD</sup> or p° give the state or reference.' },

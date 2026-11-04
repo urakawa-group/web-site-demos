@@ -31,11 +31,18 @@
 <link rel="stylesheet" href="../../../assets/site.css">
 </head>
 <body>
-<main class="page-wide">
-  <h1>Modulation Excitation and Phase-Sensitive Detection</h1>
-  <p class="lead">Switch a stimulus on and off, fold the cycles, demodulate. Pick a case, from one band that follows the stimulus at once to a sequence of species with a spectator, and move the sliders.</p>
-
-  <div class="case-picker" id="cases" role="group" aria-label="Case"></div>
+<main class="page-demo">
+  <div class="demo-head">
+    <div>
+      <h1>Modulation Excitation and Phase-Sensitive Detection</h1>
+      <p class="lead">Switch a stimulus on and off, fold the cycles, demodulate. Pick a case, from one band that follows the stimulus at once to a sequence of species with a spectator, and move the sliders.</p>
+    </div>
+    <div class="case-select" id="caseSelect">
+      <span class="case-select-label">case</span>
+      <button type="button" id="caseBtn" aria-haspopup="listbox" aria-expanded="false"></button>
+      <ul id="caseMenu" role="listbox" aria-label="Case" hidden></ul>
+    </div>
+  </div>
 
   <div class="controls" id="controls">
     <label class="ctl"><span>noise: <b id="vNoise"></b></span><input id="noise" type="range" min="0" max="100" value="0"></label>
@@ -80,14 +87,16 @@
 
   <div class="readout-wrap"><table class="readout" id="readout"></table></div>
 
-  <div class="explain">
+  <section class="explain">
     <article id="caseText"></article>
-    <aside>
-      <h2>References</h2>
-      <ol class="refs" id="refs"></ol>
-      <p class="note">All numbers on this page are illustrative: simulated first-order kinetics, not fitted to a measurement.</p>
-    </aside>
-  </div>
+    <article id="equations"></article>
+  </section>
+
+  <section class="refs-section">
+    <h2>References</h2>
+    <ol class="refs" id="refs"></ol>
+    <p class="note">All numbers on this page are illustrative: simulated first-order kinetics, not fitted to a measurement.</p>
+  </section>
 </main>
 <script type="module" src="mes-psd.js"></script>
 </body>
