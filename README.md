@@ -10,13 +10,14 @@ happens. Nothing to install, no account, no build step.
 
 | demo | field | what it shows |
 |---|---|---|
-| *none yet* | | |
+| [MES in one minute](demos/spectroscopy/mes/index.html) | spectroscopy | modulation excitation and phase-sensitive detection: folding cycles, removing a spectator band, reading time values from the phase |
 
 ## Layout
 
 ```
 index.html                          landing page that links every demo
 demos/<field>/<demo>/index.html     one demo, self-contained
+assets/fonts/                       fonts shared by all pages (Source Sans 3, OFL)
 ```
 
 `<field>` is the subject area (`spectroscopy`, `kinetics`, `reactors`,
@@ -25,6 +26,8 @@ demos/<field>/<demo>/index.html     one demo, self-contained
 `index.html`. Once GitHub Pages is switched on for this repository, every demo
 also gets its own address:
 `https://urakawa-group.github.io/web-site-demos/demos/<field>/<demo>/`.
+Opened from disk in Firefox, the shared font may not load and the page falls
+back to Arial; over GitHub Pages it always loads.
 
 ## Adding a demo
 

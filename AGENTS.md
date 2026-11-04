@@ -32,7 +32,9 @@ should understand the idea by changing something and watching the response.
   width as well as a desktop.
 - No analytics, no cookies, no tracking, no external requests. Fonts included:
   Source Sans 3 is used for all text, served from this repository rather than
-  Google Fonts, which would send every visitor's address to Google.
+  Google Fonts, which would send every visitor's address to Google. Link it with
+  `<link rel="stylesheet" href="../../../assets/fonts/source-sans-3/source-sans-3.css">`;
+  it is the one shared file a demo may use.
 - Every `index.html` starts with a comment block: what the demo shows, the
   model and equations behind it, its sources, author and date.
 

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<!--
+  MES demo: modulation excitation spectroscopy and phase-sensitive detection (PSD)
+
+  What it shows: a catalyst bed switched periodically between CO2 + H2 and H2,
+  three surface bands (a fast species, a slow species fed by the fast one, and a
+  spectator), folding and averaging of the cycles, and PSD at the fundamental
+  (k = 1): A1(phi) = (2/T) * integral of A(t) sin(wt + phi) dt. The phase of the
+  maximum gives each band's time value, and the spectator vanishes.
+
+  Model: the gas in the cell is a first-order lag (tau = 3.5 min) of a square-wave
+  valve; the fast pool follows the gas, the slow pool follows the fast pool, both
+  first order. Gaussian bands, Gaussian noise. All numbers are illustrative, not
+  fitted to any measurement.
+
+  URL parameters for a fixed view (slides, links):
+  ?fast=22&slow=68&noise=35&cycles=4&phi=0&spec=1&view=slide
+
+  Author: Julius Sommer. Moved here 2026-11-04 from
+  PhD_execute/runs_tutorials/spectroscopy/mes/demo_mes_psd.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MES demo: modulation excitation in one minute</title>
+<link rel="stylesheet" href="../../../assets/fonts/source-sans-3/source-sans-3.css">
+<style>
+  :root {
+    --ink: #1f2430; --soft: #5b6270; --line: #c9ccd2; --bg: #fbfbf9; --panel: #ffffff;
+    --co2: #2e4a62; --h2: #c8463d; --fast: #c93c74; --slow: #1a4d3a; --spec: #8a5a2b; --accent: #2e4a62;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Source Sans 3', Arial, sans-serif; }
+  header { padding: 20px 28px 8px; }
+  h1 { font-size: 26px; margin: 0 0 4px; font-weight: 700; }
+  header p { margin: 0; color: var(--soft); font-size: 16px; max-width: 1100px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 18px 28px; padding: 12px 28px; align-items: center; border-bottom: 1px solid var(--line); }
+  .ctl { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--soft); min-width: 170px; }
+  .ctl b { color: var(--ink); font-weight: 600; }
+  .ctl input[type=range] { width: 190px; accent-color: var(--accent); }
+  .ctl.check { flex-direction: row; align-items: center; gap: 8px; min-width: 0; }
+  button { font: inherit; font-size: 15px; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--accent); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 28px 8px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 6px; }
+  .card h2 { font-size: 16px; margin: 0 0 2px; font-weight: 600; }
+  .card .sub { font-size: 13px; color: var(--soft); margin: 0 0 6px; min-height: 18px; }
+  canvas { width: 100%; height: 260px; display: block; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--soft); padding: 2px 0 4px; }
+  .legend span::before { content: ""; display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 6px; background: var(--c); }
+  .readout { padding: 4px 28px 18px; font-size: 15px; color: var(--soft); }
+  .readout b { color: var(--ink); }
+  table.tv { border-collapse: collapse; margin-top: 4px; font-size: 14px; }
+  table.tv td, table.tv th { padding: 3px 12px; border-bottom: 1px solid var(--line); text-align: right; }
+  table.tv th:first-child, table.tv td:first-child { text-align: left; }
+  body.slide header, body.slide .controls, body.slide .readout { display: none; }
+  body.slide .grid { padding: 10px; gap: 10px; }
+  body.slide canvas { height: 330px; }
+  body.slide .card h2 { font-size: 20px; }
+  body.slide .card .sub { font-size: 15px; }
+  body.slide .legend { font-size: 15px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .foot { padding: 0 28px 24px; font-size: 13px; color: var(--soft); }
+  .foot a { color: var(--accent); }
+  body.slide .foot { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Modulation excitation spectroscopy, in one minute</h1>
+  <p>A catalyst bed is switched periodically between CO<sub>2</sub> + H<sub>2</sub> and H<sub>2</sub>. Three surface bands answer: a <span style="color:var(--fast)">fast species</span>, a <span style="color:var(--slow)">slow species</span> and a <span style="color:var(--spec)">spectator</span> that sits there and does nothing. Fold the cycles, multiply by a sine of phase φ and integrate: the spectator is gone, and the phase where each band is largest tells how late it is.</p>
+</header>
+
+<div class="controls">
+  <label class="ctl"><span>fast species τ: <b id="vFast"></b></span><input id="tFast" type="range" min="0" max="100" value="22"></label>
+  <label class="ctl"><span>slow species τ: <b id="vSlow"></b></span><input id="tSlow" type="range" min="0" max="100" value="68"></label>
+  <label class="ctl"><span>noise: <b id="vNoise"></b></span><input id="noise" type="range" min="0" max="100" value="35"></label>
+  <label class="ctl"><span>cycles averaged: <b id="vCyc"></b></span><input id="cycles" type="range" min="1" max="12" value="4"></label>
+  <label class="ctl"><span>phase angle φ: <b id="vPhi"></b></span><input id="phi" type="range" min="0" max="355" step="5" value="0"></label>
+  <label class="ctl check"><input id="spec" type="checkbox" checked><span>spectator on</span></label>
+  <button id="play">▶ sweep φ</button>
+  <button id="reseed" class="ghost">new noise</button>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>1 · the experiment: band heights over several cycles</h2>
+    <p class="sub">Shaded: CO<sub>2</sub> + H<sub>2</sub> (blue) and H<sub>2</sub> (red), period T = 60 min. Dashed: the gas in the cell.</p>
+    <canvas id="cTime"></canvas>
+    <div class="legend"><span style="--c:var(--fast)">fast</span><span style="--c:var(--slow)">slow</span><span style="--c:var(--spec)">spectator</span><span style="--c:#9aa0aa">gas</span></div>
+  </div>
+  <div class="card">
+    <h2>2 · fold and average: one period</h2>
+    <p class="sub" id="foldSub"></p>
+    <canvas id="cFold"></canvas>
+    <div class="legend"><span style="--c:var(--fast)">fast</span><span style="--c:var(--slow)">slow</span><span style="--c:var(--spec)">spectator</span></div>
+  </div>
+  <div class="card">
+    <h2>3 · spectra: as measured (grey) and phase-resolved at φ (bold)</h2>
+    <p class="sub">Grey: the averaged spectra through the period. Bold: A<sub>1</sub>(φ) = (2/T) ∫ A(t) sin(ωt + φ) dt.</p>
+    <canvas id="cSpec"></canvas>
+  </div>
+  <div class="card">
+    <h2>4 · each band against φ: its maximum gives the time value</h2>
+    <p class="sub">t<sub>con</sub> = (360° − φ<sub>max</sub>) / 360° · T. A first-order step can never be later than T/4.</p>
+    <canvas id="cPhase"></canvas>
+  </div>
+</div>
+<div class="readout" id="readout"></div>
+<footer class="foot">All numbers are illustrative. <a href="../../../index.html">All demos</a></footer>
+
+<script>
+(() => {
+  const T = 60, DT = 0.5, NP = Math.round(T / DT);   // min, min, points per period
+  const WARM = 2;                                     // cycles discarded before averaging
+  const WN = []; for (let w = 1800; w >= 950; w -= 4) WN.push(w);
+  const BANDS = {
+    fast: { center: 1600, fwhm: 70, amp: 1.0, color: getVar('--fast') },
+    slow: { center: 1060, fwhm: 60, amp: 0.7, color: getVar('--slow') },
+    spec: { center: 1430, fwhm: 90, amp: 0.9, color: getVar('--spec') },
+  };
+  const GAS_TAU = 3.5;                                // min, the cell's own lag
+  let seed = 7, playing = false, raf = null;
+
+  function getVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  const $ = id => document.getElementById(id);
+  const tauOf = v => 0.3 * Math.pow(120 / 0.3, v / 100);     // slider 0..100 -> 0.3..120 min, log
+  const fmt = (x, d = 1) => x.toFixed(d);
+
+  function rng() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+  function gauss() { const u = rng() || 1e-9, v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  const shape = (b, w) => Math.exp(-4 * Math.LN2 * ((w - b.center) / b.fwhm) ** 2);
+
+  // first-order pools driven by the gas, which is itself a first-order lag of the valve
+  function simulate(nCyc, tauFast, tauSlow) {
+    const n = (nCyc + WARM) * NP, gas = new Float64Array(n), fast = new Float64Array(n), slow = new Float64Array(n);
+    const kg = 1 - Math.exp(-DT / GAS_TAU), kf = 1 - Math.exp(-DT / tauFast), ks = 1 - Math.exp(-DT / tauSlow);
+    let g = 0, f = 0, s = 0;
+    for (let i = 0; i < n; i++) {
+      const valve = (i % NP) < NP / 2 ? 1 : 0;
+      g += (valve - g) * kg; f += (g - f) * kf; s += (f - s) * ks;   // slow is fed by fast: a sequence
+      gas[i] = g; fast[i] = f; slow[i] = 0.35 + 0.65 * s;           // slow carries a part that never leaves
+    }
+    return { gas, fast, slow, n };
+  }
+
+  function compute() {
+    const tauFast = tauOf(+$('tFast').value), tauSlow = tauOf(+$('tSlow').value);
+    const sigma = 0.08 * (+$('noise').value / 100) ** 1.5 * 3, nCyc = +$('cycles').value, specOn = $('spec').checked;
+    const sim = simulate(nCyc, tauFast, tauSlow);
+    seed = 7 + 1000 * (+$('reseed').dataset.n || 0);
+    // spectra over time, then fold the kept cycles
+    const nw = WN.length, gF = WN.map(w => shape(BANDS.fast, w)), gS = WN.map(w => shape(BANDS.slow, w)), gP = WN.map(w => shape(BANDS.spec, w));
+    const fold = Array.from({ length: NP }, () => new Float64Array(nw));
+    const raw = { fast: [], slow: [], spec: [], gas: [] };            // band heights incl. noise, for panel 1
+    for (let i = 0; i < sim.n; i++) {
+      const kept = i >= WARM * NP, j = i % NP;
+      const a = BANDS.fast.amp * sim.fast[i], b = BANDS.slow.amp * sim.slow[i], c = specOn ? BANDS.spec.amp : 0;
+      const nz = [gauss() * sigma, gauss() * sigma, gauss() * sigma];
+      raw.fast.push(a + nz[0]); raw.slow.push(b + nz[1]); raw.spec.push(c + nz[2]); raw.gas.push(sim.gas[i]);
+      if (!kept) continue;
+      const row = fold[j];
+      for (let k = 0; k < nw; k++) row[k] += (a * gF[k] + b * gS[k] + c * gP[k] + gauss() * sigma) / nCyc;
+    }
+    // PSD, k = 1: in-phase and quadrature per wavenumber
+    const I = new Float64Array(nw), Q = new Float64Array(nw);
+    for (let j = 0; j < NP; j++) {
+      const wt = 2 * Math.PI * j / NP, sn = Math.sin(wt), cs = Math.cos(wt);
+      for (let k = 0; k < nw; k++) { I[k] += 2 / NP * fold[j][k] * sn; Q[k] += 2 / NP * fold[j][k] * cs; }
+    }
+    // band heights per folded point (window means at the band centre) for panels 2 and 4
+    const at = c => { let best = 0; WN.forEach((w, k) => { if (Math.abs(w - c) < Math.abs(WN[best] - c)) best = k; }); return best; };
+    const idx = { fast: at(BANDS.fast.center), slow: at(BANDS.slow.center), spec: at(BANDS.spec.center) };
+    const bands = {};
+    for (const key of ['fast', 'slow', 'spec']) {
+      const k = idx[key], amp = Math.hypot(I[k], Q[k]), phiMax = ((Math.atan2(Q[k], I[k]) * 180 / Math.PI) + 360) % 360;
+      bands[key] = { trace: fold.map(r => r[k]), I: I[k], Q: Q[k], amp, phiMax, tcon: ((360 - phiMax) % 360) / 360 * T };
+    }
+    // the gas, for its own time value
+    let gi = 0, gq = 0; const gasFold = new Float64Array(NP);
+    for (let i = WARM * NP; i < sim.n; i++) gasFold[i % NP] += sim.gas[i] / nCyc;
+    gasFold.forEach((v, j) => { const wt = 2 * Math.PI * j / NP; gi += 2 / NP * v * Math.sin(wt); gq += 2 / NP * v * Math.cos(wt); });
+    const gasPhi = ((Math.atan2(gq, gi) * 180 / Math.PI) + 360) % 360;
+    return { tauFast, tauSlow, sigma, nCyc, specOn, sim, raw, fold, I, Q, bands, gasFold, gasT: ((360 - gasPhi) % 360) / 360 * T };
+  }
+
+  // ---------- drawing ----------
+  function setup(cv) {
+    const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    cv.width = r.width * d; cv.height = r.height * d;
+    const ctx = cv.getContext('2d'); ctx.setTransform(d, 0, 0, d, 0, 0);
+    return { ctx, W: r.width, H: r.height };
+  }
+  function axes(c, x0, x1, y0, y1, opt = {}) {
+    const m = { l: 46, r: 12, t: 10, b: 34 }, { ctx, W, H } = c;
+    const X = x => m.l + (x - x0) / (x1 - x0) * (W - m.l - m.r), Y = y => H - m.b - (y - y0) / (y1 - y0) * (H - m.t - m.b);
+    ctx.clearRect(0, 0, W, H);
+    if (opt.shade) opt.shade(X, Y, m);
+    ctx.strokeStyle = '#1f2430'; ctx.lineWidth = 1; ctx.strokeRect(m.l, m.t, W - m.l - m.r, H - m.t - m.b);
+    ctx.fillStyle = '#5b6270'; ctx.font = '13px "Source Sans 3", Arial'; ctx.textAlign = 'center';
+    (opt.xt || []).forEach(([v, s]) => { ctx.fillText(s, X(v), H - m.b + 16); });
+    ctx.fillText(opt.xl || '', (m.l + W - m.r) / 2, H - 4);
+    ctx.textAlign = 'right'; (opt.yt || []).forEach(([v, s]) => ctx.fillText(s, m.l - 6, Y(v) + 4));
+    ctx.save(); ctx.translate(12, (m.t + H - m.b) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText(opt.yl || '', 0, 0); ctx.restore();
+    return { X, Y, m };
+  }
+  function line(ctx, xs, ys, X, Y, color, w = 2, dash = []) {
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash);
+    xs.forEach((x, i) => (i ? ctx.lineTo(X(x), Y(ys[i])) : ctx.moveTo(X(x), Y(ys[i])))); ctx.stroke(); ctx.setLineDash([]);
+  }
+  const halves = (X, Y, m, period, nPer, ctx, y0, y1) => {
+    for (let p = 0; p < nPer; p++) {
+      ctx.fillStyle = 'rgba(46,74,98,0.10)'; ctx.fillRect(X(p * period), Y(y1), X(p * period + period / 2) - X(p * period), Y(y0) - Y(y1));
+      ctx.fillStyle = 'rgba(200,70,61,0.10)'; ctx.fillRect(X(p * period + period / 2), Y(y1), X((p + 1) * period) - X(p * period + period / 2), Y(y0) - Y(y1));
+    }
+  };
+
+  function draw(s) {
+    const phi = +$('phi').value;
+    $('vFast').textContent = fmt(s.tauFast) + ' min'; $('vSlow').textContent = fmt(s.tauSlow) + ' min';
+    $('vNoise').textContent = fmt(s.sigma, 3); $('vCyc').textContent = s.nCyc; $('vPhi').textContent = phi + '°';
+    $('foldSub').textContent = `${s.nCyc} cycle${s.nCyc > 1 ? 's' : ''} averaged after ${WARM} warm-up cycles: the noise drops by about √${s.nCyc}.`;
+
+    // 1: time series
+    let c = setup($('cTime')); const nShow = Math.min(s.sim.n, (WARM + 3) * NP), tAll = Array.from({ length: nShow }, (_, i) => i * DT);
+    let ax = axes(c, 0, nShow * DT, -0.25, 1.35, { xl: 'time on stream / min', yl: 'band height / a.u.', xt: [0, 60, 120, 180, 240, 300].filter(v => v <= nShow * DT).map(v => [v, v]), yt: [[0, '0'], [1, '1']],
+      shade: (X, Y, m) => halves(X, Y, m, T, nShow / NP, c.ctx, -0.25, 1.35) });
+    line(c.ctx, tAll, s.raw.gas.slice(0, nShow), ax.X, ax.Y, '#9aa0aa', 1.5, [5, 4]);
+    if (s.specOn) line(c.ctx, tAll, s.raw.spec.slice(0, nShow), ax.X, ax.Y, BANDS.spec.color, 1.2);
+    line(c.ctx, tAll, s.raw.slow.slice(0, nShow), ax.X, ax.Y, BANDS.slow.color, 1.2);
+    line(c.ctx, tAll, s.raw.fast.slice(0, nShow), ax.X, ax.Y, BANDS.fast.color, 1.2);
+    c.ctx.fillStyle = '#5b6270'; c.ctx.font = '12px "Source Sans 3", Arial'; c.ctx.textAlign = 'left';
+    c.ctx.fillText('warm-up, not averaged', ax.X(3), ax.Y(1.25));
+
+    // 2: one averaged period, band heights at the band centre
+    c = setup($('cFold')); const tp = Array.from({ length: NP }, (_, j) => j * DT);
+    ax = axes(c, 0, T, -0.25, 1.35, { xl: 'time in the period / min', yl: 'band height / a.u.', xt: [[0, '0'], [15, 'T/4'], [30, 'T/2'], [60, 'T']], yt: [[0, '0'], [1, '1']],
+      shade: (X, Y, m) => halves(X, Y, m, T, 1, c.ctx, -0.25, 1.35) });
+    line(c.ctx, tp, Array.from(s.gasFold), ax.X, ax.Y, '#9aa0aa', 1.5, [5, 4]);
+    for (const k of ['spec', 'slow', 'fast']) if (k !== 'spec' || s.specOn) line(c.ctx, tp, s.bands[k].trace, ax.X, ax.Y, BANDS[k].color, 2);
+
+    // 3: spectra
+    c = setup($('cSpec'));
+    const r = phi * Math.PI / 180, psd = Array.from(s.I, (v, k) => v * Math.cos(r) + s.Q[k] * Math.sin(r));
+    ax = axes(c, 1800, 950, -0.75, 1.75, { xl: 'wavenumber / cm⁻¹', yl: 'absorbance / a.u.', xt: [[1800, '1800'], [1600, '1600'], [1400, '1400'], [1200, '1200'], [1000, '1000']], yt: [[0, '0']] });
+    c.ctx.strokeStyle = '#c9ccd2'; c.ctx.beginPath(); c.ctx.moveTo(ax.X(1800), ax.Y(0)); c.ctx.lineTo(ax.X(950), ax.Y(0)); c.ctx.stroke();
+    for (let j = 0; j < NP; j += 6) line(c.ctx, WN, Array.from(s.fold[j]), ax.X, ax.Y, 'rgba(91,98,112,0.28)', 1);
+    line(c.ctx, WN, psd, ax.X, ax.Y, '#1f2430', 2.6);
+    c.ctx.font = '13px "Source Sans 3", Arial'; c.ctx.textAlign = 'center';
+    for (const k of ['fast', 'spec', 'slow']) { c.ctx.fillStyle = BANDS[k].color; c.ctx.fillText(k === 'spec' ? 'spectator' : k, ax.X(BANDS[k].center), ax.Y(1.6)); }
+
+    // 4: A_1(phi) per band, and the cursor
+    c = setup($('cPhase')); const ph = Array.from({ length: 73 }, (_, i) => i * 5);
+    ax = axes(c, 0, 360, -1.15, 1.15, { xl: 'phase angle φ / °', yl: 'phase-resolved height / a.u.', xt: [[0, '0'], [90, '90'], [180, '180'], [270, '270'], [360, '360']], yt: [[0, '0']] });
+    c.ctx.strokeStyle = '#c9ccd2'; c.ctx.beginPath(); c.ctx.moveTo(ax.X(0), ax.Y(0)); c.ctx.lineTo(ax.X(360), ax.Y(0)); c.ctx.stroke();
+    c.ctx.strokeStyle = '#1f2430'; c.ctx.setLineDash([3, 3]); c.ctx.beginPath(); c.ctx.moveTo(ax.X(phi), ax.Y(-1.15)); c.ctx.lineTo(ax.X(phi), ax.Y(1.15)); c.ctx.stroke(); c.ctx.setLineDash([]);
+    for (const k of ['spec', 'slow', 'fast']) {
+      if (k === 'spec' && !s.specOn) continue;
+      const b = s.bands[k], ys = ph.map(p => b.I * Math.cos(p * Math.PI / 180) + b.Q * Math.sin(p * Math.PI / 180));
+      line(c.ctx, ph, ys, ax.X, ax.Y, BANDS[k].color, 2);
+      if (k !== 'spec') { c.ctx.fillStyle = BANDS[k].color; c.ctx.beginPath(); c.ctx.arc(ax.X(b.phiMax), ax.Y(b.amp), 5, 0, 2 * Math.PI); c.ctx.fill(); }
+    }
+
+    // readout
+    const f = s.bands.fast, sl = s.bands.slow, an = tau => Math.atan(2 * Math.PI * tau / T) / (2 * Math.PI) * T;
+    $('readout').innerHTML = `<table class="tv"><tr><th>band</th><th>time constant τ</th><th>φ<sub>max</sub></th><th>time value t<sub>con</sub></th><th>delay after the gas</th><th>|A<sub>1</sub>|</th></tr>
+      <tr><td>gas in the cell</td><td>${fmt(GAS_TAU)} min</td><td></td><td>${fmt(s.gasT)} min</td><td>0</td><td></td></tr>
+      <tr><td style="color:${BANDS.fast.color}">fast species</td><td>${fmt(s.tauFast)} min</td><td>${fmt(f.phiMax, 0)}°</td><td>${fmt(f.tcon)} min</td><td>${fmt(f.tcon - s.gasT)} min</td><td>${fmt(f.amp, 2)}</td></tr>
+      <tr><td style="color:${BANDS.slow.color}">slow species (fed by the fast one)</td><td>${fmt(s.tauSlow)} min</td><td>${fmt(sl.phiMax, 0)}°</td><td>${fmt(sl.tcon)} min</td><td>${fmt(sl.tcon - s.gasT)} min</td><td>${fmt(sl.amp, 2)}</td></tr>
+      <tr><td style="color:${BANDS.spec.color}">spectator</td><td>–</td><td>–</td><td>–</td><td>–</td><td>${fmt(s.bands.spec.amp, 2)}</td></tr></table>
+      <p style="margin:8px 0 0">The spectator is the largest band in the spectrum and has |A<sub>1</sub>| ≈ 0 (noise only). The fast species alone would lag its input by arctan(ωτ)/ω = ${fmt(an(s.tauFast))} min; the slow one sits behind it, so the two delays add. Slow pools also lose amplitude: |A<sub>1</sub>| shrinks as 1/√(1 + (ωτ)²).</p>`;
+  }
+
+  // URL parameters, for a fixed view (slides, links): ?fast=22&slow=68&noise=35&cycles=4&phi=0&spec=1&view=slide
+  // fast, slow: slider positions 0-100 (log scale 0.3-120 min); view=slide hides the header, controls and table.
+  try {
+    const q = new URLSearchParams(location.search);
+    for (const [key, id] of [['fast', 'tFast'], ['slow', 'tSlow'], ['noise', 'noise'], ['cycles', 'cycles'], ['phi', 'phi']]) if (q.has(key)) $(id).value = q.get(key);
+    if (q.has('spec')) $('spec').checked = q.get('spec') !== '0';
+    if (q.get('view') === 'slide') document.body.classList.add('slide');
+  } catch (e) { /* no parameters: interactive defaults */ }
+
+  let state = null;
+  const update = () => { state = compute(); draw(state); };
+  ['tFast', 'tSlow', 'noise', 'cycles', 'spec'].forEach(id => $(id).addEventListener('input', update));
+  $('phi').addEventListener('input', () => draw(state));
+  $('reseed').addEventListener('click', e => { e.target.dataset.n = (+e.target.dataset.n || 0) + 1; update(); });
+  $('play').addEventListener('click', () => {
+    playing = !playing; $('play').textContent = playing ? '❚❚ pause' : '▶ sweep φ';
+    let last = 0;
+    const step = ts => {
+      if (!playing) return;
+      if (ts - last > 60) { last = ts; $('phi').value = (+$('phi').value + 5) % 360; draw(state); }
+      raf = requestAnimationFrame(step);
+    };
+    if (playing) raf = requestAnimationFrame(step); else cancelAnimationFrame(raf);
+  });
+  window.addEventListener('resize', () => draw(state));
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(update);
+})();
+</script>
+</body>
+</html>
