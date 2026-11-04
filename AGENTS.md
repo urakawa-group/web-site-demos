@@ -77,3 +77,13 @@ The same conventions as the group's other code and figures:
    control does what the text says.
 4. One demo per commit: `Add <field>/<demo> demo`, later changes as
    `<demo>: <what changed>`.
+
+## Coding assistants
+
+Coding assistants (Claude and others) are welcome here and are credited once,
+in the acknowledgement of [`README.md`](README.md). Not in the history:
+
+- No `Co-Authored-By` or other assistant trailers in commit messages, and no
+  "generated with" lines in pull requests. The commit author is the person who
+  checked the change and answers for it.
+- Commit under the maintainer's name and e-mail, never as the assistant.

@@ -38,3 +38,9 @@ number with its source, and an entry in the table above and on the landing page.
 ## Contact
 
 Maintained by Julius Sommer. Questions or ideas for a demo: open an issue.
+
+## Acknowledgement
+
+The demos and this repository were written with the help of
+[Claude](https://claude.ai) (Anthropic) as a coding assistant. The maintainer
+checked and is responsible for every commit.
