@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<!-- Impressum: who is responsible, contact, privacy, credits, and the way to the style guide. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Impressum · Urakawa Group Demos</title>
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<main class="page">
+  <h1>Impressum</h1>
+  <p class="lead">Who runs these demos, how to reach us, and what the site does and does not do with your visit.</p>
+
+  <h2>About the Demos</h2>
+  <p>Interactive demonstrations of methods used in the Urakawa group: spectroscopy, kinetics, reactors and instruments. They explain how a method works with simulated, illustrative numbers; they are not data from our experiments. Equations and statements carry citations to the literature, listed under each demo. Errors are possible, please check against the cited sources before relying on a number.</p>
+
+  <h2>Responsible for the Content</h2>
+  <div class="info-grid">
+    <span class="k">Responsible</span><span>Julius Sommer</span>
+    <span class="k">Group</span><span>Urakawa group (Prof. dr. Atsushi Urakawa), Catalysis Engineering, Department of Chemical Engineering</span>
+    <span class="k">Institution</span><span>Delft University of Technology, Faculty of Applied Sciences</span>
+    <span class="k">Address</span><span>Van der Maasweg 9, 2629 HT Delft, The Netherlands</span>
+    <span class="k">Contact</span><span><a href="mailto:j.sommer@tudelft.nl">j.sommer@tudelft.nl</a></span>
+  </div>
+
+  <h2>Privacy</h2>
+  <p>The site sets no cookies, runs no analytics and loads nothing from another server: fonts and scripts come from this repository. It is hosted on GitHub Pages; GitHub, as the host, processes technical data of each visit such as the IP address. See the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub General Privacy Statement</a>.</p>
+
+  <h2>Credits</h2>
+  <p>Typeface: Source Sans 3 by Adobe, under the SIL Open Font License 1.1, bundled in <code>assets/fonts/source-sans-3/</code> with its licence. Colours: the phd_ui colour scheme. Source code: <a href="https://github.com/urakawa-group/web-site-demos">github.com/urakawa-group/web-site-demos</a>.</p>
+
+  <h2>Style Guide</h2>
+  <p>How the site is put together: colour and type tokens, the two views, chart conventions and the writing rules. Every value on that page is read from the same token module the demos use.</p>
+  <div class="cards">
+    <a class="card" href="style-guide.html">
+      <span class="card-title">Open the style guide →</span>
+      <span class="card-desc">Design tokens, typography, the presentation view, charts and content rules. Source: <code>assets/tokens.js</code></span>
+    </a>
+  </div>
+</main>
+<script type="module">
+  import { initShell } from './assets/shell.js';
+  initShell({ page: 'impressum' });
+</script>
+</body>
+</html>

@@ -2,7 +2,8 @@
 
 Rules for working in this repository, for people and coding assistants alike.
 What the repository is and how it is laid out is in [`README.md`](README.md);
-this file does not repeat it.
+the look is in [`style-guide.html`](style-guide.html), rendered from
+[`assets/tokens.js`](assets/tokens.js). This file does not repeat either.
 
 ## What a demo is
 
@@ -11,70 +12,101 @@ an instrument. It does not show results or data from a project. The reader
 should understand the idea by changing something and watching the response.
 
 - **Concept first.** Show the idea in its most basic form: the equations as the
-  concept is known by (textbook or original-paper formulation, with its symbols),
-  and the simplest numbers that make the point. Never more abstract than the
-  concept it explains.
-- **One idea per demo.** If a demo needs a second idea to make sense, that is a
-  second demo, linked from the first.
-- **Short text.** A title, one or two sentences on what the reader will see, the
-  controls, the plots. Longer explanation goes in a collapsible section below,
-  not above the demo.
+  concept is known by (textbook or original-paper formulation, with its
+  symbols), and the simplest numbers that make the point.
+- **One topic, one page; cases inside it.** A method gets one page. Its
+  variants are cases on that page, behind a case selector, ordered from the
+  simplest (one signal, no delay, no noise) to the realistic one. A case
+  explains one idea in at most 130 words.
+- **Short text above, explanation below.** A title, a lead of at most 50 words,
+  the case selector, the controls, the plots. The explanation and the reference
+  list go under the plots.
 
 ## How a demo is built
 
-- One folder `demos/<field>/<demo>/` with one `index.html`. Markup, styles and
-  script are inline in that file. Images or data the demo needs sit next to it
-  in the same folder.
-- Plain HTML, CSS and JavaScript. No framework, no npm, no build step. If a
-  library is really needed, put a pinned copy in the demo folder rather than
-  linking a CDN.
-- It must work opened straight from disk, without a server, and on a phone
-  width as well as a desktop.
-- No analytics, no cookies, no tracking, no external requests. Fonts included:
-  Source Sans 3 is used for all text, served from this repository rather than
-  Google Fonts, which would send every visitor's address to Google. Link it with
-  `<link rel="stylesheet" href="../../../assets/fonts/source-sans-3/source-sans-3.css">`;
-  it is the one shared file a demo may use.
-- Every `index.html` starts with a comment block: what the demo shows, the
-  model and equations behind it, its sources, author and date.
+- One folder `demos/<field>/<demo>/`: an `index.html` for the markup and a
+  `<demo>.js` module for the engine. Data the demo needs sits next to them.
+- Plain HTML, CSS and JavaScript modules. No framework, no npm, no build step.
+  A library that is really needed is a pinned copy in the repository, never a
+  CDN link.
+- Every page uses the shared layer in `assets/`: `shell.js` (tokens, header,
+  footer, width steps, the two views), `site.css`, `plot.js` for canvases and
+  `cite.js` for references. A demo calls `initShell({ page: 'demo', views: true })`.
+- No analytics, no cookies, no tracking, no requests to another server. The
+  font is Source Sans 3 from `assets/fonts/`, never Google Fonts.
+- It is served over http (GitHub Pages, or `python -m http.server` locally):
+  modules and `references.bib` do not load from `file://`.
+- It works on a phone width as well as a desktop, and in the presentation view.
+- `index.html` starts with a comment block: what the demo shows, the model and
+  equations behind it, its sources, author and date.
+
+## The design system
+
+`assets/tokens.js` is the single source of truth for every colour, type role,
+radius, spacing step, chart constant, presentation setting, writing rule and
+editorial limit. `installTokens()` writes them into `:root` before anything
+renders, and the style guide renders itself from the same objects, so the
+guide cannot drift from the site.
+
+- **Never hard-code a colour, font size or font weight** in a page, a demo or
+  `site.css`. CSS uses `var(--token)`; a canvas imports `C`, `CHART` or
+  `typeFont()` from `tokens.js`.
+- **A new token is added with a `usage` note.** The note is what the style
+  guide shows next to it, so write it for a reader. A new text style is a new
+  type role in `TYPE_GROUPS`, never a one-off size.
+- **Colours come from the PhD colour scheme** (`SCHEME`, copied from phd_ui).
+  The data roles keep the meaning of the MES tutorial figures: red the
+  stimulus-on half, blue the off half, A black, B orange.
+- **Responsive rules key off `<html data-w>`** (`compact`, `mid`, `wide`), set by
+  the shell from the width it actually has, never off `@media (max-width)`.
+  Otherwise the layout stays wide while the presentation zoom makes the content
+  narrow.
+- **The presentation view is a zoom plus subtractions.** A new subtraction is
+  added to `PRESENTATION.subtractions` with the reason it is noise from the back
+  of a room, in the same change as its CSS.
 
 ## Numbers and references
 
-- Every physical constant, literature value or parameter that is not made up for
-  illustration has a source, in a comment next to it and on the page where the
-  reader sees it.
-- Made-up numbers are fine for showing a concept, but the page says they are
-  illustrative.
-- A reference shown on the page reads
-  `<first author> et al. (<group lead>), <journal abbreviation> <year>`, e.g.
-  `Urakawa et al., J. Phys. Chem. C 2019`. The bracket names the professor
-  behind the paper and is dropped when the first author is that person.
-  Journal abbreviations in ISO 4 form, with dots.
+- Every literature value, equation or claim taken from a paper is cited. Every
+  made-up number sits on a page that says the numbers are illustrative.
+- References live in [`references.bib`](references.bib), pasted from Zotero.
+  Nothing on a page types a reference by hand.
+- In text a citation is a marker, `[@alias]` or `[@alias, locator]`: the
+  locator is where in the work (`Eq. 2`, `Fig. 42.1, p. 969`). An alias is a key
+  of the demo's `SOURCES` map (a citekey plus, for a book, the chapter, and the
+  group lead) or a citekey directly. `cite.js` turns markers into numbered
+  superscripts and writes the list.
+- The list entry leads with the group short form,
+  `<first author> et al. (<group lead>), <journal ISO 4> <year>`, e.g.
+  `Weyel et al. (Hess), Acc. Chem. Res. 2024`; the bracket is dropped when the
+  first author is the group lead. Where Zotero gives the journal unabbreviated,
+  the alias carries the ISO 4 form (`journal: 'Chem. Eng. Sci.'`).
+- A locator is read from the source, never guessed. If the page is not known,
+  give the figure or equation number alone.
 
 ## Text and plot style
 
-The same conventions as the group's other code and figures:
+The full list is `WRITING_RULES` in `tokens.js`, shown on the style guide. The
+ones most often broken:
 
-- No em dashes. Use a comma, a period or a separate sentence.
-- Capitals only in titles, at the start of a sentence and in proper nouns. Axis
-  labels, tick labels, legend entries and other text inside a plot are lowercase.
-- Axis labels read `quantity / unit`, e.g. `time / s`, `temperature / K`. A
-  dimensionless quantity gets an en dash: `fraction / –`.
-- Units in power notation, not slashes: m² s⁻¹, mol m⁻³ s⁻¹, not m²/s.
-- Subscripts identify (species, role, method: <i>S</i><sub>MeOH</sub>,
-  <i>E</i><sub>a</sub>), superscripts are for the state or reference
-  (<i>p</i>°).
-- Chemical formulas with real subscripts and superscripts: CO<sub>2</sub>,
-  Al<sup>3+</sup>, never CO2 in visible text.
-- Quantities in italic, units and words upright.
+- No em dashes. A comma, a period or a separate sentence.
+- Title Case for page, section, case and panel titles. Everything inside a plot
+  is lowercase.
+- Axis labels read `quantity / unit` (`time / T`, `wavenumber / cm⁻¹`); a
+  dimensionless quantity gets an en dash (`absorbance / –`).
+- Unicode for formulas in text (CO₂, cm⁻¹, A₁); `<sub>` only for a letter
+  subscript Unicode lacks (t<sub>con</sub>, φ<sub>max</sub>).
+- Quantities italic, units and words upright.
 
 ## Adding a demo, checklist
 
-1. Create `demos/<field>/<demo>/index.html` following the rules above.
-2. Add a row to the table in [`README.md`](README.md) and a link on the landing
+1. Create `demos/<field>/<demo>/index.html` and `<demo>.js` following the rules
+   above; add its references to `references.bib`.
+2. Add a row to the table in [`README.md`](README.md) and a card on the landing
    page `index.html`.
-3. Open it from disk in a browser, at desktop and phone width, and check every
-   control does what the text says.
+3. Serve the repository and open the demo at desktop width, phone width and in
+   the presentation view; check every control does what the text says, and
+   every number in the readout against the formula it claims to follow.
 4. One demo per commit: `Add <field>/<demo> demo`, later changes as
    `<demo>: <what changed>`.
 

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<!-- Style guide, rendered live from assets/tokens.js so it cannot drift from the site. Linked from the Impressum. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Style Guide · Urakawa Group Demos</title>
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<main class="page-wide sg">
+  <h1>Style Guide</h1>
+  <p class="lead">Every colour, type role, length and rule on this page is read from <code>assets/tokens.js</code>, the module the demos use. Change a token there and this page and every demo change with it.</p>
+  <div id="sg"></div>
+</main>
+<script type="module">
+  import { initShell } from './assets/shell.js';
+  import * as T from './assets/tokens.js';
+  import { plot } from './assets/plot.js';
+  initShell({ page: 'styleguide' });
+
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const out = [];
+  const sec = (title, note, body) => out.push(`<section class="sg-section"><h2>${title}</h2>${note ? `<p class="sg-note">${note}</p>` : ''}${body}</section>`);
+
+  sec('Rules of the Road', '', `<ol class="sg-rules">
+    <li>No page and no demo hard-codes a colour, font size or font weight. CSS uses <code>var(--token)</code>; a canvas imports <code>C</code>, <code>CHART</code> or <code>typeFont()</code> from tokens.js.</li>
+    <li>A new token is added in tokens.js with a usage note. That note is the text shown here.</li>
+    <li>Layout keys off <code>&lt;html data-w&gt;</code>, set by the shell from the width it actually has, never off a media query, so it stays right when the presentation view zooms the page.</li>
+    <li>Citations come from <code>references.bib</code> through markers <code>[@alias, locator]</code>; nothing on a page types a reference by hand.</li></ol>`);
+
+  for (const g of T.COLOR_GROUPS) {
+    sec(`Colour: ${g.title}`, g.note, `<div class="sg-swatches">${Object.entries(g.tokens).map(([k, t]) =>
+      `<div class="sg-swatch"><span class="chip" style="background:${t.value}"></span><code>--${k}</code><span class="val">${esc(t.value)}</span><span class="use">${esc(t.usage)}</span></div>`).join('')}</div>`);
+  }
+
+  sec('The PhD Colour Scheme', T.SCHEME_NOTE, `<div class="sg-scheme">${Object.entries(T.SCHEME).map(([hue, tones]) =>
+    `<div class="row"><code>${hue}</code>${['light', 'base', 'dark', 'darkest', 'line'].map(t =>
+      `<span class="chip" title="${hue}.${t} ${tones[t]}" style="background:${tones[t]}"></span>`).join('')}</div>`).join('')}
+    <div class="row head"><span></span>${['light', 'base', 'dark', 'darkest', 'line'].map(t => `<span>${t}</span>`).join('')}</div></div>`);
+
+  sec('Typeface', T.FONTS_NOTE, `<div class="sg-specimen" style="font-family:var(--font-sans)">
+    <div style="font-weight:400">Regular 400: Modulation excitation, CO₂ + 3H₂ ⇌ CH₃OH + H₂O, 2349 cm⁻¹</div>
+    <div style="font-weight:600">Semibold 600: phase angle φ, time value t<sub>con</sub></div>
+    <div style="font-weight:700">Bold 700: Demos from the Urakawa Group</div>
+    <div style="font-style:italic">Italic: <i>A<sub>k</sub></i>(<i>φ</i>) = (2/<i>T</i>) ∫ <i>A</i>(<i>t</i>) sin(<i>kωt</i> + <i>φ</i>) d<i>t</i></div></div>`);
+
+  for (const g of T.TYPE_GROUPS) {
+    sec(`Type: ${g.title}`, g.note, `<table class="sg-type">${g.roles.map(r =>
+      `<tr><td><span style="font-size:var(--t-${r.key}-size);font-weight:var(--t-${r.key}-weight);color:var(--t-${r.key}-color);font-family:var(--t-${r.key}-ff);letter-spacing:var(--t-${r.key}-ls);text-transform:var(--t-${r.key}-tt);font-style:var(--t-${r.key}-fs);${r.color === 'on-accent' ? 'background:var(--accent-strong);padding:2px 6px;' : ''}">${esc(r.label)}</span></td>
+        <td><code>--t-${r.key}</code><br><span class="val">${r.size} · ${r.weight} · ${r.color}${r.family === 'mono' ? ' · mono' : ''}</span></td><td class="use">${esc(r.usage)}</td></tr>`).join('')}</table>`);
+  }
+
+  const scale = (title, map) => `<h3 class="sg-h3">${title}</h3><table class="sg-type">${Object.entries(map).map(([k, t]) =>
+    `<tr><td><code>${k.startsWith('radius') || k.startsWith('space') || k.startsWith('shadow') ? '--' + k : k}</code></td><td class="val">${esc(t.value)}</td><td class="use">${esc(t.usage)}</td></tr>`).join('')}</table>`;
+  sec('Shape, Rhythm and Layout', '', scale('Radii', T.RADII) + scale('Spacing', T.SPACING) + scale('Shadows', T.SHADOWS) + scale('Page layout', T.PAGE_LAYOUT) +
+    `<h3 class="sg-h3">Width steps</h3><table class="sg-type">${T.WIDTH_CLASSES.map(w => `<tr><td><code>data-w="${w.key}"</code></td><td class="val">${w.max === Infinity ? '&gt; 1180px' : '≤ ' + w.max + 'px'}</td><td class="use">${esc(w.usage)}</td></tr>`).join('')}</table>`);
+
+  sec('Two Views: Desktop and Presentation', 'Desktop is the default. Presentation is one CSS zoom on the page plus the subtractions below; reached by Shift+P, by ?present=1 (or ?present=1.75) and by the switch in a demo\'s header. + and − step the scale, Escape leaves.',
+    `<p class="sg-note">Scales: ${T.PRESENTATION.scales.map(s => s + '×').join(', ')}; the view opens at ${T.PRESENTATION.defaultScale}×.</p>
+     <table class="sg-type">${T.PRESENTATION.subtractions.map(s => `<tr><td><b>${esc(s.what)}</b></td><td class="use" colspan="2">${esc(s.why)}</td></tr>`).join('')}</table>
+     <p class="sg-note">Adding a subtraction means adding it to <code>PRESENTATION.subtractions</code> with the reason it is noise from the back of a room, in the same change as the CSS.</p>`);
+
+  sec('Charts', 'A closed frame, ticks outside, labels as quantity / unit, everything inside the plot lowercase. The specimen below is drawn by assets/plot.js with the data-role colours.',
+    `<div class="sg-chart"><div class="panel"><h3>1 · Specimen Plot</h3><p class="sub">Red and blue: the two half-periods. Dashed: the stimulus. Green: the one trace to look at.</p><canvas id="specimen"></canvas></div>
+     <table class="sg-type">${T.CHART_DOCS.map(c => `<tr><td>${esc(c.name)}</td><td class="val">${esc(c.value)}</td><td class="use">${esc(c.usage)}</td></tr>`).join('')}</table></div>`);
+
+  sec('Writing Rules', '', `<table class="sg-type">${T.WRITING_RULES.map(r => `<tr><td><b>${esc(r.rule)}</b></td><td class="use" colspan="2">${r.detail}</td></tr>`).join('')}</table>`);
+  sec('Editorial Limits', 'Counted in words. There is no minimum: say it and stop.',
+    `<table class="sg-type">${T.CONTENT_LIMITS.map(l => `<tr><td>${esc(l.what)}</td><td class="val">≤ ${l.max} words</td><td class="use">${esc(l.usage)}</td></tr>`).join('')}</table>`);
+
+  document.getElementById('sg').innerHTML = out.join('');
+
+  function specimen() {
+    const cv = document.getElementById('specimen');
+    const xs = Array.from({ length: 241 }, (_, i) => i / 120);
+    const step = x => (x % 1 < 0.5 ? 1 : 0);
+    const fo = tau => { let y = 0; return xs.map((x, i) => (i ? (y = step(xs[i - 1]) + (y - step(xs[i - 1])) * Math.exp(-(1 / 120) / tau)) : 0)); };
+    const p = plot(cv, { x: [0, 2], y: [-0.1, 1.15], xlabel: 'time / T', ylabel: 'band height / –', xticks: [[0, '0'], [0.5, '0.5'], [1, '1'], [1.5, '1.5'], [2, '2']], yticks: [[0, '0'], [0.5, '0.5'], [1, '1']] });
+    for (const c of [0, 1]) { p.shadeX(c, c + 0.5, T.C['shade-on']); p.shadeX(c + 0.5, c + 1, T.C['shade-off']); }
+    p.steps(xs, xs.map(step), T.C['data-stimulus']);
+    p.line(xs, fo(0.15), T.C['data-a']);
+    p.line(xs, fo(0.03), T.C['data-b']);
+    p.line(xs, fo(0.06), T.C['data-highlight'], T.CHART.lineHighlight);
+    p.text('annotation', 1.75, 1.03);
+    p.axes();
+  }
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(specimen);
+  window.addEventListener('shell:resize', specimen);
+</script>
+</body>
+</html>

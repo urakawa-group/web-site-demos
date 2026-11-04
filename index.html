@@ -1,39 +1,28 @@
 <!DOCTYPE html>
-<!-- Landing page of web-site-demos: one entry per demo, grouped by field. -->
+<!-- Landing page of web-site-demos: one card per demo, grouped by field. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Urakawa group demos</title>
-<link rel="stylesheet" href="assets/fonts/source-sans-3/source-sans-3.css">
-<style>
-  :root { --ink: #1f2430; --soft: #5b6270; --line: #c9ccd2; --bg: #fbfbf9; --panel: #ffffff; --accent: #2e4a62; }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Source Sans 3', Arial, sans-serif; }
-  main { max-width: 860px; margin: 0 auto; padding: 32px 24px 48px; }
-  h1 { font-size: 30px; margin: 0 0 6px; font-weight: 700; }
-  .lead { margin: 0 0 28px; color: var(--soft); font-size: 17px; }
-  h2 { font-size: 15px; font-weight: 600; color: var(--soft); text-transform: lowercase; margin: 24px 0 8px; }
-  a.demo { display: block; padding: 14px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: inherit; text-decoration: none; }
-  a.demo:hover { border-color: var(--accent); }
-  a.demo b { display: block; font-size: 18px; font-weight: 600; color: var(--accent); }
-  a.demo span { font-size: 15px; color: var(--soft); }
-  footer { margin-top: 40px; font-size: 13px; color: var(--soft); }
-  footer a { color: var(--accent); }
-</style>
+<title>Urakawa Group Demos</title>
+<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-<main>
-  <h1>Demos from the Urakawa group</h1>
-  <p class="lead">Spectroscopy, kinetics, reactors and instruments, explained by playing with them. Each demo runs in the browser, nothing to install.</p>
+<main class="page">
+  <h1>Demos from the Urakawa Group</h1>
+  <p class="lead">Spectroscopy, kinetics, reactors and instruments, explained by playing with them. Every demo runs in the browser, nothing to install.</p>
 
-  <h2>spectroscopy</h2>
-  <a class="demo" href="demos/spectroscopy/mes/index.html">
-    <b>Modulation excitation spectroscopy, in one minute</b>
-    <span>Switch the gas periodically, fold the cycles and apply phase-sensitive detection: the spectator band disappears and the phase tells how late each species responds.</span>
-  </a>
-
-  <footer>Urakawa group, TU Delft. Source on <a href="https://github.com/urakawa-group/web-site-demos">GitHub</a>.</footer>
+  <h2>Spectroscopy</h2>
+  <div class="cards">
+    <a class="card" href="demos/spectroscopy/mes-psd/index.html">
+      <span class="card-title">Modulation Excitation and Phase-Sensitive Detection</span>
+      <span class="card-desc">Eight cases, from one band that follows the stimulus at once to a sequence of species with a spectator: folding, the phase domain, time values and square-wave harmonics.</span>
+    </a>
+  </div>
 </main>
+<script type="module">
+  import { initShell } from './assets/shell.js';
+  initShell({ page: 'demos' });
+</script>
 </body>
 </html>
