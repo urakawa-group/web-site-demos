@@ -87,3 +87,16 @@ in the acknowledgement of [`README.md`](README.md). Not in the history:
   "generated with" lines in pull requests. The commit author is the person who
   checked the change and answers for it.
 - Commit under the maintainer's name and e-mail, never as the assistant.
+
+Two things enforce this, so it does not depend on anyone remembering:
+
+- [`.claude/settings.json`](.claude/settings.json) switches Claude Code's commit
+  and pull-request attribution off for this repository.
+- The `commit-msg` hook in [`.githooks/`](.githooks/) deletes assistant
+  `Co-Authored-By` and `Claude-Session` lines from every commit message, whoever
+  or whatever writes it. Human co-authors stay. Git does not activate hooks from
+  a clone by itself, so run this once after cloning:
+
+  ```
+  git config core.hooksPath .githooks
+  ```
