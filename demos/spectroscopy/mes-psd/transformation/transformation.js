@@ -327,6 +327,9 @@ function drawSig() {
   else p.line(ts, Array.from(S.stim), C['data-stimulus'], CHART.lineThin, CHART.dash);
   if (st.clean && disturbed()) p.line(ts, Array.from(S.y), C['data-faint'], CHART.lineData);
   if (st.kUpTo) p.line(ts, ts.map(rebuiltAt), C['ink-700'], CHART.lineData, [6, 3]);
+  // the mean of the period: against the reference it gives as much red as blue, so PSD never sees it
+  p.hline(S.mean, C['data-static'], 1);
+  p.text(`mean *a*₀ = ${S.mean.toFixed(2)}`, T * 0.98, S.mean + 0.13, C['data-static'], 'right');
   p.line(ts, Array.from(S.A), C['data-a']);
   p.line(ts, ts.map((_, j) => refAt(j)), C['data-highlight'], CHART.lineData, CHART.dash);
   // the reference's upward zero crossings (its own phase 0): grab one to move
@@ -420,19 +423,44 @@ function drawPhase() {
   const phiS = shownPhi(), yS = sumAt(S.harm, phiS);
   p.dot(phiS, yS, C['data-highlight']);
   if (withPhasor) {
-    // the turning arrow, and the green line that carries its height across
-    const r = S.p.amp, th = (90 - (phiS - S.p.phiMax)) * Math.PI / 180, cx = ph0.X(0), cy = ph0.Y(0);
-    const tipX = ph0.X(r * Math.cos(th)), tipY = ph0.Y(r * Math.sin(th));
-    ctx.strokeStyle = C['line-zero']; ctx.lineWidth = 1; ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(ph0.inner.l, cy); ctx.lineTo(ph0.inner.r, cy); ctx.moveTo(cx, ph0.inner.t); ctx.lineTo(cx, ph0.inner.b); ctx.stroke();
-    ctx.strokeStyle = C['data-faint']; ctx.beginPath(); ctx.arc(cx, cy, Math.abs(ph0.X(r) - cx), 0, 2 * Math.PI); ctx.stroke();
-    if (st.clean && disturbed() && S.pc.amp > 1e-4) {
-      const thc = (90 - (phiS - S.pc.phiMax)) * Math.PI / 180;
-      arrowPx(ctx, cx, cy, ph0.X(S.pc.amp * Math.cos(thc)), ph0.Y(S.pc.amp * Math.sin(thc)), C['data-faint']);
+    // The phasor, turned so that the φ axis points straight up: every vector
+    // at angle α is drawn at 90° − φ + α. The arrow (I, Q) keeps its length
+    // and its parts; the I and Q axes turn with φ; the arrow's shadow on the
+    // φ axis is its height, A_k(φ), carried across to the cosine.
+    const r = S.p.amp, cx = ph0.X(0), cy = ph0.Y(0), R = Math.abs(ph0.X(lim) - cx);
+    const dir = a_ => { const t = (90 - phiS + a_) * Math.PI / 180; return [Math.cos(t), Math.sin(t)]; };
+    const toPx = (x_, y_) => [ph0.X(x_), ph0.Y(y_)];
+    const ctx0 = ph0.ctx;
+    ctx0.save(); ctx0.beginPath(); ctx0.rect(ph0.inner.l, ph0.inner.t, ph0.inner.r - ph0.inner.l, ph0.inner.b - ph0.inner.t); ctx0.clip();
+    // the turning I and Q axes
+    for (const [a_, name] of [[0, '*I*'], [90, '*Q*']]) {
+      const [ux, uy] = dir(a_);
+      ctx0.strokeStyle = C['line-zero']; ctx0.lineWidth = 1; ctx0.setLineDash([]);
+      ctx0.beginPath(); ctx0.moveTo(cx - ux * 2 * R, cy + uy * 2 * R); ctx0.lineTo(cx + ux * 2 * R, cy - uy * 2 * R); ctx0.stroke();
+      ctx0.fillStyle = C['ink-500']; richText(ctx0, name, cx + ux * R * 0.86, cy - uy * R * 0.86 + 4 * sc, p.font('annotation'), 'center');
     }
-    if (r > 1e-4) arrowPx(ctx, cx, cy, tipX, tipY, C['data-a']);
+    // the φ axis, always up
+    ctx0.strokeStyle = C['data-highlight']; ctx0.lineWidth = 1; ctx0.setLineDash(CHART.dash);
+    ctx0.beginPath(); ctx0.moveTo(cx, ph0.inner.b); ctx0.lineTo(cx, ph0.inner.t); ctx0.stroke(); ctx0.setLineDash([]);
+    ctx0.strokeStyle = C['data-faint']; ctx0.beginPath(); ctx0.arc(cx, cy, Math.abs(ph0.X(r) - cx), 0, 2 * Math.PI); ctx0.stroke();
+    // the arrow's parts: I along the I axis, then Q along the Q axis
+    const [iu, iv] = dir(0), [qu, qv] = dir(90);
+    const pI = [S.p.I * iu, S.p.I * iv], tip = [pI[0] + S.p.Q * qu, pI[1] + S.p.Q * qv];
+    ctx0.strokeStyle = C['data-a']; ctx0.lineWidth = 1; ctx0.setLineDash([2, 3]);
+    ctx0.beginPath(); ctx0.moveTo(cx, cy); ctx0.lineTo(...toPx(...pI)); ctx0.lineTo(...toPx(...tip)); ctx0.stroke(); ctx0.setLineDash([]);
+    if (st.clean && disturbed() && S.pc.amp > 1e-4) {
+      const tc = [S.pc.I * iu + S.pc.Q * qu, S.pc.I * iv + S.pc.Q * qv];
+      arrowPx(ctx0, cx, cy, ...toPx(...tc), C['data-faint']);
+    }
+    if (r > 1e-4) arrowPx(ctx0, cx, cy, ...toPx(...tip), C['data-a']);
+    // the shadow on the φ axis: the height of the tip, A_k(φ)
+    ctx0.strokeStyle = C['data-highlight']; ctx0.lineWidth = CHART.lineHighlight;
+    ctx0.beginPath(); ctx0.moveTo(cx, cy); ctx0.lineTo(cx, ph0.Y(tip[1])); ctx0.stroke();
+    ctx0.restore();
+    ph0.dot(0, tip[1], C['data-highlight']);
+    // across: from the tip, through the shadow, to the cosine at φ
     ctx.strokeStyle = C['data-highlight']; ctx.lineWidth = 1.2; ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.lineTo(X(phiS), Y(yS)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(...toPx(...tip)); ctx.lineTo(X(phiS), Y(yS)); ctx.stroke(); ctx.setLineDash([]);
     ph0.axes();
   }
   grip(p, X(st.phi), C['data-highlight']);
@@ -441,7 +469,7 @@ function drawPhase() {
   $('subPhase').innerHTML = st.kUpTo
     ? `Harmonics 1 … ${st.k} summed, each at the phase of the same moment: the period, rebuilt and mirrored in <i>φ</i>.`
     : withPhasor
-      ? `The arrow, length |<i>A<sub>${st.k}</sub></i>| = ${S.p.amp.toFixed(3)}, turns with <i>φ</i>; its height is <i>A<sub>${st.k}</sub></i>(<i>φ</i>), the cosine on the right.`
+      ? `Arrow (<i>I</i>, <i>Q</i>) = (${S.p.I.toFixed(3)}, ${S.p.Q.toFixed(3)}), length ${S.p.amp.toFixed(3)}, at <i>φ</i><sub>max</sub> = ${Math.round(S.p.phiMax) % 360}°. The <i>φ</i> axis points up, so its shadow (green) is its height, <i>A<sub>${st.k}</sub></i>(<i>φ</i>).`
       : `<i>A<sub>k</sub></i>(<i>φ</i>) = |<i>A<sub>k</sub></i>| cos(<i>φ</i> − <i>φ</i><sub>max</sub>). Hover the dot or a ring, drag the ruler.${st.clean && disturbed() ? ' Grey: clean; thin: what leaks.' : ''}`;
 }
 
@@ -474,11 +502,26 @@ function heatmap(canvas, opts, rows, cols, valueAt, max, after) {
   after?.(p);
   p.axes();
 }
+/**
+ * Figure 4, bars: |A_h| of the signal for h = 1 … 15, the stimulus' own
+ * harmonics as dashed outlines, and for a linear response a tick where the
+ * first-order formula puts each one (the steps act as a low-pass filter, so
+ * the ticks fall below the outlines the faster the harmonic). h = 0 is the
+ * mean, which PSD never sees. The bar at k carries its value and its ratio
+ * to the stimulus.
+ */
 function drawHarm() {
   const st = state.s, sc = SC();
   if (st.view4 !== 'bars') { drawMap(); return; }
-  const p = plot($('cHarm'), { scale: sc, x: [0.3, NH + 0.7], y: Y_HARM, xlabel: 'harmonic *h* / –', ylabel: '|*A*_*h*_| / –', xticks: Array.from({ length: NH }, (_, i) => [i + 1, String(i + 1)]), yticks: ticks(Y_HARM[0], Y_HARM[1], 3) });
+  const xt = [[0, '0'], ...Array.from({ length: NH }, (_, i) => [i + 1, String(i + 1)])];
+  const p = plot($('cHarm'), { scale: sc, x: [-0.7, NH + 0.7], y: Y_HARM, xlabel: 'harmonic *h* / –', ylabel: '|*A*_*h*_| / –', xticks: xt, yticks: ticks(Y_HARM[0], Y_HARM[1], 3) });
   const { ctx, X, Y } = p, bw = (X(1) - X(0)) * 0.56;
+  // h = 0: the mean
+  const m = Math.min(Math.abs(S.mean), Y_HARM[1]);
+  ctx.fillStyle = C['data-static']; ctx.globalAlpha = 0.35; ctx.fillRect(X(0) - bw / 2, Y(m), bw, Y(0) - Y(m)); ctx.globalAlpha = 1;
+  ctx.strokeStyle = C['data-static']; ctx.lineWidth = 1; ctx.strokeRect(X(0) - bw / 2, Y(m), bw, Y(0) - Y(m));
+  p.text('mean', 0.1, Math.min(m, Y_HARM[1] * 0.86) + 0.05, C['data-static'], 'left');
+  const linear = st.tauOff == null || st.tauOff === st.tau;
   S.harm.forEach((h, i) => {
     const kk = i + 1, a = Math.min(h.amp, Y_HARM[1]);
     ctx.fillStyle = kk === st.k ? C['data-highlight'] : st.kUpTo && kk < st.k ? C['data-a'] : C['data-faint'];
@@ -487,10 +530,19 @@ function drawHarm() {
     const s_ = Math.min(S.harmStim[i].amp, Y_HARM[1]);
     ctx.strokeStyle = C['data-stimulus']; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
     ctx.strokeRect(X(kk) - bw / 2 - 2.5, Y(s_), bw + 5, Y(0) - Y(s_)); ctx.setLineDash([]);
+    // where the first-order formula puts it
+    if (linear && S.harmStim[i].amp > 1e-3) {
+      const th = theory(S.harmStim[i], kk);
+      if (th && th.amp > 1e-4) { ctx.strokeStyle = C['ink-900']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(kk) - bw / 2 - 3, Y(Math.min(th.amp, Y_HARM[1]))); ctx.lineTo(X(kk) + bw / 2 + 3, Y(Math.min(th.amp, Y_HARM[1]))); ctx.stroke(); }
+    }
   });
+  // the bar at k: its value, and how much of the stimulus' harmonic is left
+  const pk = S.harm[st.k - 1], sk = S.harmStim[st.k - 1];
+  const lab = `|*A*_${st.k}_| = ${pk.amp.toFixed(3)}${sk.amp > 1e-3 ? `, ×${(pk.amp / sk.amp).toFixed(2)} of the stimulus` : ''}`;
+  p.text(lab, st.k + 0.6, Math.min(Math.max(pk.amp, sk.amp), Y_HARM[1] * 0.8) + 0.07, C['data-highlight'], 'left');
   p.axes();
-  const even = S.harm.filter((_, i) => (i + 1) % 2 === 0).reduce((m, h) => Math.max(m, h.amp), 0);
-  $('subHarm').innerHTML = `Bars: the signal, outline: the stimulus, green: <i>k</i>${st.kUpTo ? ', orange: the rest of the sum' : ''}. Largest even: ${even.toFixed(3)}.`;
+  const even = S.harm.filter((_, i) => (i + 1) % 2 === 0).reduce((mx, h) => Math.max(mx, h.amp), 0);
+  $('subHarm').innerHTML = `Bars: the signal; outline: the stimulus${linear ? '; tick: first-order formula' : ''}; 0: the mean. Largest even: ${even.toFixed(3)}.`;
 }
 function drawMap() {
   const st = state.s, sc = SC(), g = rng(state.seed + 7), sig = noiseSigma(st.noise);
