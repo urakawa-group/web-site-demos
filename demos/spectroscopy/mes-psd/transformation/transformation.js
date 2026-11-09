@@ -29,7 +29,7 @@ const SOURCES = {
    it with a title and a text (the tooltip of the input selector).
 
    { shape, duty, tau, tauOff, tau2, invert, offset, drift, noise,
-     k, phi, clean, rebuild, nh, view3, view4 }
+     k, phi, clean, kUpTo, amp, view3, view4 }
 
      shape   'square' (on/off, on for a fraction duty of the period),
              'triangle' (rising for a fraction duty, then falling),
@@ -41,15 +41,18 @@ const SOURCES = {
      offset, drift, noise   what a measurement adds: a constant, a ramp of
              drift over one period, Gaussian noise (slider 0 to 100)
      clean   draw the clean signal beside the disturbed one
-     rebuild, nh   draw the period rebuilt from its mean and n harmonics
-     view3   'cos' | 'phasor';  view4   'bars' | 'mapT' | 'mapP'
+     kUpTo   harmonics 1 … k summed instead of k alone: the period rebuilt
+             in panel 1, the sum in the phase domain and in the map in φ
+     amp     the amplitude in the phase domain: the envelope ±|A_k|
+     view3   'cos' | 'phasor' (phasor and cosine side by side)
+     view4   'bars' | 'mapT' | 'mapP'
    --------------------------------------------------------------------------- */
 const base = {
   shape: 'square', duty: 0.5, tau: 0, tauOff: null, tau2: null, invert: false,
-  offset: 0, drift: 0, noise: 0, k: 1, phi: 0, clean: false, rebuild: false, nh: 3, view3: 'cos', view4: 'bars',
+  offset: 0, drift: 0, noise: 0, k: 1, phi: 0, clean: false, kUpTo: false, amp: false, view3: 'cos', view4: 'bars',
 };
 /** What a reader changes only to look, not to change the experiment: no "changed" mark for these. */
-const DISPLAY_ONLY = ['phi', 'clean', 'rebuild', 'nh', 'view3', 'view4'];
+const DISPLAY_ONLY = ['phi', 'clean', 'kUpTo', 'amp', 'view3', 'view4'];
 
 const INPUTS = [
   {
@@ -141,7 +144,7 @@ const GENERAL = `<h2>What This Page Shows</h2>
   <p>Phase-sensitive detection is a weighted area. Panel 1 multiplies the averaged period <i>A</i>(<i>t</i>) by the reference sin(<i>kωt</i> + <i>φ</i>); where the two have the same sign the area counts up (amber), where they differ it counts down (purple). Panel 2 adds that area up over the period; what is left at <i>t</i> = <i>T</i> is <i>A<sub>k</sub></i>(<i>φ</i>) [@handbook, Fig. 42.1, p. 969]. Two of those areas, at <i>φ</i> = 0° and 90°, are the whole story: they are the arrow of the phasor in panel 3, and every other <i>φ</i> is its shadow on a turning axis. Each <i>k</i> is one term of the Fourier series of the period, panel 4.</p>
   <p>Every setting is on the left and stays there; an input only sets their values, hover it for what it shows. The disturbances show what PSD removes and what it does not: an offset drops out exactly, a drift does not, because a ramp has a sine part.</p>
   <h2>Using the Plots</h2>
-  <p>Drag the reference in panel 1 by its peak, or the ruler in panel 3, or type <i>φ</i> above panel 1. ▶ integrate runs the cursor through the period in panels 1 and 2 together. Hover a dot or a ring in panel 3 for what happens at that angle; click to keep it. The view switches above panels 3 and 4 show the same result as a phasor, or the whole spectrum as a map.</p>`;
+  <p>Drag the reference in panel 1 by a green dot (where it crosses zero upwards, its own phase 0), or the ruler in panel 3, or type <i>φ</i> above panel 1. ▶ integrate runs the cursor through the period in panels 1 and 2 together. Hover a dot or a ring in panel 3 for what happens at that angle; click to keep it. The view switches above panels 3 and 4 add the phasor beside the cosine (the arrow turns with <i>φ</i>, its height is <i>A<sub>k</sub></i>(<i>φ</i>)), or show the whole spectrum as a map. "Summed 1 … <i>k</i>" adds the harmonics up to <i>k</i>, each at the phase of the same moment: the period comes back, closer to its shape with every harmonic.</p>`;
 
 /* ---------------------------------------------------------------------------
    Engine: one period on M samples, T = 1
@@ -284,8 +287,24 @@ const refAt = j => Math.sin(2 * Math.PI * state.s.k * ts[j] / T + shownPhi() * M
 const cursorJ = () => Math.round(state.cursor * M);
 /** End of the rising (on) part of the period. */
 const onTime = () => ({ square: state.s.duty, triangle: state.s.duty, saw: 1, sine: 0.5 }[state.s.shape]) * T;
+/**
+ * Harmonics 1 … k summed. In time: the period rebuilt from its mean and
+ * those harmonics. In φ: each harmonic at the phase of the same moment,
+ * φ at the fundamental standing for t = (90° − φ)/360° · T, where harmonic h
+ * has φ_h = 90° − h (90° − φ); at k = 1 that is A₁(φ) itself.
+ */
+const hs = () => (state.s.kUpTo ? Array.from({ length: state.s.k }, (_, i) => i + 1) : [state.s.k]);
+const rebuiltAt = t => { let v = S.mean; for (const h of hs()) v += S.harm[h - 1].I * Math.sin(2 * Math.PI * h * t / T) + S.harm[h - 1].Q * Math.cos(2 * Math.PI * h * t / T); return v; };
+const sumAt = (parts_, phi) => (state.s.kUpTo ? hs().reduce((a_, h) => a_ + at(parts_[h - 1], 90 - h * (90 - phi)), 0) : at(parts_[state.s.k - 1], phi));
+/** The reference's upward zero crossings, where kωt + φ = 0: the delay φ reads, once per T/k. */
+const zeroTimes = phi => { const t0 = ((((-phi) / 360) % 1) + 1) % 1 * T / state.s.k; return Array.from({ length: state.s.k }, (_, m) => t0 + m * T / state.s.k); };
+
 /** Phase-domain limits: from the stimulus' own harmonic at k (they follow k, never φ). */
-const phaseLim = () => Math.max(0.15, 1.25 * S.ps.amp + 0.1 * Math.abs(state.s.drift));
+const phaseLim = () => {
+  // summed, the largest value the summed stimulus reaches over φ; else the stimulus' harmonic k
+  const ref = state.s.kUpTo ? Math.max(...Array.from({ length: 72 }, (_, i) => Math.abs(sumAt(S.harmStim, i * 5)))) : S.ps.amp;
+  return Math.max(0.15, 1.25 * ref + 0.1 * Math.abs(state.s.drift));
+};
 
 function shade(p) { const t = onTime(); p.shadeX(0, t, C['shade-on']); if (t < T) p.shadeX(t, T, C['shade-off']); }
 
@@ -307,24 +326,17 @@ function drawSig() {
   if (st.shape === 'square') p.steps(ts, ts.map((_, j) => heldAt(j % M)), C['data-stimulus']);
   else p.line(ts, Array.from(S.stim), C['data-stimulus'], CHART.lineThin, CHART.dash);
   if (st.clean && disturbed()) p.line(ts, Array.from(S.y), C['data-faint'], CHART.lineData);
-  if (st.rebuild) {
-    const w = 2 * Math.PI / T;
-    const rb = ts.map(t => { let v = S.mean; for (let i = 0; i < st.nh; i++) v += S.harm[i].I * Math.sin((i + 1) * w * t) + S.harm[i].Q * Math.cos((i + 1) * w * t); return v; });
-    p.line(ts, rb, C['ink-700'], CHART.lineData, [6, 3]);
-  }
+  if (st.kUpTo) p.line(ts, ts.map(rebuiltAt), C['ink-700'], CHART.lineData, [6, 3]);
   p.line(ts, Array.from(S.A), C['data-a']);
   p.line(ts, ts.map((_, j) => refAt(j)), C['data-highlight'], CHART.lineData, CHART.dash);
-  // the reference's peaks: grab one to move the reference, which sets φ
-  const t0 = (((90 - st.phi) / 360) % 1 + 1) % 1 * T / st.k, xs = [];
-  for (let m = 0; m < st.k; m++) {
-    const t = t0 + m * T / st.k; xs.push(X(t));
-    p.dot(t, 1, C['data-highlight']);
-  }
+  // the reference's upward zero crossings (its own phase 0): grab one to move
+  // the reference, which sets φ. The first is also the delay φ reads.
+  const xs = zeroTimes(st.phi).map(t => { p.dot(t, 0, C['data-highlight']); return X(t); });
   grip(p, xs[0], C['data-highlight']);
   if (state.cursor < 1) p.vline(state.cursor * T, C['ink-700'], 1, []);
   p.axes();
   P1 = { p, xs };
-  $('subSig').innerHTML = `<i>A</i>(<i>t</i>) times the reference (green, drag a peak): amber counts up, purple down.${st.rebuild ? ` Dashed: rebuilt from ${st.nh}.` : ''}`;
+  $('subSig').innerHTML = `<i>A</i>(<i>t</i>) times the reference (green, drag it by a dot): amber counts up, purple down.${st.kUpTo ? ` Dashed: harmonics 1 … ${st.k}.` : ''}`;
 }
 
 /* panel 2: the running integral */
@@ -344,49 +356,9 @@ function drawInt() {
   $('subInt').innerHTML = `(2/<i>T</i>)∫<sub>0</sub><sup><i>t</i></sup> of the product. At <i>T</i>: <i>A<sub>${k}</sub></i>(${Math.round(shownPhi())}°) = ${at(S.p, shownPhi()).toFixed(3)}, what PSD returns.`;
 }
 
-/* panel 3: the phase domain, as a cosine or as a phasor */
+/* panel 3: the phase domain, alone or with the phasor beside it */
 let P3 = null;
-function drawPhase() {
-  const st = state.s, lim = phaseLim(), sc = SC();
-  if (st.view3 === 'phasor') { drawPhasor(lim); return; }
-  const ph = Array.from({ length: 73 }, (_, i) => i * 5), yr = [-lim, lim];
-  const p = plot($('cPhase'), { scale: sc, x: [0, 360], y: yr, xlabel: 'phase angle *φ* / °', ylabel: `*A*_${st.k}_(*φ*) / –`, xticks: PHI_TICKS, yticks: ticks(yr[0], yr[1], 4) });
-  p.hline(0);
-  if (state.preview) p.vline(state.preview.phi, C['data-highlight'], 1, [1, 3]);
-  p.vline(st.phi, C['data-highlight'], 1.5, [4, 3]);
-  if (st.clean && disturbed()) {
-    p.line(ph, ph.map(f => at(S.pd, f)), C['data-static'], CHART.lineThin);
-    p.line(ph, ph.map(f => at(S.pc, f)), C['data-faint'], CHART.lineData);
-  }
-  p.line(ph, ph.map(f => at(S.p, f)), C['data-a']);
-  const pois = [];
-  if (S.p.amp > 0.01 * lim) {
-    pois.push({ kind: 'max', phi: S.p.phiMax, y: S.p.amp });
-    for (const z of [90, 270]) pois.push({ kind: 'zero', phi: (S.p.phiMax + z) % 360, y: 0 });
-  }
-  const { ctx, X, Y } = p;
-  for (const q of pois) {
-    if (q.kind === 'max') p.dot(q.phi, q.y, C['data-a']);
-    else {
-      ctx.strokeStyle = C['data-a']; ctx.lineWidth = 1.8; ctx.fillStyle = C.surface;
-      ctx.beginPath(); ctx.arc(X(q.phi), Y(0), CHART.marker, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
-    }
-    q.px = X(q.phi); q.py = Y(q.y);
-  }
-  markMaxima(p, pois.filter(q => q.kind === 'max').map(q => ({ phi: q.phi, y: q.y, delta: S.p.delta, color: C['data-a'] })), yr);
-  grip(p, X(st.phi), C['data-highlight']);
-  p.axes();
-  P3 = { p, pois, rx: X(st.phi) };
-  $('subPhase').innerHTML = `<i>A<sub>k</sub></i>(<i>φ</i>) = |<i>A<sub>k</sub></i>| cos(<i>φ</i> − <i>φ</i><sub>max</sub>). Hover the dot or a ring, drag the ruler.${st.clean && disturbed() ? ' Grey: clean; thin: the part that leaks.' : ''}`;
-}
-
-/** Plot ranges with one unit the same length on both axes. */
-function squareRange(canvas, r, sc) {
-  const m = CHART.margin, w = canvas.clientWidth - m.l * sc - m.r, h = canvas.clientHeight - m.t - m.b * sc;
-  return w > h ? { x: [-r * w / h, r * w / h], y: [-r, r] } : { x: [-r, r], y: [-r * h / w, r * h / w] };
-}
-function arrow(p, x1, y1, color, w = CHART.lineData) {
-  const { ctx, X, Y } = p, ax = X(x1), ay = Y(y1), bx = X(0), by = Y(0);
+function arrowPx(ctx, bx, by, ax, ay, color, w = CHART.lineData) {
   const ang = Math.atan2(ay - by, ax - bx), L = Math.min(11, Math.hypot(ax - bx, ay - by) * 0.4);
   ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w; ctx.setLineDash([]);
   ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(ax - Math.cos(ang) * L * 0.6, ay - Math.sin(ang) * L * 0.6); ctx.stroke();
@@ -394,27 +366,83 @@ function arrow(p, x1, y1, color, w = CHART.lineData) {
   ctx.lineTo(ax - L * Math.cos(ang - 0.4), ay - L * Math.sin(ang - 0.4));
   ctx.lineTo(ax - L * Math.cos(ang + 0.4), ay - L * Math.sin(ang + 0.4)); ctx.closePath(); ctx.fill();
 }
-function drawPhasor(lim) {
-  const st = state.s, sc = SC(), c = $('cPhase'), rg = squareRange(c, lim, sc), { I, Q, amp } = S.p;
-  const p = plot(c, { scale: sc, ...rg, xlabel: 'sine part *I* / –', ylabel: 'cosine part *Q* / –', xticks: ticks(rg.x[0], rg.x[1], 4), yticks: ticks(rg.y[0], rg.y[1], 4) });
-  const { ctx, X, Y } = p;
+/**
+ * The phasor, drawn so that it turns with φ: the arrow has the length
+ * |A_k| and the angle 90° − (φ − φmax), so its height is
+ * |A_k| cos(φ − φmax) = A_k(φ), the value the cosine has at φ. It sits in a
+ * square at the left at the full height of the panel; the cosine continues
+ * to the right, on the same y axis, and a green line carries the height
+ * across.
+ */
+function drawPhase() {
+  const st = state.s, lim = phaseLim(), sc = SC(), cv = $('cPhase'), yr = [-lim, lim];
+  const withPhasor = st.view3 === 'phasor' && !st.kUpTo;
+  const m = CHART.margin, H = cv.clientHeight, side = H - m.t - m.b * sc;
+  const ylabel = st.kUpTo ? `Σ *A*_*h*_ , *h* ≤ ${st.k} / –` : `*A*_${st.k}_(*φ*) / –`;
+  let ph0 = null;
+  if (withPhasor) {
+    // the square: x and y in the same units
+    const left = m.l * sc;
+    ph0 = plot(cv, { scale: sc, margin: { l: left, r: cv.clientWidth - left - side }, x: [-lim, lim], y: yr, xlabel: '', ylabel, xticks: [], yticks: ticks(yr[0], yr[1], 4) });
+  }
+  const pOpts = { scale: sc, x: [0, 360], y: yr, xlabel: 'phase angle *φ* / °', ylabel: withPhasor ? '' : ylabel, xticks: PHI_TICKS, yticks: withPhasor ? [] : ticks(yr[0], yr[1], 4) };
+  if (withPhasor) { pOpts.keep = true; pOpts.margin = { l: m.l * sc + side + 14 * sc }; }
+  const p = plot(cv, pOpts);
+  const ph = Array.from({ length: 145 }, (_, i) => i * 2.5);
   p.hline(0);
-  ctx.strokeStyle = C['line-zero']; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(0), Y(rg.y[0])); ctx.lineTo(X(0), Y(rg.y[1])); ctx.stroke();
-  ctx.strokeStyle = C['data-faint']; ctx.beginPath(); ctx.ellipse(X(0), Y(0), Math.abs(X(amp) - X(0)), Math.abs(Y(amp) - Y(0)), 0, 0, 2 * Math.PI); ctx.stroke();
-  const r = shownPhi() * Math.PI / 180, ux = Math.cos(r), uy = Math.sin(r), far = 3 * lim;
-  p.line([-far * ux, far * ux], [-far * uy, far * uy], C['data-highlight'], 1, CHART.dash);
-  const v = I * ux + Q * uy;
-  p.line([I, v * ux], [Q, v * uy], C['ink-500'], 1, [2, 3]);
-  p.line([0, v * ux], [0, v * uy], C['data-highlight'], CHART.lineHighlight);
-  p.dot(v * ux, v * uy, C['data-highlight']);
-  if (st.clean && disturbed() && S.pc.amp > 1e-4) arrow(p, S.pc.I, S.pc.Q, C['data-faint']);
-  p.line([0, I], [0, 0], C['data-a'], 1, [2, 3]); p.line([I, I], [0, Q], C['data-a'], 1, [2, 3]);
-  if (amp > 1e-4) arrow(p, I, Q, C['data-a']);
-  const lr = 0.8 * Math.min(rg.x[1], rg.y[1]);
-  p.text('*φ* axis', lr * ux, lr * uy, C['data-highlight']);
+  if (state.preview) p.vline(state.preview.phi, C['data-highlight'], 1, [1, 3]);
+  p.vline(st.phi, C['data-highlight'], 1.5, [4, 3]);
+  if (st.clean && disturbed()) {
+    if (!st.kUpTo) p.line(ph, ph.map(f => at(S.pd, f)), C['data-static'], CHART.lineThin);   // what leaks through
+    p.line(ph, ph.map(f => sumAt(S.harmClean, f)), C['data-faint'], CHART.lineData);
+  }
+  const curve = ph.map(f => sumAt(S.harm, f));
+  if (st.amp) {
+    const e = st.kUpTo ? Math.max(...curve.map(Math.abs)) : S.p.amp;
+    p.hline(e, C['ink-700'], 1); p.hline(-e, C['ink-700'], 1);
+    p.text(st.kUpTo ? 'largest' : `|*A*_${st.k}_| = ${e.toFixed(3)}`, 8, e + lim * 0.08, C['ink-700'], 'left');
+  }
+  p.line(ph, curve, C['data-a']);
+  const { ctx, X, Y } = p, pois = [];
+  if (!st.kUpTo && S.p.amp > 0.01 * lim) {
+    pois.push({ kind: 'max', phi: S.p.phiMax, y: S.p.amp });
+    for (const z of [90, 270]) pois.push({ kind: 'zero', phi: (S.p.phiMax + z) % 360, y: 0 });
+    for (const q of pois) {
+      if (q.kind === 'max') p.dot(q.phi, q.y, C['data-a']);
+      else {
+        ctx.strokeStyle = C['data-a']; ctx.lineWidth = 1.8; ctx.fillStyle = C.surface;
+        ctx.beginPath(); ctx.arc(X(q.phi), Y(0), CHART.marker, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+      }
+      q.px = X(q.phi); q.py = Y(q.y);
+    }
+    markMaxima(p, [{ phi: S.p.phiMax, y: S.p.amp, delta: S.p.delta, color: C['data-a'] }], yr);
+  }
+  const phiS = shownPhi(), yS = sumAt(S.harm, phiS);
+  p.dot(phiS, yS, C['data-highlight']);
+  if (withPhasor) {
+    // the turning arrow, and the green line that carries its height across
+    const r = S.p.amp, th = (90 - (phiS - S.p.phiMax)) * Math.PI / 180, cx = ph0.X(0), cy = ph0.Y(0);
+    const tipX = ph0.X(r * Math.cos(th)), tipY = ph0.Y(r * Math.sin(th));
+    ctx.strokeStyle = C['line-zero']; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(ph0.inner.l, cy); ctx.lineTo(ph0.inner.r, cy); ctx.moveTo(cx, ph0.inner.t); ctx.lineTo(cx, ph0.inner.b); ctx.stroke();
+    ctx.strokeStyle = C['data-faint']; ctx.beginPath(); ctx.arc(cx, cy, Math.abs(ph0.X(r) - cx), 0, 2 * Math.PI); ctx.stroke();
+    if (st.clean && disturbed() && S.pc.amp > 1e-4) {
+      const thc = (90 - (phiS - S.pc.phiMax)) * Math.PI / 180;
+      arrowPx(ctx, cx, cy, ph0.X(S.pc.amp * Math.cos(thc)), ph0.Y(S.pc.amp * Math.sin(thc)), C['data-faint']);
+    }
+    if (r > 1e-4) arrowPx(ctx, cx, cy, tipX, tipY, C['data-a']);
+    ctx.strokeStyle = C['data-highlight']; ctx.lineWidth = 1.2; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.lineTo(X(phiS), Y(yS)); ctx.stroke(); ctx.setLineDash([]);
+    ph0.axes();
+  }
+  grip(p, X(st.phi), C['data-highlight']);
   p.axes();
-  P3 = null;
-  $('subPhase').innerHTML = `The arrow (<i>I</i>, <i>Q</i>) = (${I.toFixed(3)}, ${Q.toFixed(3)}), length |<i>A<sub>${st.k}</sub></i>| = ${amp.toFixed(3)}. Green: its shadow on the axis at <i>φ</i>, which is <i>A<sub>${st.k}</sub></i>(<i>φ</i>).`;
+  P3 = { p, pois, rx: X(st.phi) };
+  $('subPhase').innerHTML = st.kUpTo
+    ? `Harmonics 1 … ${st.k} summed, each at the phase of the same moment: the period, rebuilt and mirrored in <i>φ</i>.`
+    : withPhasor
+      ? `The arrow, length |<i>A<sub>${st.k}</sub></i>| = ${S.p.amp.toFixed(3)}, turns with <i>φ</i>; its height is <i>A<sub>${st.k}</sub></i>(<i>φ</i>), the cosine on the right.`
+      : `<i>A<sub>k</sub></i>(<i>φ</i>) = |<i>A<sub>k</sub></i>| cos(<i>φ</i> − <i>φ</i><sub>max</sub>). Hover the dot or a ring, drag the ruler.${st.clean && disturbed() ? ' Grey: clean; thin: what leaks.' : ''}`;
 }
 
 /* panel 4: the harmonic content, or the whole spectrum as a map */
@@ -446,7 +474,7 @@ function drawHarm() {
   const { ctx, X, Y } = p, bw = (X(1) - X(0)) * 0.56;
   S.harm.forEach((h, i) => {
     const kk = i + 1, a = Math.min(h.amp, Y_HARM[1]);
-    ctx.fillStyle = kk === st.k ? C['data-highlight'] : st.rebuild && kk <= st.nh ? C['data-a'] : C['data-faint'];
+    ctx.fillStyle = kk === st.k ? C['data-highlight'] : st.kUpTo && kk < st.k ? C['data-a'] : C['data-faint'];
     ctx.fillRect(X(kk) - bw / 2, Y(a), bw, Y(0) - Y(a));
     // the stimulus' own harmonic, as an outline
     const s_ = Math.min(S.harmStim[i].amp, Y_HARM[1]);
@@ -455,7 +483,7 @@ function drawHarm() {
   });
   p.axes();
   const even = S.harm.filter((_, i) => (i + 1) % 2 === 0).reduce((m, h) => Math.max(m, h.amp), 0);
-  $('subHarm').innerHTML = `Bars: the signal, outline: the stimulus, green: <i>k</i>${st.rebuild ? ', orange: rebuilt from' : ''}. Largest even: ${even.toFixed(3)}.`;
+  $('subHarm').innerHTML = `Bars: the signal, outline: the stimulus, green: <i>k</i>${st.kUpTo ? ', orange: the rest of the sum' : ''}. Largest even: ${even.toFixed(3)}.`;
 }
 function drawMap() {
   const st = state.s, sc = SC(), g = rng(state.seed + 7), sig = noiseSigma(st.noise);
@@ -464,13 +492,19 @@ function drawMap() {
   const xt = [0, 10, 20, 30, 40, 50, 60].map(v => [v, String(v)]);
   if (st.view4 === 'mapT') {
     heatmap($('cHarm'), { scale: sc, x: [0, 60], y: [0, T], xlabel: 'spectral position / –', ylabel: 'time in the period / *T*', xticks: xt, yticks: T_TICKS }, M + 1, XS.length, val, 1.9,
-      p => { if (state.cursor < 1) p.hline(state.cursor * T, C['ink-700'], 1); });
-    $('subHarm').innerHTML = 'The spectra through the period: a static band at 20, the signal at 40.';
+      p => {
+        if (state.cursor < 1) p.hline(state.cursor * T, C['ink-700'], 1);
+        for (const t of zeroTimes(shownPhi())) p.hline(t, C['data-highlight'], 1.5);
+      });
+    $('subHarm').innerHTML = 'The spectra through the period: a static band at 20, the signal at 40. Green: where the reference crosses zero upwards.';
     return;
   }
-  const w = 2 * Math.PI * st.k / T;
-  const IQ = XS.map((_, x) => ({ I: 2 / T * trap(j => val(j, x) * Math.sin(w * ts[j])), Q: 2 / T * trap(j => val(j, x) * Math.cos(w * ts[j])) }));
-  heatmap($('cHarm'), { scale: sc, x: [0, 60], y: [0, 360], xlabel: 'spectral position / –', ylabel: 'phase angle *φ* / °', xticks: xt, yticks: PHI_TICKS }, 73, XS.length, (r, x) => at(IQ[x], r * 5), phaseLim(),
+  // PSD at every spectral position, at every harmonic the sum needs
+  const IQ = XS.map((_, x) => Array.from({ length: st.k }, (__, h) => {
+    const w = 2 * Math.PI * (h + 1) / T;
+    return { I: 2 / T * trap(j => val(j, x) * Math.sin(w * ts[j])), Q: 2 / T * trap(j => val(j, x) * Math.cos(w * ts[j])) };
+  }));
+  heatmap($('cHarm'), { scale: sc, x: [0, 60], y: [0, 360], xlabel: 'spectral position / –', ylabel: 'phase angle *φ* / °', xticks: xt, yticks: PHI_TICKS }, 73, XS.length, (r, x) => sumAt(IQ[x], r * 5), phaseLim(),
     p => p.hline(shownPhi(), C['data-highlight'], 2));
   $('subHarm').innerHTML = `PSD at every position: the static band is gone, the signal a cosine in <i>φ</i>.`;
 }
@@ -555,11 +589,6 @@ function bindOf(key) {
       label: 'sweep speed', unit: '° s⁻¹', min: 10, max: 240, step: 10, redraw: 'none',
       get: () => state.speed, set: v => { state.speed = Math.round(clamp(v, 1, 720)); }, toR: v => v, fromR: r => +r, fmt: v => String(v), caseV: () => 80, def: 80,
     };
-    case 'nh': return {
-      label: 'harmonics used, <i>n</i>', unit: '', min: 0, max: NH, step: 1, redraw: 'draw',
-      get: () => st.nh, set: v => { st.nh = Math.round(clamp(v, 0, NH)); }, toR: v => v, fromR: r => +r, fmt: v => String(v), caseV: () => caseS().nh, def: 3,
-      off: () => !st.rebuild,
-    };
     default: throw new Error(`no binding ${key}`);
   }
 }
@@ -571,7 +600,7 @@ const groupSums = () => {
     stimulus: `${SHAPE_NAME[st.shape]}${(st.shape === 'square' || st.shape === 'triangle') && st.duty !== 0.5 ? ` ${st.duty.toFixed(2)}` : ''}`,
     response: `<i>τ</i> ${st.tau.toFixed(3)}${st.tauOff != null ? ` / ${st.tauOff.toFixed(3)}` : ''}${st.tau2 != null ? ` + ${st.tau2.toFixed(3)}` : ''}${st.invert ? ' · antiphase' : ''}`,
     disturbances: dis.length ? dis.join(' · ') : 'none',
-    demodulation: `<i>k</i> = ${st.k} · <i>φ</i> = ${st.phi}°`,
+    demodulation: `<i>k</i> ${st.kUpTo ? '≤' : '='} ${st.k} · <i>φ</i> = ${st.phi}°`,
   };
 };
 const sums = foldingGroups(groupSums);
@@ -585,11 +614,13 @@ const controls = valueControls({
     setSeg($('shape'), st.shape); setSeg($('invert'), st.invert ? 1 : 0); setSeg($('harm'), st.k);
     setSeg($('view3'), st.view3); setSeg($('view4'), st.view4);
     $('asym').checked = st.tauOff != null; $('chain').checked = st.tau2 != null;
-    $('clean').checked = st.clean; $('rebuild').checked = st.rebuild;
+    $('clean').checked = st.clean; $('amp').checked = st.amp;
+    setSeg($('kMode'), st.kUpTo ? 'le' : 'eq');
+    $('view3').querySelector('[data-v="phasor"]').disabled = st.kUpTo;
     const pf = $('phiField');
     if (document.activeElement !== pf) pf.value = Math.round(shownPhi());
     pf.classList.toggle('preview', !!state.preview);
-    $('kField').innerHTML = `<i>k</i> = ${st.k}, `;
+    $('kField').innerHTML = `<i>k</i> ${st.kUpTo ? '≤' : '='} ${st.k}, `;
   },
 });
 
@@ -605,7 +636,8 @@ segClick('view4', v => { state.s.view4 = v; });
 $('asym').addEventListener('change', e => { state.s.tauOff = e.target.checked ? state.s.tau : null; update(); });
 $('chain').addEventListener('change', e => { state.s.tau2 = e.target.checked ? 0.1 : null; update(); });
 $('clean').addEventListener('change', e => { state.s.clean = e.target.checked; draw(); });
-$('rebuild').addEventListener('change', e => { state.s.rebuild = e.target.checked; draw(); });
+$('amp').addEventListener('change', e => { state.s.amp = e.target.checked; draw(); });
+segClick('kMode', v => { state.s.kUpTo = v === 'le'; });
 $('reseed').addEventListener('click', () => { state.seed += 1; update(); });
 $('resetCase').addEventListener('click', () => selectInput(state.idx, false));
 $('phiField').addEventListener('change', e => {
@@ -620,7 +652,7 @@ const setPhi = v => { state.s.phi = ((Math.round(v) % 360) + 360) % 360; draw();
 const cSig = $('cSig');
 dragRuler(cSig, {
   rulerXs: () => P1?.xs ?? [], plotOf: () => P1?.p,
-  onDrag: x => { const { inner } = P1.p, t = clamp((x - inner.l) / (inner.r - inner.l), 0, 1) * T; setPhi(90 - 360 * state.s.k * t / T); },
+  onDrag: x => { const { inner } = P1.p, t = clamp((x - inner.l) / (inner.r - inner.l), 0, 1) * T; setPhi(-360 * state.s.k * t / T); },
 });
 
 /* panel 3: hover a point, click to keep it, drag the ruler */
@@ -694,7 +726,7 @@ function renderRail() {
       `<div class="fly-title">Harmonic <i>k</i></div>${[1, 2, 3, 4, 5].map(k => rail.item('k', k, `k = ${k}`, k === st.k)).join('')}`),
     rail.btn('play', playing ? '❚❚' : '▶', playing ? 'Pause the sweep' : 'Sweep φ', { on: playing, text: true }),
     rail.btn('run', '∫', integrating ? 'Pause the integration' : 'Run the integral', { on: integrating, text: true }),
-    rail.btn('rebuild', 'Σ', st.rebuild ? 'Rebuilt period shown. Click to hide' : 'Rebuild the period from its harmonics', { on: st.rebuild, text: true }),
+    rail.btn('kUpTo', 'Σ', st.kUpTo ? `Harmonics 1 … ${st.k} summed. Click for k alone` : `Sum the harmonics 1 … ${st.k}`, { on: st.kUpTo, text: true }),
     rail.btn('clean', '≈', st.clean ? 'Clean signal shown. Click to hide' : 'Show the clean signal', { on: st.clean, text: true }),
     rail.btn('view3', st.view3 === 'cos' ? '∿' : '↗', st.view3 === 'cos' ? 'Phase domain as a cosine. Click for the phasor' : 'Phase domain as a phasor. Click for the cosine', { text: true }),
   ].join('');
@@ -711,7 +743,7 @@ $('rail').addEventListener('click', e => {
   if (r === 'run') { toggleRun(); return; }
   if (r === 'shape') st.shape = b.dataset.v;
   else if (r === 'k') st.k = +b.dataset.v;
-  else if (r === 'rebuild') st.rebuild = !st.rebuild;
+  else if (r === 'kUpTo') st.kUpTo = !st.kUpTo;
   else if (r === 'clean') st.clean = !st.clean;
   else if (r === 'view3') st.view3 = st.view3 === 'cos' ? 'phasor' : 'cos';
   else return;

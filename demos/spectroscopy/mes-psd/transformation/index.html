@@ -112,8 +112,9 @@
               <button class="btn primary" id="play" type="button">▶ sweep φ</button>
               <button class="btn" id="run" type="button">▶ integrate</button>
             </div>
-            <label class="ctl check" title="Draw the period rebuilt from its mean and the first n harmonics in panel 1, and mark them in panel 4"><input type="checkbox" id="rebuild"><span>rebuild the period from its harmonics</span></label>
-            <div class="ctl vctl" data-k="nh"></div>
+            <div class="ctl"><span>harmonics</span>
+              <span class="seg" id="kMode"><button type="button" data-v="eq" title="The harmonic k alone">only <i>k</i></button><button type="button" data-v="le" title="Harmonics 1 … k added, each at the phase of the same moment: the period rebuilt, closer to its shape the more are added">summed 1 … <i>k</i></button></span></div>
+            <label class="ctl check" title="In the phase domain: the envelope ±|A_k| = √(I² + Q²), which no φ exceeds"><input type="checkbox" id="amp"><span>amplitude |<i>A<sub>k</sub></i>|</span></label>
           </div>
         </section>
       </div>
@@ -148,7 +149,7 @@
             <h3>3 · Phase Domain</h3>
             <div class="sub-row">
               <p class="sub" id="subPhase"></p>
-              <span class="seg view-seg" id="view3"><button type="button" data-v="cos">cosine</button><button type="button" data-v="phasor">phasor</button></span>
+              <span class="seg view-seg" id="view3"><button type="button" data-v="cos">cosine</button><button type="button" data-v="phasor" title="The phasor beside the cosine: the arrow turns with φ, its height is A_k(φ)">+ phasor</button></span>
             </div>
             <canvas id="cPhase" class="interactive"></canvas>
             <div class="legend" id="legPhase"></div>

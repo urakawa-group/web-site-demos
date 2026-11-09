@@ -8,6 +8,9 @@
  *
  * `scale` (default 1) multiplies every text size and the margins that hold
  * text, e.g. CHART.workbenchScale for the plots of a workbench page.
+ * `keep: true` draws into what is already on the canvas instead of clearing
+ * it, so two plots can share one canvas side by side (each with its own
+ * margins; `margin.l` / `margin.r` in px place it).
  * p.font(role, weight) is a type role's font at that scale, for text a page
  * draws itself.
  *
@@ -48,15 +51,17 @@ export function plot(canvas, o) {
   // backing store at device pixels, including presentation zoom, so lines stay sharp
   const zoom = parseFloat(document.body.style.zoom) || 1;
   const d = (window.devicePixelRatio || 1) * zoom;
-  canvas.width = Math.round(W * d);
-  canvas.height = Math.round(H * d);
   const ctx = canvas.getContext('2d');
-  ctx.setTransform(d, 0, 0, d, 0, 0);
-  ctx.clearRect(0, 0, W, H);
+  if (!o.keep) {
+    canvas.width = Math.round(W * d);
+    canvas.height = Math.round(H * d);
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+  }
 
   const sc = o.scale ?? 1;
   const base = { ...CHART.margin, ...(o.margin ?? {}) };
-  const m = { l: base.l * sc, r: base.r, t: base.t, b: base.b * sc };
+  const m = { l: o.margin?.l != null ? base.l : base.l * sc, r: base.r, t: base.t, b: base.b * sc };
   const [x0, x1] = o.x, [y0, y1] = o.y;
   const X = x => m.l + (x - x0) / (x1 - x0) * (W - m.l - m.r);
   const Y = y => H - m.b - (y - y0) / (y1 - y0) * (H - m.t - m.b);
