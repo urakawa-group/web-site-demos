@@ -57,8 +57,8 @@ const DISPLAY_ONLY = ['phi', 'clean', 'kUpTo', 'amp', 'view3', 'view4'];
 const INPUTS = [
   {
     id: 'square', title: 'Square Wave, No Delay', s: { ...base },
-    text: `<p>The stimulus itself: 1 in the first half-period, 0 in the second. It is ½ plus odd sines [@handbook, Eq. 42.1, p. 970], so the product with the reference has more amber than purple area at <i>k</i> = 1, <i>φ</i> = 0, and the integral ends at 2/π ≈ 0.64.</p>
-      <p>Drag the reference a quarter period: amber and purple balance and the integral ends at zero. At <i>k</i> = 2 every lobe of the reference meets as much amber as purple, so the amplitude is zero at every <i>φ</i>: no even harmonics.</p>`,
+    text: `<p>The stimulus itself: 1 in the first half-period, 0 in the second. It is ½ plus odd sines [@handbook, Eq. 42.1, p. 970], so the product with the reference has more red than blue area at <i>k</i> = 1, <i>φ</i> = 0, and the integral ends at 2/π ≈ 0.64.</p>
+      <p>Drag the reference a quarter period: red and blue balance and the integral ends at zero. At <i>k</i> = 2 every lobe of the reference meets as much red as blue, so the amplitude is zero at every <i>φ</i>: no even harmonics.</p>`,
   },
   {
     id: 'lag', title: 'Square Wave, First-Order Delay', s: { ...base, tau: 0.08 },
@@ -73,7 +73,7 @@ const INPUTS = [
   {
     id: 'chain', title: 'Two Steps in Series', s: { ...base, tau: 0.05, tau2: 0.12 },
     text: `<p>A species fed by another one: the stimulus drives the first step, the first step drives the second. The phase lags of steps in series add, arctan(<i>ωτ</i>₁) + arctan(<i>ωτ</i>₂), so the arrow can turn past 90° and the time value past <i>T</i>/4, which one step alone never does.</p>
-      <p>The amplitudes multiply, so a late signal is also a small one. Watch the amber and purple areas shift as the period turns into an S-shaped rise.</p>`,
+      <p>The amplitudes multiply, so a late signal is also a small one. Watch the red and blue areas shift as the period turns into an S-shaped rise.</p>`,
   },
   {
     id: 'asym', title: 'Fast Up, Slow Down', s: { ...base, tau: 0.02, tauOff: 0.2, k: 2 },
@@ -141,7 +141,7 @@ const EQUATIONS = [
 ];
 
 const GENERAL = `<h2>What This Page Shows</h2>
-  <p>Phase-sensitive detection is a weighted area. Panel 1 multiplies the averaged period <i>A</i>(<i>t</i>) by the reference sin(<i>kωt</i> + <i>φ</i>); where the two have the same sign the area counts up (amber), where they differ it counts down (purple). Panel 2 adds that area up over the period; what is left at <i>t</i> = <i>T</i> is <i>A<sub>k</sub></i>(<i>φ</i>) [@handbook, Fig. 42.1, p. 969]. Two of those areas, at <i>φ</i> = 0° and 90°, are the whole story: they are the arrow of the phasor in panel 3, and every other <i>φ</i> is its shadow on a turning axis. Each <i>k</i> is one term of the Fourier series of the period, panel 4.</p>
+  <p>Phase-sensitive detection is a weighted area. Panel 1 multiplies the averaged period <i>A</i>(<i>t</i>) by the reference sin(<i>kωt</i> + <i>φ</i>); where the two have the same sign the area counts up (red), where they differ it counts down (blue). Panel 2 adds that area up over the period; what is left at <i>t</i> = <i>T</i> is <i>A<sub>k</sub></i>(<i>φ</i>) [@handbook, Fig. 42.1, p. 969]. Two of those areas, at <i>φ</i> = 0° and 90°, are the whole story: they are the arrow of the phasor in panel 3, and every other <i>φ</i> is its shadow on a turning axis. Each <i>k</i> is one term of the Fourier series of the period, panel 4.</p>
   <p>Every setting is on the left and stays there; an input only sets their values, hover it for what it shows. The disturbances show what PSD removes and what it does not: an offset drops out exactly, a drift does not, because a ramp has a sine part.</p>
   <h2>Using the Plots</h2>
   <p>Drag the reference in panel 1 by a green dot (where it crosses zero upwards, its own phase 0), or the ruler in panel 3, or type <i>φ</i> above panel 1. ▶ integrate runs the cursor through the period in panels 1 and 2 together. Hover a dot or a ring in panel 3 for what happens at that angle; click to keep it. The view switches above panels 3 and 4 add the phasor beside the cosine (the arrow turns with <i>φ</i>, its height is <i>A<sub>k</sub></i>(<i>φ</i>)), or show the whole spectrum as a map. "Summed 1 … <i>k</i>" adds the harmonics up to <i>k</i>, each at the phase of the same moment: the period comes back, closer to its shape with every harmonic.</p>`;
@@ -313,10 +313,10 @@ let P1 = null;
 function drawSig() {
   const st = state.s, jc = cursorJ(), sc = SC();
   const p = plot($('cSig'), { scale: sc, x: [0, T], y: Y_SIG, xlabel: XLAB_T, ylabel: 'signal / –', xticks: T_TICKS, yticks: ticks(Y_SIG[0], Y_SIG[1], 4) });
-  shade(p);
+  // no on/off shading here: the product's areas are red and blue; the dashed stimulus shows on and off
   // the product as area, up to the cursor
   const prod = ts.map((_, j) => S.A[j] * refAt(j));
-  const { ctx, X, Y } = p, pos = rgba(C['map-pos'], 0.4), neg = rgba(C['map-neg'], 0.3);
+  const { ctx, X, Y } = p, pos = rgba(C['map-pos'], 0.32), neg = rgba(C['map-neg'], 0.3);
   for (let j = 0; j < jc; j++) {
     const a = prod[j], b = prod[j + 1];
     ctx.fillStyle = a + b >= 0 ? pos : neg;
@@ -336,7 +336,7 @@ function drawSig() {
   if (state.cursor < 1) p.vline(state.cursor * T, C['ink-700'], 1, []);
   p.axes();
   P1 = { p, xs };
-  $('subSig').innerHTML = `<i>A</i>(<i>t</i>) times the reference (green, drag it by a dot): amber counts up, purple down.${st.kUpTo ? ` Dashed: harmonics 1 … ${st.k}.` : ''}`;
+  $('subSig').innerHTML = `<i>A</i>(<i>t</i>) times the reference (green, drag it by a dot): red counts up, blue down.${st.kUpTo ? ` Dashed: harmonics 1 … ${st.k}.` : ''}`;
 }
 
 /* panel 2: the running integral */
@@ -449,9 +449,16 @@ function drawPhase() {
 const XS = Array.from({ length: 121 }, (_, i) => i * 0.5);
 const gauss = (x, c, w) => Math.exp(-4 * Math.LN2 * ((x - c) / w) ** 2);
 const GA = XS.map(x => gauss(x, 20, 10)), GB = XS.map(x => gauss(x, 40, 10));
+/**
+ * A diverging map in the manner of cmocean balance, built from the scheme:
+ * white at zero, the line tone halfway, the darkest tone at the limit; blue
+ * below zero, red above.
+ */
 function colourOf(v, max) {
-  const t = clamp(v / max, -1, 1), [r, g, b] = hexRgb(t >= 0 ? C['map-pos'] : C['map-neg']), [sr, sg, sb] = hexRgb(C.surface), a = Math.abs(t);
-  return [sr + (r - sr) * a, sg + (g - sg) * a, sb + (b - sb) * a];
+  const t = clamp(v / max, -1, 1), a = Math.abs(t);
+  const [mid, end] = t >= 0 ? [C['map-pos'], C['map-pos-strong']] : [C['map-neg'], C['map-neg-strong']];
+  const mix = (c1, c2, f) => hexRgb(c1).map((x, i) => x + (hexRgb(c2)[i] - x) * f);
+  return a <= 0.5 ? mix(C.surface, mid, a * 2) : mix(mid, end, (a - 0.5) * 2);
 }
 function heatmap(canvas, opts, rows, cols, valueAt, max, after) {
   const p = plot(canvas, opts);
@@ -667,9 +674,9 @@ const hitPoi = e => {
 function poiText(q) {
   const k = state.s.k, p = S.p;
   if (q.kind === 'max') return `<div class="tip-title">The signal at its maximum, <i>φ</i> = ${q.phi.toFixed(0)}°</div>
-    <p>The reference is in step with the signal: in panel 1 almost all of the product is amber, and the integral in panel 2 ends at its largest value, |<i>A</i><sub>${k}</sub>| = ${p.amp.toFixed(3)}. The lag <i>δ</i> = 360° − <i>φ</i><sub>max</sub> = ${p.delta.toFixed(0)}° reads as the time value <i>t</i><sub>con</sub> = ${p.tcon.toFixed(3)} <i>T</i>.</p><p class="tip-hint">click to keep this <i>φ</i></p>`;
+    <p>The reference is in step with the signal: in panel 1 almost all of the product is red, and the integral in panel 2 ends at its largest value, |<i>A</i><sub>${k}</sub>| = ${p.amp.toFixed(3)}. The lag <i>δ</i> = 360° − <i>φ</i><sub>max</sub> = ${p.delta.toFixed(0)}° reads as the time value <i>t</i><sub>con</sub> = ${p.tcon.toFixed(3)} <i>T</i>.</p><p class="tip-hint">click to keep this <i>φ</i></p>`;
   return `<div class="tip-title">The signal is gone, <i>φ</i> = ${q.phi.toFixed(0)}°</div>
-    <p>90° from the maximum the reference is a quarter period out of step: in panel 1 the amber and purple areas are equal, and the integral in panel 2 comes back to zero.</p><p class="tip-hint">click to keep this <i>φ</i></p>`;
+    <p>90° from the maximum the reference is a quarter period out of step: in panel 1 the red and blue areas are equal, and the integral in panel 2 comes back to zero.</p><p class="tip-hint">click to keep this <i>φ</i></p>`;
 }
 dragRuler(cPhase, {
   rulerXs: () => (P3 ? [P3.rx] : []), plotOf: () => P3?.p,

@@ -111,8 +111,10 @@ export const COLOR_GROUPS = [
       'data-faint':     { value: 'rgba(94,101,112,0.28)', usage: 'Many traces at once (grey dark at 28 %): the spectra of one period, the other phase angles' },
       'shade-on':       { value: 'rgba(196,64,54,0.08)', usage: 'Background of the stimulus-on half in a time plot (red line at 8 %)' },
       'shade-off':      { value: 'rgba(1,134,174,0.08)', usage: 'Background of the stimulus-off half (blue line at 8 %)' },
-      'map-pos':        { value: SCHEME.amber.line, usage: 'Positive values in a colour map and positive area under a product curve (amber line, PuOr-style). Not red, so it is never read as stimulus on' },
-      'map-neg':        { value: SCHEME.purple.dark, usage: 'Negative values in a colour map and negative area under a product curve (purple dark). Not blue, so it is never read as stimulus off' },
+      'map-pos':        { value: SCHEME.red.line, usage: 'Positive values: halfway up a diverging colour map (blue, white, red, as cmocean balance) and the positive area under a product curve. A plot that uses it shows no on/off shading, so red is never read as stimulus on there' },
+      'map-pos-strong': { value: SCHEME.red.darkest, usage: 'The largest positive value of a diverging colour map' },
+      'map-neg':        { value: SCHEME.blue.line, usage: 'Negative values: halfway down a diverging colour map, and the negative area under a product curve' },
+      'map-neg-strong': { value: SCHEME.blue.darkest, usage: 'The most negative value of a diverging colour map' },
     },
   },
 ];

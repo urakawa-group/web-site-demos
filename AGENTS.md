@@ -143,6 +143,10 @@ guide cannot drift from the site.
   (A) orange, the second (B) ink grey, then purple, pink and sand. A page
   with a single signal draws it in A's orange. (The phd_ui MES tutorial
   figures still draw A black and B orange.)
+  Signed values in a map, and the area under a product curve, use the
+  diverging blue, white, red of cmocean balance (`map-neg-strong`,
+  `map-neg`, white, `map-pos`, `map-pos-strong`). Because red and blue are
+  also on and off, a plot that shows them as signs draws no on/off shading.
 - **Responsive rules key off `<html data-w>`** (`compact`, `mid`, `wide`), set by
   the shell from the width it actually has, never off `@media (max-width)`.
   Otherwise the layout stays wide while the presentation zoom makes the content
