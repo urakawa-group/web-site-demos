@@ -148,7 +148,7 @@ const GENERAL = `<h2>What This Page Shows</h2>
    Engine: one period on M samples, T = 1
    --------------------------------------------------------------------------- */
 /* Samples per period: 720, more for a high harmonic so that the reference
-   keeps at least 72 samples per oscillation (7200 at k = 100). The bars show
+   keeps at least 72 samples per oscillation (2160 at k = 30). The bars show
    15 harmonics, or up to k. */
 const T = 1, WARM = 12;
 let M = 720, dt = T / M, NH = 15;
@@ -321,18 +321,17 @@ function shade(p) { const t = onTime(); p.shadeX(0, t, C['shade-on']); if (t < T
  *   stimulus      grey, dashed
  *   signal A(t)   orange, solid; clean (no disturbances) faint grey, solid
  *   reference     green, dashed; the chosen φ and its ruler green, dashed
- *   product       solid, red where positive and blue where negative, with
- *                 its area in the same colours, lighter
+ *   product       ink, solid; its area red where positive, blue where negative
  *   summed 1 … k  ink, dashed
  */
 const DASH_SUM = [6, 3];
-const KS = [1, 2, 3, 4, 5, 10, 30, 100];
+const KS = [1, 2, 3, 4, 5, 10, 30];
 const LG = {
   stim: ['stimulus', C['data-stimulus'], 'dashed'],
   sig: ['signal <i>A</i>(<i>t</i>)', C['data-a'], ''],
   clean: ['clean signal', C['data-faint'], ''],
   ref: ['sin(<i>kωt</i> + <i>φ</i>)', C['data-highlight'], 'dashed'],
-  prod: ['product', '', 'rb'],
+  prod: ['product', C['ink-700'], ''],
 };
 function legend(el, items) {
   el.innerHTML = items.filter(Boolean).map(([label, color, cls]) => `<span class="${cls}" style="--c:${color}">${label}</span>`).join('');
@@ -347,7 +346,7 @@ function drawSig() {
   const p = plot($('cSig'), { scale: sc, x: [0, T], y: Y_SIG, xlabel: XLAB_T, ylabel: 'signal / –', xticks: T_TICKS, yticks: ticks(Y_SIG[0], Y_SIG[1], 4) });
   const { ctx, X, Y } = p;
   p.hline(0);
-  // the product: its area, then its line, red where positive and blue where negative
+  // the product: its area red where positive and blue where negative, its line in ink
   const prod = ts.map((_, j) => S.A[j] * refAt(j));
   const fillPos = rgba(C['map-pos'], 0.22), fillNeg = rgba(C['map-neg'], 0.22);
   for (let j = 0; j < jc; j++) {
@@ -355,13 +354,7 @@ function drawSig() {
     ctx.fillStyle = a + b >= 0 ? fillPos : fillNeg;
     ctx.beginPath(); ctx.moveTo(X(ts[j]), Y(0)); ctx.lineTo(X(ts[j]), Y(a)); ctx.lineTo(X(ts[j + 1]), Y(b)); ctx.lineTo(X(ts[j + 1]), Y(0)); ctx.closePath(); ctx.fill();
   }
-  ctx.save(); ctx.beginPath(); ctx.rect(p.inner.l, p.inner.t, p.inner.r - p.inner.l, p.inner.b - p.inner.t); ctx.clip();
-  ctx.lineWidth = CHART.lineData; ctx.setLineDash([]); ctx.lineJoin = 'round';
-  for (let j = 0; j < jc; j++) {
-    ctx.strokeStyle = prod[j] + prod[j + 1] >= 0 ? C['map-pos'] : C['map-neg'];
-    ctx.beginPath(); ctx.moveTo(X(ts[j]), Y(prod[j])); ctx.lineTo(X(ts[j + 1]), Y(prod[j + 1])); ctx.stroke();
-  }
-  ctx.restore();
+  p.line(ts.slice(0, jc + 1), prod.slice(0, jc + 1), C['ink-700']);
   // stimulus, clean signal, rebuilt, signal, reference
   if (st.shape === 'square') p.steps(ts, ts.map((_, j) => heldAt(j % M)), C['data-stimulus']);
   else p.line(ts, Array.from(S.stim), C['data-stimulus'], CHART.lineThin, CHART.dash);
@@ -399,7 +392,7 @@ function drawInt() {
   if (state.cursor >= 1) {
     p.hline(end, C['data-highlight'], 1);
     p.dot(T, end, C['data-highlight']);
-    p.text(`*A*_${k}_(*φ*) = ${end.toFixed(3)}`, T * 0.97, end + (end > 0.6 ? -0.16 : 0.1), C['data-highlight'], 'right');
+    p.text(`*A*_${k}_(*φ*) = ${end.toFixed(3)}`, T * 0.97, end + (end > 0.6 ? -0.16 : 0.1), C['data-highlight'], 'right', undefined, false);
   } else p.dot(ts[jc], run[jc], C['data-a']);
   p.axes();
   $('subInt').innerHTML = `The product added up; at <i>T</i> it is <i>A<sub>${k}</sub></i>(<i>φ</i>).`;

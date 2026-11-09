@@ -87,9 +87,9 @@ should understand the idea by changing something and watching the response.
   `dashed`, `rb`, `bar`, `outline`, `tick`, `dot`, `ring`), never spelled out
   in the subtitle. One look per kind of line on a page: stimulus grey dashed,
   signal solid in its colour, reference and chosen φ green dashed (grabbable,
-  with a grip, wherever they appear, maps included), product red where
-  positive and blue where negative, summed harmonics ink dashed, clean signal
-  faint grey.
+  with a grip, wherever they appear, maps included), product ink solid with
+  its area red where positive and blue where negative, summed harmonics ink
+  dashed, clean signal faint grey.
 - **Figure 3 of a PSD page offers three views of the demodulated spectra.**
   Phase-resolved (the set over φ) or the averaged period; the amplitude
   |A_k| = √(I² + Q²) as the envelope no φ exceeds; and the harmonic k alone or

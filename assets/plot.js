@@ -121,13 +121,17 @@ export function plot(canvas, o) {
       ctx.fillStyle = color; ctx.strokeStyle = C.surface; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(X(x), Y(y), r, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
     },
-    /** A label on the data, on a surface-coloured box so a trace under it does not cut it. */
-    text(s, x, y, color = note.color, align = 'center', font = note.font) {
-      const w = richText(ctx, s, 0, 0, font, 'left', false), px = X(x), py = Y(y);
-      const left = align === 'center' ? px - w / 2 : align === 'right' ? px - w : px;
-      ctx.fillStyle = C.surface; ctx.globalAlpha = 0.85;
-      ctx.fillRect(left - 3, py - 12 * sc, w + 6, 16 * sc);
-      ctx.globalAlpha = 1; ctx.fillStyle = color;
+    /** A label on the data, on a surface-coloured box so a trace under it does not cut it (box = false: no box). */
+    text(s, x, y, color = note.color, align = 'center', font = note.font, box = true) {
+      const px = X(x), py = Y(y);
+      if (box) {
+        const w = richText(ctx, s, 0, 0, font, 'left', false);
+        const left = align === 'center' ? px - w / 2 : align === 'right' ? px - w : px;
+        ctx.fillStyle = C.surface; ctx.globalAlpha = 0.85;
+        ctx.fillRect(left - 3, py - 12 * sc, w + 6, 16 * sc);
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = color;
       richText(ctx, s, px, py, font, align);
     },
     /** Frame, ticks and labels. Call last, so the frame sits on top. */
