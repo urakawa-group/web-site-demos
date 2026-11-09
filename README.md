@@ -12,7 +12,7 @@ happens. Nothing to install, no account, no build step.
 
 | demo | field | what it shows |
 |---|---|---|
-| [MES-PSD](demos/spectroscopy/mes-psd/index.html) | spectroscopy | modulation excitation and phase-sensitive detection. [Transformation](demos/spectroscopy/mes-psd/transformation/index.html): one period turned into the phase domain five ways (multiply and integrate, phasor, harmonics, disturbances, the whole spectrum), six inputs. [Cases](demos/spectroscopy/mes-psd/cases/index.html): every setting on a control, eight stored cases from one band without delay to a sequence of species with a spectator |
+| [MES-PSD](demos/spectroscopy/mes-psd/index.html) | spectroscopy | modulation excitation and phase-sensitive detection. [Transformation](demos/spectroscopy/mes-psd/transformation/index.html): one period turned into the phase domain five ways (multiply and integrate, phasor, harmonics, disturbances, the whole spectrum), six inputs. [Cases](demos/spectroscopy/mes-psd/cases/index.html): every setting on a control, nine stored cases from one band without delay to a sequence of species with a spectator |
 
 ## Layout
 

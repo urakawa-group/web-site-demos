@@ -183,6 +183,16 @@ body.wb-locked { overflow: hidden; }
 .wb-center .panel canvas { flex: 1 1 0; min-height: 0; height: auto; }
 /* fixed heights: two lines of subtitle, one of legend, whatever they hold */
 .wb-center .panel .sub { flex: none; height: calc(2 * var(--t-panel-sub-lh) * 1em); overflow: hidden; }
+.sub-row { display: flex; align-items: flex-start; gap: var(--space-3); flex: none; }
+.wb-center .panel .sub-row .sub, .sub-row .sub { flex: 1 1 0; min-width: 0; }
+.phi-field { flex: none; white-space: nowrap; color: var(--data-highlight); font-weight: var(--t-control-value-weight); font-size: var(--t-panel-sub-size); }
+[data-w="wide"] .phi-field { font-size: calc(var(--t-panel-sub-size) * var(--wb-text-scale)); }
+.phi-field input {
+  font: inherit; color: inherit; width: 3.2em; text-align: right; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); padding: 0 4px; margin: 0 1px;
+}
+.phi-field input:focus { outline: none; border-color: var(--data-highlight); }
+.phi-field input.preview { border-style: dashed; }
 .wb-center .panel h3 { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wb-center .legend { flex: none; height: 2.9em; overflow: hidden; align-content: flex-start; }
 .wb-center .legend span { flex: none; white-space: nowrap; }
@@ -312,6 +322,10 @@ table.readout.side td:first-child { font-weight: var(--t-control-value-weight); 
 .sp-fold { font: inherit; font-size: var(--t-control-size); color: var(--ink-300); background: none; border: 0; padding: 0 4px; cursor: pointer; line-height: 1; }
 .sp-fold:hover { color: var(--ink-900); }
 .sp-card.folded .sp-body { display: none; }
+.sp-card.folded { cursor: pointer; }
+.sp-card.folded:hover { background: var(--surface-hover); }
+.sp-label { flex: 1; min-width: 0; padding: 3px 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--t-control-size); font-weight: var(--t-control-value-weight); color: var(--c); }
 .sp-top .sp-x { font: inherit; font-size: var(--t-control-size); color: var(--ink-500); background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 6px; line-height: 1.4; cursor: pointer; }
 .sp-top .sp-x:hover { background: var(--surface-hover); color: var(--ink-900); }
 .sp-note { margin: 0; font-size: var(--t-footer-size); color: var(--t-footer-color); line-height: var(--t-panel-sub-lh); }

@@ -5,7 +5,7 @@
 
   What it shows: one engine with every setting on a control, always on
   screen: five species slots (each on or off), the measurement settings, and
-  eight cases, from the simplest (one band that follows the stimulus at once)
+  nine cases, from the simplest (one band that follows the stimulus at once)
   to a sequence of species with a spectator. A case is a stored set of
   values for the settings: picking it changes the values, it never adds or
   removes a control. The transformation itself, on one trace, is the sibling
@@ -49,9 +49,9 @@
     <!-- left: every setting, always there; collapsed, a rail of quick switches -->
     <aside class="wb-side wb-left" id="left" aria-label="Settings">
       <div class="side-open">
-        <section class="sgroup" data-g="case" id="caseSelect">
+        <section class="sgroup closed" data-g="case" id="caseSelect">
           <div class="sg-head">
-            <button type="button" class="sg-toggle" aria-expanded="true" title="The case: a stored set of values for every setting below. Click to fold"><span class="sg-name">case</span><span class="sg-sum"></span></button>
+            <button type="button" class="sg-toggle" aria-expanded="false" title="The case: a stored set of values for every setting below. Click to fold"><span class="sg-name">case</span><span class="sg-sum"></span></button>
             <span class="changed-mark" title="A setting differs from the case">changed</span>
             <button type="button" class="side-toggle" id="leftToggle" title="Collapse the settings to quick switches">◀</button>
           </div>
@@ -64,8 +64,8 @@
           </div>
         </section>
 
-        <section class="sgroup" data-g="measurement">
-          <div class="sg-head"><button type="button" class="sg-toggle" aria-expanded="true" title="The experiment: time base, spectral axis, stimulus, noise and averaging. Click to fold"><span class="sg-name">measurement</span><span class="sg-sum"></span></button></div>
+        <section class="sgroup closed" data-g="measurement">
+          <div class="sg-head"><button type="button" class="sg-toggle" aria-expanded="false" title="The experiment: time base, spectral axis, stimulus, noise and averaging. Click to fold"><span class="sg-name">measurement</span><span class="sg-sum"></span></button></div>
           <div class="sg-body">
             <div class="ctl"><span>time unit</span>
               <span class="seg" id="unit"><button type="button" data-v="T">periods</button><button type="button" data-v="min">minutes</button></span></div>
@@ -73,6 +73,7 @@
             <label class="ctl"><span>spectral axis</span><select id="axis"></select></label>
             <div class="ctl"><span>stimulus</span>
               <span class="seg" id="shape"><button type="button" data-v="square">on / off</button><button type="button" data-v="sine">sine</button></span></div>
+            <div class="ctl vctl" data-k="duty"></div>
             <div class="ctl vctl" data-k="noise"></div>
             <div class="ctl vctl" data-k="cycles"></div>
             <button class="btn" id="reseed" type="button">new noise</button>
@@ -120,12 +121,15 @@
           <section class="panel">
             <h3>2 · Fold and Average</h3>
             <p class="sub" id="subFold"></p>
-            <canvas id="cFold"></canvas>
+            <canvas id="cFold" class="interactive"></canvas>
             <div class="legend" id="legFold"></div>
           </section>
           <section class="panel">
             <h3>3 · Spectra</h3>
-            <p class="sub"><span id="subSpecFold">Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].</span><span id="subSpecAll" hidden><i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].</span></p>
+            <div class="sub-row">
+              <p class="sub"><span id="subSpecFold">Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].</span><span id="subSpecAll" hidden><i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].</span></p>
+              <label class="phi-field" title="The phase angle on show: type a value, or move the ruler in figure 2 or 4"><i>φ</i> = <input id="phiField" type="text" inputmode="decimal" aria-label="phase angle">°<span id="kField"></span></label>
+            </div>
             <canvas id="cSpec"></canvas>
             <div class="legend" aria-hidden="true"></div>
           </section>

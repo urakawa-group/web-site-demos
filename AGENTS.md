@@ -70,7 +70,10 @@ should understand the idea by changing something and watching the response.
   a click anywhere else in the plot does nothing.
 - **The left panel folds by group.** Each group (case, measurement,
   demodulation, species) folds on its heading and then shows what it is set
-  to; each species card folds to its name row. The case heading also holds
+  to; each species card folds to its name row. The page opens with case and
+  measurement folded, demodulation and species open, every species card
+  folded. A folded card opens on a click anywhere but its switch; its name
+  can be edited only while it is open. The case heading also holds
   the "changed" mark and the button that collapses the whole panel.
 - **Labels in a plot set quantities in italic** (`*φ*`, `*T*`) and subscripts
   as subscripts (`*φ*_max_`), through `plot.js`. In Source Sans 3 the

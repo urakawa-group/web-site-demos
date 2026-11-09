@@ -34,6 +34,7 @@ const SOURCES = {
      unit     'T' (time in periods, T = 1) or 'min' (T in minutes)
      axis     'generic' (spectral position 0 to 60) or 'ir' (wavenumber)
      noise    slider value 0 to 100
+     duty     on fraction of the period, for the on/off stimulus (½ by default)
      species  always five slots, s1 to s5, in drive order. Each one:
        on     whether it is in the sample; a slot that is off keeps its values
        key, label, color ('data-a' | 'data-b' | 'data-c'; static and bandless
@@ -43,6 +44,8 @@ const SOURCES = {
        drive  'stim', 'static' or the key of an earlier slot; an earlier slot
               that is off or static counts as the stimulus
        tau    time constant, in the unit of the settings
+       tauOff time constant while the species falls, or null for the same
+              as tau; a different one makes the step non-linear
        invert antiphase: falls while the stimulus is on
        base   part of the band that never leaves, 0 to 0.95
 
@@ -57,7 +60,7 @@ const DYN_COLORS = ['data-a', 'data-b', 'data-c', 'data-d', 'data-e'];
 const SLOTS = 5;          // always there; the reader can add more below them
 const MAX_SPECIES = 8;
 
-const sp = (label, color, band, drive, tau, extra = {}) => ({ label, color, band, drive, tau, invert: false, base: 0, ...extra });
+const sp = (label, color, band, drive, tau, extra = {}) => ({ label, color, band, drive, tau, tauOff: null, invert: false, base: 0, ...extra });
 /** The slots in the generic axis, as a case that does not use them leaves them. */
 const DEFAULT_SLOTS = [
   sp('A', 'data-a', [20, 10, 1], 'stim', 0.04),
@@ -81,7 +84,7 @@ function slots(list, axis) {
     return { key, on: false, ...d, band: axis === 'generic' ? d.band : mapAxis(d.band, 'generic', axis) };
   });
 }
-const base = { unit: 'T', T: 1, axis: 'generic', noise: 0, cycles: 4, shape: 'square', k: 1, phi: 0, allPhi: false };
+const base = { unit: 'T', T: 1, axis: 'generic', noise: 0, cycles: 4, shape: 'square', duty: 0.5, k: 1, phi: 0, allPhi: false };
 const settings = (extra, list) => ({ ...base, ...extra, species: slots(list, extra.axis ?? 'generic') });
 
 const CASES = [
@@ -141,6 +144,12 @@ const CASES = [
     ]),
     text: `<p>A square wave is a sum of odd sines, (4/π) Σ sin[(2<i>n</i> − 1)<i>ωt</i>]/(2<i>n</i> − 1), so one square-wave experiment drives the sample at <i>ω</i>, 3<i>ω</i> and 5<i>ω</i> at once [@handbook, Eq. 42.1, p. 970]. Demodulating at <i>k</i> = 3 or 5 gives the response to a 3 or 5 times faster modulation, and the amplitude times <i>k</i> puts it on the scale of the fundamental. This holds exactly only while the response is linear [@handbook, p. 970].</p>
       <p>Compare <i>k</i> = 1 and 3: at the faster frequency the slow band A falls further behind and loses more amplitude. <i>k</i> = 2 shows nothing. Switch the stimulus to sine and only <i>k</i> = 1 is left [@urakawa2008].</p>`,
+  },
+  {
+    id: 'even', title: 'Even Harmonics: Fast Up, Slow Down',
+    s: settings({ k: 2 }, [sp('A', 'data-a', [30, 10, 1], 'stim', 0.02, { tauOff: 0.2 })]),
+    text: `<p>A linear response to an on/off wave of half-period on time has no even harmonics: what builds up in the on half decays the same way in the off half, so the response repeats with the opposite sign every <i>T</i>/2 [@handbook, Eq. 42.1, p. 970]. Here A rises fast while the stimulus is on and falls slowly when it is off, as for fast adsorption and slow desorption. Rise and fall differ, the response is no longer linear in the stimulus, and <i>k</i> = 2 shows a band.</p>
+      <p>Set the falling <i>τ</i> back to the rising one and the band at <i>k</i> = 2 goes. A stimulus that is on for less or more than half the period gives even harmonics even with a linear response: try the on fraction.</p>`,
   },
   {
     id: 'sequence', title: 'A Sequence with a Spectator',
@@ -269,12 +278,15 @@ function rng(seed) {
  * `held[i]` the value it holds over [t_i, t_i+1]. Without `held`, the mean of
  * the two neighbouring points is used (a chain of steps).
  */
-function firstOrder(points, tau, dt, held = null) {
-  if (!(tau > 0)) return Float64Array.from(points);
-  const e = Math.exp(-dt / tau), y = new Float64Array(points.length);
+function firstOrder(points, tau, dt, held = null, tauOff = null) {
+  const off = tauOff ?? tau;
+  if (!(tau > 0) && !(off > 0)) return Float64Array.from(points);
+  // rising toward the input with tau, falling with tauOff: one step, two rates
+  const eOn = tau > 0 ? Math.exp(-dt / tau) : 0, eOff = off > 0 ? Math.exp(-dt / off) : 0;
+  const y = new Float64Array(points.length);
   for (let i = 1; i < points.length; i++) {
     const h = held ? held[i - 1] : 0.5 * (points[i - 1] + points[i]);
-    y[i] = h + (y[i - 1] - h) * e;
+    y[i] = h + (y[i - 1] - h) * (h >= y[i - 1] ? eOn : eOff);
   }
   return y;
 }
@@ -290,8 +302,9 @@ function compute() {
   for (let i = 0; i < n; i++) {
     const j = i % M;
     if (st.shape === 'square') {
-      stim[i] = j === 0 || j === M / 2 ? (i === 0 ? 0 : 0.5) : (j < M / 2 ? 1 : 0);
-      held[i] = j < M / 2 ? 1 : 0;
+      const nOn = Math.round(st.duty * M);
+      stim[i] = j === 0 || j === nOn ? (i === 0 ? 0 : 0.5) : (j < nOn ? 1 : 0);
+      held[i] = j < nOn ? 1 : 0;
     } else {
       stim[i] = 0.5 + 0.5 * Math.sin(2 * Math.PI * j / M);
       held[i] = 0.5 + 0.5 * Math.sin(2 * Math.PI * (j + 0.5) / M);
@@ -301,7 +314,7 @@ function compute() {
   const conc = { stim }, height = {}, on = live();
   for (const s of on) {
     const d = driverOf(s);
-    conc[s.key] = isStatic(s) ? new Float64Array(n).fill(1) : firstOrder(d ? conc[d.key] : stim, s.tau, dt, d ? null : held);
+    conc[s.key] = isStatic(s) ? new Float64Array(n).fill(1) : firstOrder(d ? conc[d.key] : stim, s.tau, dt, d ? null : held, s.tauOff);
     if (!s.band) continue;
     const b0 = s.base ?? 0, c = conc[s.key], h = new Float64Array(n);
     for (let i = 0; i < n; i++) {
@@ -354,7 +367,8 @@ function compute() {
     }
     return phaseOf(i_, q_);
   };
-  const rows = [{ key: 'stim', label: 'stimulus', color: C['data-stimulus'], ...psdTrace(stim), theory: 0 }];
+  const sl = stimLag(k);
+  const rows = [{ key: 'stim', label: 'stimulus', color: C['data-stimulus'], ...psdTrace(stim), theory: sl == null ? null : sl / (2 * Math.PI) * T / k }];
   for (const s of on) {
     const r = s.band ? phaseOf(I[centre[s.key]], Q[centre[s.key]]) : psdTrace(conc[s.key]);
     rows.push({ key: s.key, label: s.label, color: colorOf(s), static: isStatic(s), sp: s, ...r, theory: theoryTcon(s, k) });
@@ -363,14 +377,38 @@ function compute() {
 }
 
 /** One-step (or chain) first-order time value at harmonic k: phases of steps in series add. */
+/**
+ * The stimulus' own lag at harmonic k, in rad. An on/off wave on for a
+ * fraction d of the period has its k-th harmonic at φ = 90° − 180°·frac(kd),
+ * so it lags by 180°·frac(kd) − 90°; null where that harmonic is absent.
+ * Zero for d = ½ at every odd k, and for the sine.
+ */
+function stimLag(k) {
+  const st = state.s;
+  if (st.shape !== 'square') return k === 1 ? 0 : null;
+  const f = (k * st.duty) % 1;
+  if (f < 1e-9 || f > 1 - 1e-9) return null;
+  const lag = (180 * f - 90) * Math.PI / 180;
+  return ((lag % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+}
+
+/**
+ * First-order time value at harmonic k: the stimulus' own lag plus the lags of
+ * the steps in series. Only for linear steps: a step that falls with its own
+ * τ has no single lag, and the formula gives none.
+ */
 function theoryTcon(s0, k) {
   if (isStatic(s0)) return null;
-  const T = state.s.T, w = 2 * Math.PI * k / T;
-  let phase = 0, s = s0;
-  while (s) { phase += Math.atan(w * s.tau); s = driverOf(s); }
+  const T = state.s.T, w = 2 * Math.PI * k / T, sl = stimLag(k);
+  if (sl == null) return null;
+  let phase = sl, s = s0;
+  while (s) {
+    if (s.tauOff != null && s.tauOff !== s.tau) return null;
+    phase += Math.atan(w * s.tau); s = driverOf(s);
+  }
   if (s0.invert) phase += Math.PI;
   const period = T / k;
-  return ((phase / (2 * Math.PI)) * period) % period;
+  return (((phase / (2 * Math.PI)) * period) % period + period) % period;
 }
 
 /* ---------------------------------------------------------------------------
@@ -378,6 +416,8 @@ function theoryTcon(s0, k) {
    --------------------------------------------------------------------------- */
 let S = null;
 
+/** End of the stimulus-on part of the period: the on fraction for on/off, half for the sine. */
+const onTime = () => (state.s.shape === 'square' ? state.s.duty : 0.5) * state.s.T;
 const fmtT = v => (state.s.unit === 'T' ? `${v.toFixed(3)} T` : `${v.toFixed(1)} min`);
 const timeLabel = () => (state.s.unit === 'T' ? 'time / *T*' : 'time / min');
 /**
@@ -418,7 +458,8 @@ function drawTime() {
     x: [0, cyc * T], y: yr, xlabel: timeLabel(), ylabel: 'signal / –',
     xticks: ticks(0, cyc * T, 5, v => String(+v.toFixed(2))), yticks: ticks(yr[0], yr[1], 4),
   });
-  for (let c = 0; c < cyc; c++) { p.shadeX(c * T, c * T + T / 2, C['shade-on']); p.shadeX(c * T + T / 2, (c + 1) * T, C['shade-off']); }
+  const tOn = onTime();
+  for (let c = 0; c < cyc; c++) { p.shadeX(c * T, c * T + tOn, C['shade-on']); p.shadeX(c * T + tOn, (c + 1) * T, C['shade-off']); }
   p.steps(ts, cut(held), C['data-stimulus']);
   for (const s of live().filter(s => !s.band)) p.line(ts, cut(conc[s.key]), colorOf(s), CHART.lineThin, CHART.dash);
   for (const s of S.banded) p.line(ts, cut(raw[s.key]), colorOf(s), CHART.lineThin);
@@ -431,7 +472,7 @@ function drawFold() {
   const yr = limits().time;
   const tk = st.unit === 'T' ? [[0, '0'], [0.25, 'T/4'], [0.5, 'T/2'], [0.75, '3T/4'], [1, 'T']] : ticks(0, T, 4);
   const p = plot($('cFold'), { scale: SC(), x: [0, T], y: yr, xlabel: st.unit === 'T' ? 'time in the period / *T*' : 'time in the period / min', ylabel: 'signal / –', xticks: tk, yticks: ticks(yr[0], yr[1], 4) });
-  p.shadeX(0, T / 2, C['shade-on']); p.shadeX(T / 2, T, C['shade-off']);
+  p.shadeX(0, onTime(), C['shade-on']); p.shadeX(onTime(), T, C['shade-off']);
   p.steps(tp, Array.from(held.subarray(0, M)), C['data-stimulus']);
   for (const s of live().filter(s => !s.band)) {
     const c = conc[s.key], avg = tp.map((_, j) => { let v = 0; for (let q = WARM; q < WARM + st.cycles; q++) v += c[q * M + j]; return v / st.cycles; });
@@ -447,8 +488,16 @@ function drawFold() {
   };
   if (state.preview) mark(state.preview.phi, 1, [1, 3]);
   mark(st.phi, 1.5, [4, 3]);
+  // grips on top of the lines, to grab the ruler by
+  const t0 = ((360 - st.phi) % 360) / 360 * T / st.k, g = 6, xs = [];
+  p.ctx.fillStyle = C['data-highlight'];
+  for (let m = 0; m < st.k; m++) {
+    const x = p.X(t0 + m * T / st.k); xs.push(x);
+    p.ctx.beginPath(); p.ctx.moveTo(x - g, p.inner.t); p.ctx.lineTo(x + g, p.inner.t); p.ctx.lineTo(x, p.inner.t + g * 1.4); p.ctx.closePath(); p.ctx.fill();
+  }
+  FD = { p, xs, T, k: st.k };
   p.axes();
-  $('subFold').innerHTML = `${st.cycles} cycle${st.cycles > 1 ? 's' : ''} in quasi-steady state, averaged: the noise drops by about √${st.cycles}. Green: the delay the chosen <i>φ</i> reads, (360° − <i>φ</i>)/360° · <i>T</i>/<i>k</i>.`;
+  $('subFold').innerHTML = `${st.cycles} cycle${st.cycles > 1 ? 's' : ''} in quasi-steady state, averaged: the noise drops by about √${st.cycles}. Green: the delay the chosen <i>φ</i> reads, (360° − <i>φ</i>)/360° · <i>T</i>/<i>k</i>; drag it to set <i>φ</i>.`;
 }
 
 const psdAt = phi => {
@@ -465,21 +514,17 @@ function drawSpec() {
   const set = st.allPhi ? Array.from({ length: 18 }, (_, i) => psdAt(i * 10)) : [];
   const avg = st.allPhi ? [] : Array.from({ length: 12 }, (_, i) => Array.from(S.fold[i * (M / 12)]));
   const yr = limits().spec;
-  const p = plot($('cSpec'), { scale: SC(), x: [ax.from, ax.to], y: yr, xlabel: ax.label, ylabel: 'absorbance / –', xticks: ax.ticks, yticks: ticks(yr[0], yr[1], 4) });
+  const p = plot($('cSpec'), { scale: SC(), x: [ax.from, ax.to], y: yr, xlabel: ax.label, ylabel: st.allPhi ? '*A*_*k*_(*φ*) / –' : 'signal / –', xticks: ax.ticks, yticks: ticks(yr[0], yr[1], 4) });
   p.hline(0);
   for (const s of avg) p.line(xs, s, C['data-faint'], CHART.lineFaint);
   for (const s of set) p.line(xs, s, C['data-faint'], CHART.lineFaint);
   p.line(xs, cur, C['data-highlight'], CHART.lineHighlight);
   for (const s of S.banded) p.text(s.label.split(',')[0], s.band[0], yr[1] - (yr[1] - yr[0]) * 0.07, colorOf(s));
-  // the angle on show, bold green, top left
-  const { ctx, inner } = p;
-  ctx.fillStyle = C['data-highlight'];
-  richText(ctx, `*φ* = ${Math.round(phi)}°${st.k > 1 ? `, *k* = ${st.k}` : ''}`, inner.l + 8, inner.t + 18 * p.scale, p.font('axis', 700));
   p.axes();
 }
 
-/* phase domain: the points of interest, kept for hover and click */
-let PH = null;
+/* phase domain: the points of interest, kept for hover and click; figure 2: its ruler */
+let PH = null, FD = null;
 
 function drawPhase() {
   const ph = Array.from({ length: 73 }, (_, i) => i * 5);
@@ -508,18 +553,48 @@ function drawPhase() {
     }
     q.px = X(q.phi); q.py = Y(q.y);
   }
-  // each maximum read off in the plot: a drop line to the φ axis carries
-  // φmax, a line to the right edge (360°) carries the lag δ = 360° − φmax
-  const maxima = pois.filter(q => q.kind === 'max'), span = yr[1] - yr[0];
-  maxima.forEach((q, i) => {
-    const c = q.row.color, name = q.row.label.split(',')[0];
+  // each maximum read off in the plot: a drop line to the φ axis and a line to
+  // the right edge (360°), whose length is the lag δ = 360° − φmax. The angle
+  // sits above the dot, δ on its line halfway to the edge, or left of the dot
+  // where the line is too short. Where two labels would touch, a δ moves up
+  // or down a little and an angle sideways.
+  const maxima = pois.filter(q => q.kind === 'max').sort((u, v) => u.phi - v.phi);
+  const font = p.font('annotation'), sc = p.scale, placed = [];
+  const boxOf = (txt, x, y, align) => {
+    const w = richText(ctx, txt, 0, 0, font, 'left', false), h = 15 * sc;
+    const l = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x;
+    return { l: l - 3, r: l + w + 3, t: y - 12 * sc, b: y - 12 * sc + h, w };
+  };
+  const hits = bx => placed.some(o => bx.l < o.r && bx.r > o.l && bx.t < o.b && bx.b > o.t);
+  const put = (txt, x, y, align, color, nudge) => {
+    let bx = boxOf(txt, x, y, align), k = 0;
+    while (hits(bx) && k < 6) {
+      k += 1;
+      const step = Math.ceil(k / 2) * (k % 2 ? 1 : -1);
+      if (nudge === 'y') { y += step * (bx.b - bx.t + 2); } else { x += step * (bx.w + 6); }
+      bx = boxOf(txt, x, y, align);
+    }
+    placed.push(bx);
+    ctx.fillStyle = C.surface; ctx.globalAlpha = 0.85; ctx.fillRect(bx.l, bx.t, bx.r - bx.l, bx.b - bx.t); ctx.globalAlpha = 1;
+    ctx.fillStyle = color; richText(ctx, txt, x, y, font, align);
+  };
+  for (const q of maxima) {
+    const c = q.row.color;
     p.line([q.phi, q.phi], [q.y, yr[0]], c, 1, [3, 3]);
     p.line([q.phi, 360], [q.y, q.y], c, 1, [3, 3]);
-    // φmax at the foot of the drop line, stacked upwards if there are several;
-    // δ beside its own dot, on the side away from the right edge
-    p.text(`*φ*_max_ = ${q.phi.toFixed(0)}°`, q.phi - 2, yr[0] + span * (0.1 + 0.13 * i), c, 'right');
-    p.text(`${name}: *δ* = ${q.row.delta.toFixed(0)}°`, q.phi - 4, q.y + span * 0.1, c, 'right');
-  });
+    placed.push({ l: X(q.phi) - 6, r: X(q.phi) + 6, t: Y(q.y) - 6, b: Y(q.y) + 6 });   // the dot itself
+  }
+  // the angle above its dot, or below it where the dot is close to the top of the frame
+  for (const q of maxima) {
+    const above = Y(q.y) - 9 * sc, below = Y(q.y) + 21 * sc;
+    put(`${q.phi.toFixed(0)}°`, X(q.phi), above - 12 * sc < p.inner.t + 2 ? below : above, 'center', q.row.color, 'x');
+  }
+  for (const q of maxima) {
+    const txt = `*δ* = ${q.row.delta.toFixed(0)}°`, w = richText(ctx, txt, 0, 0, font, 'left', false);
+    const room = X(360) - X(q.phi) - 10;
+    if (room >= w + 6) put(txt, (X(q.phi) + X(360)) / 2, Y(q.y) - 4 * sc, 'center', q.row.color, 'y');
+    else put(txt, X(q.phi) - 9, Y(q.y) + 5 * sc, 'right', q.row.color, 'y');
+  }
   // the ruler's grip: a small triangle on top of the dashed line, to grab it by
   const rx = X(state.s.phi), g = 6;
   ctx.fillStyle = C['data-highlight'];
@@ -696,7 +771,7 @@ function setPhi(v) {
    Controls: the species slots. Always five, in drive order: a slot can only
    follow the stimulus or a slot above it. Off keeps the values.
    --------------------------------------------------------------------------- */
-/** Species cards folded to their name row: the slots that are off at first, then the reader's choice. */
+/** Species cards folded to their name row: all of them when the page opens, then the reader's choice. */
 const folded = new Set();
 let foldedInit = false;
 
@@ -713,7 +788,7 @@ function slotCard(s, i) {
     <div class="sp-top">
       <label class="switch" title="${s.on ? 'in the sample: click to take it out' : 'not in the sample: click to add it'}"><input type="checkbox" data-f="on"${s.on ? ' checked' : ''}><span></span></label>
       <span class="sp-swatch${s.band ? '' : ' dashed'}"></span>
-      <input type="text" data-f="label" value="${s.label}" aria-label="name">
+      ${folded.has(s.key) ? `<span class="sp-label">${s.label}</span>` : `<input type="text" data-f="label" value="${s.label}" aria-label="name">`}
       <button type="button" class="sp-fold" data-f="fold" aria-expanded="${!folded.has(s.key)}" title="${folded.has(s.key) ? 'Show the settings of this species' : 'Fold this species to its name'}">${folded.has(s.key) ? '▸' : '▾'}</button>
       ${i < SLOTS ? `<button type="button" class="rst" data-f="resetSlot" title="this slot back to the case"${slotChanged(i) ? '' : ' hidden'}>↺</button>`
         : '<button type="button" class="sp-x" data-f="remove" title="remove this added species">×</button>'}
@@ -722,6 +797,8 @@ function slotCard(s, i) {
       <label class="ctl wide"><span>follows</span><select data-f="drive">${opts}</select></label>
       <div class="ctl vctl wide" data-k="tau:${i}"></div>
       <div class="ctl vctl wide" data-k="lag:${i}"></div>
+      <label class="ctl check wide" title="Rise and fall at different rates: the step is no longer linear, and even harmonics appear"><input type="checkbox" data-f="asym"${s.tauOff != null ? ' checked' : ''}${dis(isStatic(s))}><span>falls with its own <i>τ</i></span></label>
+      <div class="ctl vctl wide" data-k="tauOff:${i}"></div>
       <div class="ctl wide"><span>response</span><span class="seg" data-f="invert"><button type="button" data-v="0"${dis(isStatic(s))} aria-pressed="${!s.invert}" title="rises while the stimulus is on">in phase</button><button type="button" data-v="1"${dis(isStatic(s))} aria-pressed="${!!s.invert}" title="falls while the stimulus is on">antiphase</button></span></div>
       ${s.band ? '' : '<p class="sp-note wide">a signal without a band, e.g. the gas in the cell: it drives what follows it and is drawn dashed</p>'}
       <label class="ctl num"><span>centre</span><input type="number" data-f="c" min="${lo}" max="${hi}" step="${Math.abs(ax.step)}" value="${s.band ? num(s.band[0], 1) : ''}"${dis(!s.band)}></label>
@@ -733,7 +810,7 @@ function slotCard(s, i) {
 }
 
 function renderSpecies() {
-  if (!foldedInit) { state.s.species.forEach(s => { if (!s.on) folded.add(s.key); }); foldedInit = true; }
+  if (!foldedInit) { state.s.species.forEach(s => folded.add(s.key)); foldedInit = true; }
   $('species').innerHTML = state.s.species.map(slotCard).join('');
   $('addSpecies').disabled = state.s.species.length >= MAX_SPECIES;
   fillVctls($('species'));
@@ -757,7 +834,7 @@ function refuse(card) {
 
 $('species').addEventListener('input', e => {
   const t = e.target, f = t.dataset.f, card = t.closest('.sp-card');
-  if (!f || !card || f === 'on' || f === 'hasBand' || t.closest('.vctl')) return;
+  if (!f || !card || f === 'on' || f === 'asym' || f === 'hasBand' || t.closest('.vctl')) return;
   const st = state.s, s = st.species[+card.dataset.i];
   const v = parseFloat(t.value);
   if (f === 'label') { s.label = t.value; legends(); update(); return; }
@@ -776,6 +853,7 @@ $('species').addEventListener('change', e => {
   if (!f || !card) return;
   const st = state.s, s = st.species[+card.dataset.i];
   const before = clone(s);
+  if (f === 'asym') { s.tauOff = t.checked ? s.tau : null; renderSpecies(); update(); return; }
   if (f === 'on') s.on = t.checked;
   else if (f === 'drive') { s.drive = t.value; if (isStatic(s)) s.invert = false; }
   else if (f === 'hasBand') {
@@ -792,6 +870,13 @@ $('species').addEventListener('click', e => {
   if (fb) {
     const key = state.s.species[+fb.closest('.sp-card').dataset.i].key;
     if (folded.has(key)) folded.delete(key); else folded.add(key);
+    renderSpecies();
+    return;
+  }
+  // a folded card opens on a click anywhere but its switch and buttons
+  const card = e.target.closest('.sp-card.folded');
+  if (card && !e.target.closest('.switch, button')) {
+    folded.delete(state.s.species[+card.dataset.i].key);
     renderSpecies();
     return;
   }
@@ -965,6 +1050,30 @@ cPhase.addEventListener('pointermove', e => {
   if (q) showTip(poiText(q), e.clientX, e.clientY, 'cursor'); else hideTip();
 });
 cPhase.addEventListener('pointerleave', () => { if (dragging) return; state.preview = null; hideTip(); draw(); });
+/* figure 2: drag the delay ruler; φ = 360° − 360°·k·t/T, read in whichever of the k periods it is */
+const cFold = $('cFold');
+const localIn = (cv, e) => { const r = cv.getBoundingClientRect(), f = cv.clientWidth / r.width; return { x: (e.clientX - r.left) * f, y: (e.clientY - r.top) * f }; };
+const onFoldRuler = e => {
+  if (!FD) return false;
+  const { x, y } = localIn(cFold, e), { inner } = FD.p;
+  return y >= inner.t - 4 && y <= inner.b && FD.xs.some(rx => Math.abs(x - rx) <= 7);
+};
+const phiFromFold = e => {
+  const { x } = localIn(cFold, e), { inner } = FD.p;
+  const t = Math.max(0, Math.min(FD.T, (x - inner.l) / (inner.r - inner.l) * FD.T)), per = FD.T / FD.k;
+  return (360 - 360 * ((t % per) / per) + 360) % 360;
+};
+let foldDrag = false;
+cFold.addEventListener('pointermove', e => {
+  if (foldDrag) { setPhi(phiFromFold(e)); return; }
+  cFold.style.cursor = onFoldRuler(e) ? 'ew-resize' : 'default';
+});
+cFold.addEventListener('pointerdown', e => {
+  if (!onFoldRuler(e)) return;
+  foldDrag = true; cFold.setPointerCapture(e.pointerId);
+});
+cFold.addEventListener('pointerup', e => { foldDrag = false; try { cFold.releasePointerCapture(e.pointerId); } catch { /* already released */ } });
+
 /* the ruler moves only when grabbed, or when a marked point is clicked; a click elsewhere does nothing */
 cPhase.addEventListener('pointerdown', e => {
   const q = hit(e);
@@ -1001,6 +1110,12 @@ const BIND = {
     toR: v => 100 * Math.pow(v / SIG_MAX, 2 / 3), fromR: r => sigmaFromSlider(r), fmt: v => v.toFixed(3),
     caseV: () => sigmaFromSlider(caseS().noise), def: 0,
   },
+  duty: {
+    label: 'on fraction of the period', unit: '', min: 0.1, max: 0.9, step: 0.05, redraw: 'update',
+    get: () => state.s.duty, set: v => { state.s.duty = Math.round(clamp(v, 0.05, 0.95) * 20) / 20; },
+    toR: v => v, fromR: r => +r, fmt: v => v.toFixed(2), caseV: () => caseS().duty ?? 0.5, def: 0.5,
+    off: () => state.s.shape !== 'square',
+  },
   cycles: {
     label: 'cycles averaged', unit: '', min: 1, max: 12, step: 1, redraw: 'update',
     get: () => state.s.cycles, set: v => { state.s.cycles = Math.round(clamp(v, 1, 12)); },
@@ -1023,6 +1138,16 @@ const tauOfLag = d => Math.tan(clamp(d, 0, 89.5) * Math.PI / 180) * state.s.T / 
 function bindOf(key) {
   if (BIND[key]) return BIND[key];
   const i = +key.split(':')[1];
+  // the time constant while the species falls, when it has one of its own
+  if (key.startsWith('tauOff:')) return {
+    label: '<i>τ</i> while falling', unit: state.s.unit === 'T' ? 'T' : 'min', min: 0, max: 100, step: 1, redraw: 'update',
+    get: () => state.s.species[i].tauOff ?? state.s.species[i].tau,
+    set: v => { state.s.species[i].tauOff = clamp(v, 0, 2 * state.s.T); },
+    toR: v => sliderFromTau(v, state.s.T), fromR: r => tauFromSlider(r, state.s.T),
+    fmt: v => (state.s.unit === 'T' ? v.toFixed(3) : v.toFixed(1)),
+    caseV: () => { const c = caseS().species[i]; return c ? (c.tauOff ?? c.tau) * state.s.T / caseS().T : state.s.species[i].tau; },
+    def: state.s.species[i].tau, off: () => isStatic(state.s.species[i]) || state.s.species[i].tauOff == null,
+  };
   // the same step set by its lag: δ of this one step at k = 1, so τ = tan(δ) T / 2π
   if (key.startsWith('lag:')) return {
     label: 'or its lag <i>δ</i> at <i>k</i> = 1', unit: '°', min: 0, max: 89, step: 1, redraw: 'update',
@@ -1055,7 +1180,7 @@ function fillVctls(root) {
 function groupSummaries() {
   const st = state.s, sum = (g, t) => { const el = document.querySelector(`.sgroup[data-g="${g}"] .sg-sum`); if (el) el.innerHTML = t; };
   sum('case', `${state.caseIdx + 1} · ${CASES[state.caseIdx].title}`);
-  sum('measurement', `${st.shape === 'square' ? 'on / off' : 'sine'} · <i>σ</i> ${sigmaFromSlider(st.noise).toFixed(3)} · ${st.cycles} cycles`);
+  sum('measurement', `${st.shape === 'square' ? `on / off${st.duty !== 0.5 ? ` ${st.duty.toFixed(2)}` : ''}` : 'sine'} · <i>σ</i> ${sigmaFromSlider(st.noise).toFixed(3)} · ${st.cycles} cycles`);
   sum('demodulation', `<i>k</i> = ${st.k} · <i>φ</i> = ${st.phi}°`);
   sum('species', live().map(s => s.label.split(',')[0]).join(' ') || 'none on');
 }
@@ -1067,6 +1192,10 @@ document.querySelectorAll('.sg-toggle').forEach(b => b.addEventListener('click',
 function refreshVals() {
   if (!state.s) return;
   groupSummaries();
+  const pf = $('phiField'), shown = state.preview ? state.preview.phi : state.s.phi;
+  if (document.activeElement !== pf) pf.value = Math.round(shown);
+  pf.classList.toggle('preview', !!state.preview);
+  $('kField').innerHTML = state.s.k > 1 ? `, <i>k</i> = ${state.s.k}` : '';
   document.querySelectorAll('.vctl').forEach(el => {
     const b = bindOf(el.dataset.k), v = b.get(), off = b.off?.() ?? false;
     const range = el.querySelector('input[type=range]'), val = el.querySelector('.val'), rst = el.querySelector('.rst');
@@ -1097,6 +1226,12 @@ document.addEventListener('change', e => {
   if (Number.isFinite(v)) applyVal(el.dataset.k, v);
   e.target.blur(); refreshVals();
 });
+$('phiField').addEventListener('change', e => {
+  const v = parseFloat(String(e.target.value).replace(',', '.'));
+  if (Number.isFinite(v)) applyVal('phi', v);
+  e.target.blur(); refreshVals();
+});
+$('phiField').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.dispatchEvent(new Event('change')); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.classList?.contains('val')) e.target.dispatchEvent(new Event('change', { bubbles: true }));
 });
@@ -1113,7 +1248,7 @@ document.addEventListener('dblclick', e => {
    Measurement and demodulation controls
    --------------------------------------------------------------------------- */
 $('allPhi').addEventListener('change', e => { state.s.allPhi = e.target.checked; syncControls(); update(); });
-$('shape').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.shape = b.dataset.v; setSeg($('shape'), state.s.shape); update(); });
+$('shape').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.shape = b.dataset.v; setSeg($('shape'), state.s.shape); update(); refreshVals(); });
 $('harm').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.k = +b.dataset.v; setSeg($('harm'), state.s.k); update(); });
 $('reseed').addEventListener('click', () => { state.seed += 1; update(); });
 
@@ -1122,7 +1257,7 @@ $('unit').addEventListener('click', e => {
   const b = e.target.closest('button'), st = state.s;
   if (!b || b.dataset.v === st.unit) return;
   const T = b.dataset.v === 'T' ? 1 : 60;
-  for (const s of st.species) s.tau *= T / st.T;
+  for (const s of st.species) { s.tau *= T / st.T; if (s.tauOff != null) s.tauOff *= T / st.T; }
   st.unit = b.dataset.v; st.T = T;
   syncControls(); renderSpecies(); update();
 });
