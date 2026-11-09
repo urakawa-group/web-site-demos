@@ -88,8 +88,10 @@
             <div class="ctl"><span>figure 3 shows</span>
               <span class="seg" id="kMode"><button type="button" data-v="eq" title="The harmonic k alone">only <i>k</i></button><button type="button" data-v="le" title="Harmonics 1 … k added, each at the phase of the same moment: the averaged period rebuilt, closer to its shape the more are added">summed 1 … <i>k</i></button></span></div>
             <div class="ctl vctl" data-k="phi"></div>
-            <label class="ctl check" title="Figure 3 shows the phase-resolved spectra at φ = 0, 10, …, 170° instead of the averaged period"><input id="allPhi" type="checkbox"><span>phase-resolved</span></label>
-            <label class="ctl check sub-check" title="Also the amplitude spectrum |A_k| = √(I² + Q²): the envelope no φ exceeds"><input id="absSpec" type="checkbox"><span>amplitude, |<i>A<sub>k</sub></i>|</span></label>
+            <div class="check-row">
+              <label class="ctl check" title="Figure 3 shows the phase-resolved spectra at φ = 0, 10, …, 170° instead of the averaged period"><input id="allPhi" type="checkbox"><span>phase-resolved</span></label>
+              <label class="ctl check" title="With phase-resolved: also the amplitude spectrum |A_k| = √(I² + Q²), the envelope no φ exceeds"><input id="absSpec" type="checkbox"><span>amplitude |<i>A<sub>k</sub></i>|</span></label>
+            </div>
             <div class="ctl vctl" data-k="speed"></div>
             <button class="btn primary" id="play" type="button">▶ sweep φ</button>
           </div>
@@ -131,7 +133,7 @@
             <h3>3 · Spectra</h3>
             <div class="sub-row">
               <p class="sub"><span id="subSpecFold">Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].</span><span id="subSpecAll" hidden>Phase-resolved: <i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].</span><span id="subSpecMode"></span></p>
-              <label class="phi-field" title="The phase angle on show: type a value, or move the ruler in figure 2 or 4"><i>φ</i> = <input id="phiField" type="text" inputmode="decimal" aria-label="phase angle">°<span id="kField"></span></label>
+              <label class="phi-field" title="The harmonic and the phase angle on show: type a φ, or move the ruler in figure 2 or 4"><span id="kField"></span><i>φ</i> = <input id="phiField" type="text" inputmode="decimal" aria-label="phase angle">°</label>
             </div>
             <canvas id="cSpec"></canvas>
             <div class="legend" aria-hidden="true"></div>
