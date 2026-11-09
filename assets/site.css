@@ -196,7 +196,7 @@ body.wb-locked { overflow: hidden; }
 .phi-field input:focus { outline: none; border-color: var(--data-highlight); }
 .phi-field input.preview { border-style: dashed; }
 .wb-center .panel h3 { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wb-center .legend { flex: none; height: 2.9em; overflow: hidden; align-content: flex-start; }
+.wb-center .legend { flex: none; height: calc(3em + 10px); line-height: 1.5; overflow: hidden; align-content: flex-start; }
 .wb-center .legend span { flex: none; white-space: nowrap; }
 /* the centre's text at the workbench scale, on a wide screen */
 [data-w="wide"] .wb-center .panel h3 { font-size: calc(var(--t-panel-title-size) * var(--wb-text-scale)); }
@@ -415,6 +415,14 @@ canvas.interactive { touch-action: none; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--t-panel-sub-size); color: var(--t-panel-sub-color); padding: 4px 0 2px; }
 .legend span::before { content: ''; display: inline-block; width: 18px; height: 0; border-top: 2.5px solid var(--c); vertical-align: middle; margin-right: 6px; }
 .legend span.dashed::before { border-top-style: dashed; }
+/* legend marks beyond a line: the way the mark looks in the plot */
+.legend span.rb::before { border-top: 0; height: 3px; background: linear-gradient(90deg, var(--map-pos) 50%, var(--map-neg) 50%); }
+.legend span.bar::before { width: 10px; height: 10px; border: 0; background: var(--c); vertical-align: -1px; }
+.legend span.outline::before { width: 10px; height: 10px; border: 1px dashed var(--c); background: none; vertical-align: -1px; }
+.legend span.tick::before { width: 14px; border-top-width: 3px; }
+.legend span.dot::before { width: 9px; height: 9px; border: 0; border-radius: 50%; background: var(--c); vertical-align: 0; }
+.legend span.ring::before { width: 7px; height: 7px; border: 2px solid var(--c); border-radius: 50%; background: var(--surface); vertical-align: 0; }
+.legend span.area::before { width: 14px; height: 10px; border: 0; background: linear-gradient(90deg, var(--map-pos) 50%, var(--map-neg) 50%); opacity: 0.35; vertical-align: -1px; }
 
 table.readout { border-collapse: collapse; font-size: var(--t-table-size); color: var(--t-table-color); margin-top: var(--space-3); background: var(--surface); }
 table.readout th { font-size: var(--t-table-head-size); font-weight: var(--t-table-head-weight); color: var(--t-table-head-color); text-align: right; }

@@ -15,14 +15,14 @@
  * draws itself.
  *
  * Axis labels and p.text() take *…* for italic, the way quantities are set
- * in text, and _…_ for a subscript: 'phase angle *φ* / °', '*φ*_max_'. In
+ * in text, _…_ for a subscript and ^…^ for a superscript: 'phase angle *φ* / °', '*φ*_max_'. In
  * Source Sans 3 the italic φ is the looped form (varphi); the upright one is
  * the stroked form.
  */
 import { C, CHART, typeFont } from './tokens.js';
 
 /**
- * Draw text with *…* runs in italic and _…_ runs as a subscript (smaller,
+ * Draw text with *…* runs in italic, _…_ as a subscript and ^…^ as a superscript (smaller,
  * lowered; *…* works inside it): '*φ*_max_ = 317°', '*A*_*k*_(*φ*)'. align
  * as canvas textAlign; the runs are laid out from one measured start point,
  * so mixed text centres correctly. With draw = false it only measures.
@@ -30,13 +30,18 @@ import { C, CHART, typeFont } from './tokens.js';
 export function richText(ctx, s, x, y, font, align = 'left', draw = true) {
   const size = parseFloat(font.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? 12);
   const base = font.replace(/^italic /, '');
+  // *…* italic, _…_ subscript, ^…^ superscript; they nest (*t* inside ^…^)
   const runs = [];
-  String(s).split('_').forEach((chunk, si) => chunk.split('*').forEach((t, ii) => {
-    if (!t) return;
-    let f = si % 2 ? base.replace(/(\d+(?:\.\d+)?)px/, `${(size * 0.72).toFixed(2)}px`) : base;
-    if (ii % 2) f = `italic ${f}`;
-    runs.push({ t, f, dy: si % 2 ? size * 0.28 : 0 });
-  }));
+  let it = false, sub = false, sup = false;
+  for (const tok of String(s).split(/([*_^])/)) {
+    if (tok === '*') { it = !it; continue; }
+    if (tok === '_') { sub = !sub; continue; }
+    if (tok === '^') { sup = !sup; continue; }
+    if (!tok) continue;
+    let f = sub || sup ? base.replace(/(\d+(?:\.\d+)?)px/, `${(size * 0.72).toFixed(2)}px`) : base;
+    if (it) f = `italic ${f}`;
+    runs.push({ t: tok, f, dy: sub ? size * 0.28 : sup ? -size * 0.38 : 0 });
+  }
   let w = 0;
   for (const r of runs) { ctx.font = r.f; r.w = ctx.measureText(r.t).width; w += r.w; }
   if (!draw) return w;

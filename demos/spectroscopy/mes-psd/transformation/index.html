@@ -105,7 +105,7 @@
           <div class="sg-head"><button type="button" class="sg-toggle" aria-expanded="true" title="Phase-sensitive detection: the harmonic and the phase angle. Click to fold"><span class="sg-name">demodulation</span><span class="sg-sum"></span></button></div>
           <div class="sg-body">
             <div class="ctl"><span>harmonic <i>k</i></span>
-              <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button></span></div>
+              <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button><button type="button" data-v="10">10</button><button type="button" data-v="30">30</button><button type="button" data-v="100">100</button></span></div>
             <div class="ctl vctl" data-k="phi"></div>
             <div class="ctl vctl" data-k="speed"></div>
             <div class="check-row">
@@ -114,7 +114,6 @@
             </div>
             <div class="ctl"><span>harmonics</span>
               <span class="seg" id="kMode"><button type="button" data-v="eq" title="The harmonic k alone">only <i>k</i></button><button type="button" data-v="le" title="Harmonics 1 … k added, each at the phase of the same moment: the period rebuilt, closer to its shape the more are added">summed 1 … <i>k</i></button></span></div>
-            <label class="ctl check" title="In the phase domain: the envelope ±|A_k| = √(I² + Q²), which no φ exceeds"><input type="checkbox" id="amp"><span>amplitude |<i>A<sub>k</sub></i>|</span></label>
           </div>
         </section>
       </div>
@@ -127,7 +126,7 @@
         <div class="wb-head">
           <p class="crumbs"><a href="../index.html">MES-PSD</a> · Transformation</p>
           <h1>Phase-Sensitive Detection: The Transformation</h1>
-          <p class="lead">One averaged period at one wavenumber, turned into the phase domain. Multiply by the reference, integrate over the period: drag the reference, run the integral, hover a point.</p>
+          <p class="lead">One averaged period, turned into the phase domain: multiply by the reference and integrate. Drag the reference, run the integral, hover a point.</p>
         </div>
         <div class="wb-center">
           <section class="panel">
@@ -143,13 +142,12 @@
             <h3>2 · Running Integral</h3>
             <p class="sub" id="subInt"></p>
             <canvas id="cInt"></canvas>
-            <div class="legend" aria-hidden="true"></div>
+            <div class="legend" id="legInt"></div>
           </section>
           <section class="panel">
             <h3>3 · Phase Domain</h3>
             <div class="sub-row">
               <p class="sub" id="subPhase"></p>
-              <span class="seg view-seg" id="view3"><button type="button" data-v="cos">cosine</button><button type="button" data-v="phasor" title="The phasor beside the cosine: the arrow turns with φ, its height is A_k(φ)">+ phasor</button></span>
             </div>
             <canvas id="cPhase" class="interactive"></canvas>
             <div class="legend" id="legPhase"></div>
@@ -160,8 +158,8 @@
               <p class="sub" id="subHarm"></p>
               <span class="seg view-seg" id="view4"><button type="button" data-v="bars">bars</button><button type="button" data-v="mapT">map in <i>t</i></button><button type="button" data-v="mapP">map in <i>φ</i></button></span>
             </div>
-            <canvas id="cHarm"></canvas>
-            <div class="legend" aria-hidden="true"></div>
+            <canvas id="cHarm" class="interactive"></canvas>
+            <div class="legend" id="legHarm"></div>
           </section>
         </div>
       </div>

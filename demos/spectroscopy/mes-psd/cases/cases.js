@@ -244,7 +244,7 @@ const EQ = {
 /* ---------------------------------------------------------------------------
    Engine
    --------------------------------------------------------------------------- */
-const M = 120;     // samples per period
+const M = 360;     // samples per period
 const WARM = 2;    // cycles discarded before averaging
 const SIG_MAX = 0.06;
 

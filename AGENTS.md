@@ -82,6 +82,14 @@ should understand the idea by changing something and watching the response.
   as subscripts (`*φ*_max_`), through `plot.js`. In Source Sans 3 the
   italic φ is the looped form, as in the text. Values read off a plot are
   written in it, beside what they belong to, not in a key.
+- **Every plot has a proper legend and a one-sentence subtitle.** What a
+  line, area or mark means goes in the legend under the plot (`.legend` with
+  `dashed`, `rb`, `bar`, `outline`, `tick`, `dot`, `ring`), never spelled out
+  in the subtitle. One look per kind of line on a page: stimulus grey dashed,
+  signal solid in its colour, reference and chosen φ green dashed (grabbable,
+  with a grip, wherever they appear, maps included), product red where
+  positive and blue where negative, summed harmonics ink dashed, clean signal
+  faint grey.
 - **Figure 3 of a PSD page offers three views of the demodulated spectra.**
   Phase-resolved (the set over φ) or the averaged period; the amplitude
   |A_k| = √(I² + Q²) as the envelope no φ exceeds; and the harmonic k alone or

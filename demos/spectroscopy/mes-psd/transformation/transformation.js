@@ -29,7 +29,7 @@ const SOURCES = {
    it with a title and a text (the tooltip of the input selector).
 
    { shape, duty, tau, tauOff, tau2, invert, offset, drift, noise,
-     k, phi, clean, kUpTo, amp, view3, view4 }
+     k, phi, clean, kUpTo, view4 }
 
      shape   'square' (on/off, on for a fraction duty of the period),
              'triangle' (rising for a fraction duty, then falling),
@@ -43,16 +43,14 @@ const SOURCES = {
      clean   draw the clean signal beside the disturbed one
      kUpTo   harmonics 1 … k summed instead of k alone: the period rebuilt
              in panel 1, the sum in the phase domain and in the map in φ
-     amp     the amplitude in the phase domain: the envelope ±|A_k|
-     view3   'cos' | 'phasor' (phasor and cosine side by side)
      view4   'bars' | 'mapT' | 'mapP'
    --------------------------------------------------------------------------- */
 const base = {
   shape: 'square', duty: 0.5, tau: 0, tauOff: null, tau2: null, invert: false,
-  offset: 0, drift: 0, noise: 0, k: 1, phi: 0, clean: false, kUpTo: false, amp: false, view3: 'cos', view4: 'bars',
+  offset: 0, drift: 0, noise: 0, k: 1, phi: 0, clean: false, kUpTo: false, view4: 'bars',
 };
 /** What a reader changes only to look, not to change the experiment: no "changed" mark for these. */
-const DISPLAY_ONLY = ['phi', 'clean', 'kUpTo', 'amp', 'view3', 'view4'];
+const DISPLAY_ONLY = ['phi', 'clean', 'kUpTo', 'view4'];
 
 const INPUTS = [
   {
@@ -149,10 +147,19 @@ const GENERAL = `<h2>What This Page Shows</h2>
 /* ---------------------------------------------------------------------------
    Engine: one period on M samples, T = 1
    --------------------------------------------------------------------------- */
-const M = 240, T = 1, dt = T / M, WARM = 12;
-const NH = 15;
+/* Samples per period: 720, more for a high harmonic so that the reference
+   keeps at least 72 samples per oscillation (7200 at k = 100). The bars show
+   15 harmonics, or up to k. */
+const T = 1, WARM = 12;
+let M = 720, dt = T / M, NH = 15;
 const NOISE_MAX = 0.25;
-const ts = Array.from({ length: M + 1 }, (_, j) => j * dt);
+let ts = Array.from({ length: M + 1 }, (_, j) => j * dt);
+function setResolution(k) {
+  const m = 720 * Math.max(1, Math.ceil(k / 10));
+  NH = Math.max(15, k);
+  if (m === M) return;
+  M = m; dt = T / M; ts = Array.from({ length: M + 1 }, (_, j) => j * dt);
+}
 
 const $ = id => document.getElementById(id);
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -258,6 +265,7 @@ function theory(ps, k) {
 let S = null;
 function compute() {
   const st = state.s;
+  setResolution(st.k);
   const { stim, y } = response(), d = disturbance();
   const A = Float64Array.from(y, (v, j) => v + d[j]);
   const harm = Array.from({ length: NH }, (_, i) => parts(A, i + 1));
@@ -308,46 +316,84 @@ const phaseLim = () => {
 
 function shade(p) { const t = onTime(); p.shadeX(0, t, C['shade-on']); if (t < T) p.shadeX(t, T, C['shade-off']); }
 
+/**
+ * One look per kind of line, on every panel of this page:
+ *   stimulus      grey, dashed
+ *   signal A(t)   orange, solid; clean (no disturbances) faint grey, solid
+ *   reference     green, dashed; the chosen φ and its ruler green, dashed
+ *   product       solid, red where positive and blue where negative, with
+ *                 its area in the same colours, lighter
+ *   summed 1 … k  ink, dashed
+ */
+const DASH_SUM = [6, 3];
+const KS = [1, 2, 3, 4, 5, 10, 30, 100];
+const LG = {
+  stim: ['stimulus', C['data-stimulus'], 'dashed'],
+  sig: ['signal <i>A</i>(<i>t</i>)', C['data-a'], ''],
+  clean: ['clean signal', C['data-faint'], ''],
+  ref: ['sin(<i>kωt</i> + <i>φ</i>)', C['data-highlight'], 'dashed'],
+  prod: ['product', '', 'rb'],
+};
+function legend(el, items) {
+  el.innerHTML = items.filter(Boolean).map(([label, color, cls]) => `<span class="${cls}" style="--c:${color}">${label}</span>`).join('');
+}
+/** Many lines would be noise: above k = 10 only the first of the k repeating marks is drawn. */
+const repeats = list => (state.s.k > 10 ? list.slice(0, 1) : list);
+
 /* panel 1: the period, the reference and their product */
 let P1 = null;
 function drawSig() {
   const st = state.s, jc = cursorJ(), sc = SC();
   const p = plot($('cSig'), { scale: sc, x: [0, T], y: Y_SIG, xlabel: XLAB_T, ylabel: 'signal / –', xticks: T_TICKS, yticks: ticks(Y_SIG[0], Y_SIG[1], 4) });
-  // no on/off shading here: the product's areas are red and blue; the dashed stimulus shows on and off
-  // the product as area, up to the cursor
+  const { ctx, X, Y } = p;
+  p.hline(0);
+  // the product: its area, then its line, red where positive and blue where negative
   const prod = ts.map((_, j) => S.A[j] * refAt(j));
-  const { ctx, X, Y } = p, pos = rgba(C['map-pos'], 0.32), neg = rgba(C['map-neg'], 0.3);
+  const fillPos = rgba(C['map-pos'], 0.22), fillNeg = rgba(C['map-neg'], 0.22);
   for (let j = 0; j < jc; j++) {
     const a = prod[j], b = prod[j + 1];
-    ctx.fillStyle = a + b >= 0 ? pos : neg;
+    ctx.fillStyle = a + b >= 0 ? fillPos : fillNeg;
     ctx.beginPath(); ctx.moveTo(X(ts[j]), Y(0)); ctx.lineTo(X(ts[j]), Y(a)); ctx.lineTo(X(ts[j + 1]), Y(b)); ctx.lineTo(X(ts[j + 1]), Y(0)); ctx.closePath(); ctx.fill();
   }
-  p.hline(0);
+  ctx.save(); ctx.beginPath(); ctx.rect(p.inner.l, p.inner.t, p.inner.r - p.inner.l, p.inner.b - p.inner.t); ctx.clip();
+  ctx.lineWidth = CHART.lineData; ctx.setLineDash([]); ctx.lineJoin = 'round';
+  for (let j = 0; j < jc; j++) {
+    ctx.strokeStyle = prod[j] + prod[j + 1] >= 0 ? C['map-pos'] : C['map-neg'];
+    ctx.beginPath(); ctx.moveTo(X(ts[j]), Y(prod[j])); ctx.lineTo(X(ts[j + 1]), Y(prod[j + 1])); ctx.stroke();
+  }
+  ctx.restore();
+  // stimulus, clean signal, rebuilt, signal, reference
   if (st.shape === 'square') p.steps(ts, ts.map((_, j) => heldAt(j % M)), C['data-stimulus']);
   else p.line(ts, Array.from(S.stim), C['data-stimulus'], CHART.lineThin, CHART.dash);
-  if (st.clean && disturbed()) p.line(ts, Array.from(S.y), C['data-faint'], CHART.lineData);
-  if (st.kUpTo) p.line(ts, ts.map(rebuiltAt), C['ink-700'], CHART.lineData, [6, 3]);
-  // the mean of the period: against the reference it gives as much red as blue, so PSD never sees it
-  p.hline(S.mean, C['data-static'], 1);
-  p.text(`mean *a*₀ = ${S.mean.toFixed(2)}`, T * 0.98, S.mean + 0.13, C['data-static'], 'right');
+  const showClean = st.clean && disturbed();
+  if (showClean) p.line(ts, Array.from(S.y), C['data-faint'], CHART.lineData);
+  if (st.kUpTo) p.line(ts, ts.map(rebuiltAt), C['ink-700'], CHART.lineData, DASH_SUM);
   p.line(ts, Array.from(S.A), C['data-a']);
   p.line(ts, ts.map((_, j) => refAt(j)), C['data-highlight'], CHART.lineData, CHART.dash);
-  // the reference's upward zero crossings (its own phase 0): grab one to move
-  // the reference, which sets φ. The first is also the delay φ reads.
-  const xs = zeroTimes(st.phi).map(t => { p.dot(t, 0, C['data-highlight']); return X(t); });
+  // the reference's upward zero crossings (its own phase 0): grab one to move it, which sets φ
+  const xs = repeats(zeroTimes(st.phi)).map(t => { p.dot(t, 0, C['data-highlight']); return X(t); });
   grip(p, xs[0], C['data-highlight']);
   if (state.cursor < 1) p.vline(state.cursor * T, C['ink-700'], 1, []);
   p.axes();
   P1 = { p, xs };
-  $('subSig').innerHTML = `<i>A</i>(<i>t</i>) times the reference (green, drag it by a dot): red counts up, blue down.${st.kUpTo ? ` Dashed: harmonics 1 … ${st.k}.` : ''}`;
+  $('subSig').innerHTML = 'The period, the reference and their product.';
+  legend($('legSig'), [LG.stim, LG.sig, showClean && LG.clean, LG.ref, LG.prod,
+    st.kUpTo && [`Σ <i>h</i> ≤ ${st.k}`, C['ink-700'], 'dashed']]);
 }
 
-/* panel 2: the running integral */
+/* panel 2: the running integral, on a background that says whether it rises (red) or falls (blue) */
 function drawInt() {
   const run = [0];
   for (let j = 1; j <= M; j++) run.push(run[j - 1] + 2 / T * 0.5 * (S.A[j - 1] * refAt(j - 1) + S.A[j] * refAt(j)) * dt);
   const jc = cursorJ(), end = run[M], k = state.s.k;
-  const p = plot($('cInt'), { scale: SC(), x: [0, T], y: Y_INT, xlabel: XLAB_T, ylabel: 'running integral / –', xticks: T_TICKS, yticks: ticks(Y_INT[0], Y_INT[1], 4) });
+  const p = plot($('cInt'), { scale: SC(), x: [0, T], y: Y_INT, xlabel: XLAB_T, ylabel: '(2/*T*) ∫_0_^*t*^ / –', xticks: T_TICKS, yticks: ticks(Y_INT[0], Y_INT[1], 4) });
+  // background: where the product is positive the integral rises (red), where negative it falls (blue)
+  const bgPos = rgba(C['map-pos'], 0.10), bgNeg = rgba(C['map-neg'], 0.10);
+  let j0 = 0;
+  const sign = j => (S.A[j] * refAt(j) + S.A[j + 1] * refAt(j + 1) >= 0);
+  for (let j = 1; j <= M; j++) {
+    if (j === M || sign(j) !== sign(j0)) { p.shadeX(ts[j0], ts[j], sign(j0) ? bgPos : bgNeg); j0 = j; }
+  }
   p.hline(0);
   p.line(ts.slice(0, jc + 1), run.slice(0, jc + 1), C['data-a']);
   if (state.cursor >= 1) {
@@ -356,10 +402,12 @@ function drawInt() {
     p.text(`*A*_${k}_(*φ*) = ${end.toFixed(3)}`, T * 0.97, end + (end > 0.6 ? -0.16 : 0.1), C['data-highlight'], 'right');
   } else p.dot(ts[jc], run[jc], C['data-a']);
   p.axes();
-  $('subInt').innerHTML = `(2/<i>T</i>)∫<sub>0</sub><sup><i>t</i></sup> of the product. At <i>T</i>: <i>A<sub>${k}</sub></i>(${Math.round(shownPhi())}°) = ${at(S.p, shownPhi()).toFixed(3)}, what PSD returns.`;
+  $('subInt').innerHTML = `The product added up; at <i>T</i> it is <i>A<sub>${k}</sub></i>(<i>φ</i>).`;
+  legend($('legInt'), [['integral', C['data-a'], ''], [`<i>A<sub>${k}</sub></i>(<i>φ</i>) = ${end.toFixed(3)}`, C['data-highlight'], ''],
+    ['rises', C['map-pos'], 'bar'], ['falls', C['map-neg'], 'bar']]);
 }
 
-/* panel 3: the phase domain, alone or with the phasor beside it */
+/* panel 3: the phase domain, the phasor beside the cosine (the cosine alone when summed) */
 let P3 = null;
 function arrowPx(ctx, bx, by, ax, ay, color, w = CHART.lineData) {
   const ang = Math.atan2(ay - by, ax - bx), L = Math.min(11, Math.hypot(ax - bx, ay - by) * 0.4);
@@ -379,7 +427,7 @@ function arrowPx(ctx, bx, by, ax, ay, color, w = CHART.lineData) {
  */
 function drawPhase() {
   const st = state.s, lim = phaseLim(), sc = SC(), cv = $('cPhase'), yr = [-lim, lim];
-  const withPhasor = st.view3 === 'phasor' && !st.kUpTo;
+  const withPhasor = !st.kUpTo;
   const m = CHART.margin, H = cv.clientHeight, side = H - m.t - m.b * sc;
   const ylabel = st.kUpTo ? `Σ *A*_*h*_ , *h* ≤ ${st.k} / –` : `*A*_${st.k}_(*φ*) / –`;
   let ph0 = null;
@@ -400,11 +448,6 @@ function drawPhase() {
     p.line(ph, ph.map(f => sumAt(S.harmClean, f)), C['data-faint'], CHART.lineData);
   }
   const curve = ph.map(f => sumAt(S.harm, f));
-  if (st.amp) {
-    const e = st.kUpTo ? Math.max(...curve.map(Math.abs)) : S.p.amp;
-    p.hline(e, C['ink-700'], 1); p.hline(-e, C['ink-700'], 1);
-    p.text(st.kUpTo ? 'largest' : `|*A*_${st.k}_| = ${e.toFixed(3)}`, 8, e + lim * 0.08, C['ink-700'], 'left');
-  }
   p.line(ph, curve, C['data-a']);
   const { ctx, X, Y } = p, pois = [];
   if (!st.kUpTo && S.p.amp > 0.01 * lim) {
@@ -467,10 +510,18 @@ function drawPhase() {
   p.axes();
   P3 = { p, pois, rx: X(st.phi) };
   $('subPhase').innerHTML = st.kUpTo
-    ? `Harmonics 1 … ${st.k} summed, each at the phase of the same moment: the period, rebuilt and mirrored in <i>φ</i>.`
-    : withPhasor
-      ? `Arrow (<i>I</i>, <i>Q</i>) = (${S.p.I.toFixed(3)}, ${S.p.Q.toFixed(3)}), length ${S.p.amp.toFixed(3)}, at <i>φ</i><sub>max</sub> = ${Math.round(S.p.phiMax) % 360}°. The <i>φ</i> axis points up, so its shadow (green) is its height, <i>A<sub>${st.k}</sub></i>(<i>φ</i>).`
-      : `<i>A<sub>k</sub></i>(<i>φ</i>) = |<i>A<sub>k</sub></i>| cos(<i>φ</i> − <i>φ</i><sub>max</sub>). Hover the dot or a ring, drag the ruler.${st.clean && disturbed() ? ' Grey: clean; thin: what leaks.' : ''}`;
+    ? `Harmonics 1 … ${st.k} summed: the period rebuilt in <i>φ</i>.`
+    : `The integral at every <i>φ</i>, the height of a turning arrow.`;
+  const dis = st.clean && disturbed();
+  legend($('legPhase'), [
+    [st.kUpTo ? `Σ <i>A<sub>h</sub></i>, <i>h</i> ≤ ${st.k}` : `<i>A<sub>${st.k}</sub></i>(<i>φ</i>)`, C['data-a'], ''],
+    !st.kUpTo && ['phasor (<i>I</i>, <i>Q</i>)', C['data-a'], 'tick'],
+    ['chosen <i>φ</i>', C['data-highlight'], 'dashed'],
+    !st.kUpTo && S.p.amp > 0.01 * lim && ['<i>φ</i><sub>max</sub>', C['data-a'], 'dot'],
+    !st.kUpTo && S.p.amp > 0.01 * lim && ['zero', C['data-a'], 'ring'],
+    dis && ['clean', C['data-faint'], ''],
+    dis && !st.kUpTo && ['what leaks through', C['data-static'], ''],
+  ]);
 }
 
 /* panel 4: the harmonic content, or the whole spectrum as a map */
@@ -513,59 +564,101 @@ function heatmap(canvas, opts, rows, cols, valueAt, max, after) {
 function drawHarm() {
   const st = state.s, sc = SC();
   if (st.view4 !== 'bars') { drawMap(); return; }
-  const xt = [[0, '0'], ...Array.from({ length: NH }, (_, i) => [i + 1, String(i + 1)])];
+  const every = NH <= 15 ? 1 : NH <= 30 ? 5 : 10;
+  const xt = [[0, '0'], ...Array.from({ length: NH }, (_, i) => i + 1).filter(h => h === 1 || h % every === 0).map(h => [h, String(h)])];
   const p = plot($('cHarm'), { scale: sc, x: [-0.7, NH + 0.7], y: Y_HARM, xlabel: 'harmonic *h* / –', ylabel: '|*A*_*h*_| / –', xticks: xt, yticks: ticks(Y_HARM[0], Y_HARM[1], 3) });
-  const { ctx, X, Y } = p, bw = (X(1) - X(0)) * 0.56;
-  // h = 0: the mean
+  const { ctx, X, Y } = p, bw = Math.max(1, (X(1) - X(0)) * 0.56), pad = Math.min(2.5, bw * 0.15);
+  // h = 0: the mean a₀, which PSD never sees
   const m = Math.min(Math.abs(S.mean), Y_HARM[1]);
-  ctx.fillStyle = C['data-static']; ctx.globalAlpha = 0.35; ctx.fillRect(X(0) - bw / 2, Y(m), bw, Y(0) - Y(m)); ctx.globalAlpha = 1;
+  ctx.fillStyle = rgba(C['data-static'], 0.35); ctx.fillRect(X(0) - bw / 2, Y(m), bw, Y(0) - Y(m));
   ctx.strokeStyle = C['data-static']; ctx.lineWidth = 1; ctx.strokeRect(X(0) - bw / 2, Y(m), bw, Y(0) - Y(m));
-  p.text('mean', 0.1, Math.min(m, Y_HARM[1] * 0.86) + 0.05, C['data-static'], 'left');
   const linear = st.tauOff == null || st.tauOff === st.tau;
   S.harm.forEach((h, i) => {
     const kk = i + 1, a = Math.min(h.amp, Y_HARM[1]);
     ctx.fillStyle = kk === st.k ? C['data-highlight'] : st.kUpTo && kk < st.k ? C['data-a'] : C['data-faint'];
     ctx.fillRect(X(kk) - bw / 2, Y(a), bw, Y(0) - Y(a));
-    // the stimulus' own harmonic, as an outline
     const s_ = Math.min(S.harmStim[i].amp, Y_HARM[1]);
-    ctx.strokeStyle = C['data-stimulus']; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
-    ctx.strokeRect(X(kk) - bw / 2 - 2.5, Y(s_), bw + 5, Y(0) - Y(s_)); ctx.setLineDash([]);
-    // where the first-order formula puts it
+    if (s_ > 1e-4) {
+      ctx.strokeStyle = C['data-stimulus']; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
+      ctx.strokeRect(X(kk) - bw / 2 - pad, Y(s_), bw + 2 * pad, Y(0) - Y(s_)); ctx.setLineDash([]);
+    }
     if (linear && S.harmStim[i].amp > 1e-3) {
       const th = theory(S.harmStim[i], kk);
-      if (th && th.amp > 1e-4) { ctx.strokeStyle = C['ink-900']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(kk) - bw / 2 - 3, Y(Math.min(th.amp, Y_HARM[1]))); ctx.lineTo(X(kk) + bw / 2 + 3, Y(Math.min(th.amp, Y_HARM[1]))); ctx.stroke(); }
+      if (th && th.amp > 1e-4) { const yy = Y(Math.min(th.amp, Y_HARM[1])); ctx.strokeStyle = C['ink-900']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(kk) - bw / 2 - pad, yy); ctx.lineTo(X(kk) + bw / 2 + pad, yy); ctx.stroke(); }
     }
   });
-  // the bar at k: its value, and how much of the stimulus' harmonic is left
+  // the value at k, top right where nothing else is drawn
   const pk = S.harm[st.k - 1], sk = S.harmStim[st.k - 1];
-  const lab = `|*A*_${st.k}_| = ${pk.amp.toFixed(3)}${sk.amp > 1e-3 ? `, ×${(pk.amp / sk.amp).toFixed(2)} of the stimulus` : ''}`;
-  p.text(lab, st.k + 0.6, Math.min(Math.max(pk.amp, sk.amp), Y_HARM[1] * 0.8) + 0.07, C['data-highlight'], 'left');
+  p.text(`|*A*_${st.k}_| = ${pk.amp.toFixed(3)}${sk.amp > 1e-3 ? `, ×${(pk.amp / sk.amp).toFixed(2)} of the stimulus` : ''}`, NH + 0.5, Y_HARM[1] * 0.9, C['data-highlight'], 'right');
   p.axes();
-  const even = S.harm.filter((_, i) => (i + 1) % 2 === 0).reduce((mx, h) => Math.max(mx, h.amp), 0);
-  $('subHarm').innerHTML = `Bars: the signal; outline: the stimulus${linear ? '; tick: first-order formula' : ''}; 0: the mean. Largest even: ${even.toFixed(3)}.`;
+  $('subHarm').innerHTML = 'Every harmonic of the period.';
+  legend($('legHarm'), [
+    ['signal', C['data-faint'], 'bar'], [`<i>h</i> = ${st.k}`, C['data-highlight'], 'bar'],
+    st.kUpTo && st.k > 1 && ['summed', C['data-a'], 'bar'],
+    ['stimulus', C['data-stimulus'], 'outline'], linear && ['first order', C['ink-900'], 'tick'],
+    ['mean', C['data-static'], 'bar'],
+  ]);
 }
+/**
+ * The map's data: a static band at 20 and the signal as a band at 40, plus
+ * noise, at every time sample. In φ the bands separate: PSD of the static
+ * band is zero, of the signal band the signal's own A_h, so only the noise
+ * has to be demodulated position by position. Kept until the period, the
+ * noise or k change.
+ */
+let MAP = { key: '' };
+function mapData() {
+  const st = state.s, key = [state.seed, st.noise, M, st.k, st.kUpTo].join();
+  if (MAP.key === key) return MAP;
+  const g = rng(state.seed + 7), sig = noiseSigma(st.noise);
+  const noise = Array.from({ length: M + 1 }, () => Float64Array.from(XS, () => sig * g()));
+  const hsN = sig > 0 ? hs() : [];
+  const nIQ = XS.map((_, x) => {
+    const out = [];
+    for (const h of hsN) {
+      const w = 2 * Math.PI * h / T; let I = 0, Q = 0;
+      for (let j = 0; j <= M; j++) { const f = j === 0 || j === M ? 0.5 : 1, v = noise[j][x] * f; I += v * Math.sin(w * ts[j]); Q += v * Math.cos(w * ts[j]); }
+      out[h - 1] = { I: 2 / T * I * dt, Q: 2 / T * Q * dt };
+    }
+    return out;
+  });
+  MAP = { key, noise, nIQ };
+  return MAP;
+}
+let P4 = null;
 function drawMap() {
-  const st = state.s, sc = SC(), g = rng(state.seed + 7), sig = noiseSigma(st.noise);
-  const noise = Array.from({ length: M + 1 }, () => XS.map(() => sig * g()));
-  const val = (j, x) => GA[x] + S.A[j] * GB[x] + noise[j][x];   // a static band at 20, the signal as a band at 40
+  const st = state.s, sc = SC(), { noise, nIQ } = mapData();
   const xt = [0, 10, 20, 30, 40, 50, 60].map(v => [v, String(v)]);
+  const scaleLeg = ['> 0', C['map-pos'], 'bar'], negLeg = ['< 0', C['map-neg'], 'bar'];
   if (st.view4 === 'mapT') {
+    const val = (j, x) => GA[x] + S.A[j] * GB[x] + noise[j][x];
     heatmap($('cHarm'), { scale: sc, x: [0, 60], y: [0, T], xlabel: 'spectral position / –', ylabel: 'time in the period / *T*', xticks: xt, yticks: T_TICKS }, M + 1, XS.length, val, 1.9,
       p => {
         if (state.cursor < 1) p.hline(state.cursor * T, C['ink-700'], 1);
-        for (const t of zeroTimes(shownPhi())) p.hline(t, C['data-highlight'], 1.5);
+        const ys = repeats(zeroTimes(shownPhi()));
+        for (const t of ys) dashedH(p, t);
+        P4 = { p, ys: ys.map(p.Y), toPhi: y => -360 * st.k * clamp((p.inner.b - y) / (p.inner.b - p.inner.t), 0, 1) };
       });
-    $('subHarm').innerHTML = 'The spectra through the period: a static band at 20, the signal at 40. Green: where the reference crosses zero upwards.';
+    $('subHarm').innerHTML = 'The spectra through the period.';
+    legend($('legHarm'), [scaleLeg, negLeg, ['reference at phase 0', C['data-highlight'], 'dashed']]);
     return;
   }
-  // PSD at every spectral position, at every harmonic the sum needs
-  const IQ = XS.map((_, x) => Array.from({ length: st.k }, (__, h) => {
-    const w = 2 * Math.PI * (h + 1) / T;
-    return { I: 2 / T * trap(j => val(j, x) * Math.sin(w * ts[j])), Q: 2 / T * trap(j => val(j, x) * Math.cos(w * ts[j])) };
-  }));
-  heatmap($('cHarm'), { scale: sc, x: [0, 60], y: [0, 360], xlabel: 'spectral position / –', ylabel: 'phase angle *φ* / °', xticks: xt, yticks: PHI_TICKS }, 73, XS.length, (r, x) => sumAt(IQ[x], r * 5), phaseLim(),
-    p => p.hline(shownPhi(), C['data-highlight'], 2));
-  $('subHarm').innerHTML = `PSD at every position: the static band is gone, the signal a cosine in <i>φ</i>.`;
+  const sigIQ = S.harm;
+  const at_ = (x, phi) => GB[x] * sumAt(sigIQ, phi) + (nIQ[x].length ? sumAt(nIQ[x], phi) : 0);
+  heatmap($('cHarm'), { scale: sc, x: [0, 60], y: [0, 360], xlabel: 'spectral position / –', ylabel: 'phase angle *φ* / °', xticks: xt, yticks: PHI_TICKS }, 73, XS.length, (r, x) => at_(x, r * 5), phaseLim(),
+    p => {
+      dashedH(p, shownPhi());
+      P4 = { p, ys: [p.Y(shownPhi())], toPhi: y => 360 * clamp((p.inner.b - y) / (p.inner.b - p.inner.t), 0, 0.9999) };
+    });
+  $('subHarm').innerHTML = 'PSD at every position: the static band drops out.';
+  legend($('legHarm'), [scaleLeg, negLeg, ['chosen <i>φ</i>', C['data-highlight'], 'dashed']]);
+}
+/** A green dashed line across a map, with a grip at its left end. */
+function dashedH(p, y) {
+  const { ctx, inner } = p, yy = p.Y(y);
+  ctx.strokeStyle = C['data-highlight']; ctx.lineWidth = 2; ctx.setLineDash(CHART.dash);
+  ctx.beginPath(); ctx.moveTo(inner.l, yy); ctx.lineTo(inner.r, yy); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = C['data-highlight']; ctx.beginPath(); ctx.arc(inner.l, yy, CHART.marker, 0, 2 * Math.PI); ctx.fill();
 }
 
 /* the values: signal, clean, stimulus, formula */
@@ -671,11 +764,10 @@ const controls = valueControls({
     const st = state.s;
     sums();
     setSeg($('shape'), st.shape); setSeg($('invert'), st.invert ? 1 : 0); setSeg($('harm'), st.k);
-    setSeg($('view3'), st.view3); setSeg($('view4'), st.view4);
+    setSeg($('view4'), st.view4);
     $('asym').checked = st.tauOff != null; $('chain').checked = st.tau2 != null;
-    $('clean').checked = st.clean; $('amp').checked = st.amp;
+    $('clean').checked = st.clean;
     setSeg($('kMode'), st.kUpTo ? 'le' : 'eq');
-    $('view3').querySelector('[data-v="phasor"]').disabled = st.kUpTo;
     const pf = $('phiField');
     if (document.activeElement !== pf) pf.value = Math.round(shownPhi());
     pf.classList.toggle('preview', !!state.preview);
@@ -690,12 +782,10 @@ const segClick = (id, fn) => $(id).addEventListener('click', e => { const b = e.
 segClick('shape', v => { state.s.shape = v; });
 segClick('invert', v => { state.s.invert = v === '1'; });
 segClick('harm', v => { state.s.k = +v; });
-segClick('view3', v => { state.s.view3 = v; });
 segClick('view4', v => { state.s.view4 = v; });
 $('asym').addEventListener('change', e => { state.s.tauOff = e.target.checked ? state.s.tau : null; update(); });
 $('chain').addEventListener('change', e => { state.s.tau2 = e.target.checked ? 0.1 : null; update(); });
 $('clean').addEventListener('change', e => { state.s.clean = e.target.checked; draw(); });
-$('amp').addEventListener('change', e => { state.s.amp = e.target.checked; draw(); });
 segClick('kMode', v => { state.s.kUpTo = v === 'le'; });
 $('reseed').addEventListener('click', () => { state.seed += 1; update(); });
 $('resetCase').addEventListener('click', () => selectInput(state.idx, false));
@@ -713,6 +803,23 @@ dragRuler(cSig, {
   rulerXs: () => P1?.xs ?? [], plotOf: () => P1?.p,
   onDrag: x => { const { inner } = P1.p, t = clamp((x - inner.l) / (inner.r - inner.l), 0, 1) * T; setPhi(-360 * state.s.k * t / T); },
 });
+
+/* panel 4, maps: grab a green line and drag it up or down */
+const cHarm = $('cHarm');
+{
+  let dragging = false;
+  const near = e => {
+    if (state.s.view4 === 'bars' || !P4) return false;
+    const { x, y } = localIn(cHarm, e), { inner } = P4.p;
+    return x >= inner.l - 8 && x <= inner.r && P4.ys.some(yy => Math.abs(y - yy) <= 7);
+  };
+  cHarm.addEventListener('pointermove', e => {
+    if (dragging) { setPhi(P4.toPhi(localIn(cHarm, e).y)); return; }
+    cHarm.style.cursor = near(e) ? 'ns-resize' : 'default';
+  });
+  cHarm.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cHarm.setPointerCapture(e.pointerId); });
+  cHarm.addEventListener('pointerup', e => { dragging = false; try { cHarm.releasePointerCapture(e.pointerId); } catch { /* released */ } });
+}
 
 /* panel 3: hover a point, click to keep it, drag the ruler */
 const cPhase = $('cPhase');
@@ -782,12 +889,11 @@ function renderRail() {
     rail.fly('shape', rail.btn('shFly', { square: '⊓', triangle: '⋀', saw: '◿', sine: '∿' }[st.shape], 'Stimulus shape', { text: true }),
       `<div class="fly-title">Stimulus</div>${Object.entries(SHAPE_NAME).map(([v, n]) => rail.item('shape', v, n, v === st.shape)).join('')}`),
     rail.fly('k', rail.btn('kFly', `k${st.k}`, 'Harmonic k', { text: true }),
-      `<div class="fly-title">Harmonic <i>k</i></div>${[1, 2, 3, 4, 5].map(k => rail.item('k', k, `k = ${k}`, k === st.k)).join('')}`),
+      `<div class="fly-title">Harmonic <i>k</i></div>${KS.map(k => rail.item('k', k, `k = ${k}`, k === st.k)).join('')}`),
     rail.btn('play', playing ? '❚❚' : '▶', playing ? 'Pause the sweep' : 'Sweep φ', { on: playing, text: true }),
     rail.btn('run', '∫', integrating ? 'Pause the integration' : 'Run the integral', { on: integrating, text: true }),
     rail.btn('kUpTo', 'Σ', st.kUpTo ? `Harmonics 1 … ${st.k} summed. Click for k alone` : `Sum the harmonics 1 … ${st.k}`, { on: st.kUpTo, text: true }),
     rail.btn('clean', '≈', st.clean ? 'Clean signal shown. Click to hide' : 'Show the clean signal', { on: st.clean, text: true }),
-    rail.btn('view3', st.view3 === 'cos' ? '∿' : '↗', st.view3 === 'cos' ? 'Phase domain as a cosine. Click for the phasor' : 'Phase domain as a phasor. Click for the cosine', { text: true }),
   ].join('');
 }
 $('rail').addEventListener('click', e => {
@@ -804,7 +910,6 @@ $('rail').addEventListener('click', e => {
   else if (r === 'k') st.k = +b.dataset.v;
   else if (r === 'kUpTo') st.kUpTo = !st.kUpTo;
   else if (r === 'clean') st.clean = !st.clean;
-  else if (r === 'view3') st.view3 = st.view3 === 'cos' ? 'phasor' : 'cos';
   else return;
   update();
 });
