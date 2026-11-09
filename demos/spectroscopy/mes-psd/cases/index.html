@@ -72,7 +72,7 @@
             <label class="ctl num"><span>period <i>T</i> / min</span><input id="period" type="number" min="1" max="600" step="1"></label>
             <label class="ctl"><span>spectral axis</span><select id="axis"></select></label>
             <div class="ctl"><span>stimulus</span>
-              <span class="seg" id="shape"><button type="button" data-v="square">on / off</button><button type="button" data-v="sine">sine</button></span></div>
+              <span class="seg" id="shape"><button type="button" data-v="square" title="switch between two feeds">on / off</button><button type="button" data-v="triangle" title="ramp up, then down">triangle</button><button type="button" data-v="saw" title="ramp up slowly, then back at once">sawtooth</button><button type="button" data-v="sine">sine</button></span></div>
             <div class="ctl vctl" data-k="duty"></div>
             <div class="ctl vctl" data-k="noise"></div>
             <div class="ctl vctl" data-k="cycles"></div>
@@ -84,7 +84,7 @@
           <div class="sg-head"><button type="button" class="sg-toggle" aria-expanded="true" title="Phase-sensitive detection: the harmonic and the phase angle. Click to fold"><span class="sg-name">demodulation</span><span class="sg-sum"></span></button></div>
           <div class="sg-body">
             <div class="ctl"><span>harmonic <i>k</i></span>
-              <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="5">5</button></span></div>
+              <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button><button type="button" data-v="10">10</button><button type="button" data-v="30">30</button></span></div>
             <div class="ctl"><span>figure 3 shows</span>
               <span class="seg" id="kMode"><button type="button" data-v="eq" title="The harmonic k alone">only <i>k</i></button><button type="button" data-v="le" title="Harmonics 1 … k added, each at the phase of the same moment: the averaged period rebuilt, closer to its shape the more are added">summed 1 … <i>k</i></button></span></div>
             <div class="ctl vctl" data-k="phi"></div>
@@ -119,7 +119,7 @@
         <div class="wb-center">
           <section class="panel">
             <h3>1 · Time Domain</h3>
-            <p class="sub">Quasi-steady state: the signal at each band maximum. Red: stimulus on, blue: off. Dashed: the stimulus.</p>
+            <p class="sub">The signal at each band maximum, in quasi-steady state.</p>
             <canvas id="cTime"></canvas>
             <div class="legend" id="legTime"></div>
           </section>
@@ -132,15 +132,15 @@
           <section class="panel">
             <h3>3 · Spectra</h3>
             <div class="sub-row">
-              <p class="sub"><span id="subSpecFold">Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].</span><span id="subSpecAll" hidden>Phase-resolved: <i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].</span><span id="subSpecMode"></span></p>
+              <p class="sub"><span id="subSpecFold">The averaged period, and its demodulated spectrum at <i>φ</i> [@handbook, Fig. 42.1, p. 969].</span><span id="subSpecAll" hidden>The phase-resolved spectra, one per <i>φ</i> [@handbook, Fig. 42.2, pp. 971–972].</span><span id="subSpecMode"></span></p>
               <label class="phi-field" title="The harmonic and the phase angle on show: type a φ, or move the ruler in figure 2 or 4"><span id="kField"></span><i>φ</i> = <input id="phiField" type="text" inputmode="decimal" aria-label="phase angle">°</label>
             </div>
             <canvas id="cSpec"></canvas>
-            <div class="legend" aria-hidden="true"></div>
+            <div class="legend" id="legSpec"></div>
           </section>
           <section class="panel">
             <h3>4 · Phase Domain</h3>
-            <p class="sub" id="subPhase"><i>A<sub>k</sub></i>(<i>φ</i>) at each band maximum. Dot: <i>φ</i><sub>max</sub>, ring: where a band is gone. Hover a point, click to keep it; drag the dashed green ruler [@weyel, Eq. 2].</p>
+            <p class="sub" id="subPhase"><i>A<sub>k</sub></i>(<i>φ</i>) at each band maximum: hover a point, drag the ruler [@weyel, Eq. 2].</p>
             <canvas id="cPhase" class="interactive"></canvas>
             <div class="legend" id="legPhase"></div>
           </section>

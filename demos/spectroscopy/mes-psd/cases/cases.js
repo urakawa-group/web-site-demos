@@ -294,6 +294,20 @@ function firstOrder(points, tau, dt, held = null, tauOff = null) {
   return y;
 }
 
+/**
+ * The stimulus at the fraction f of the period: on/off, a triangle rising for
+ * the fraction duty and falling for the rest, a sawtooth rising over the whole
+ * period and dropping at once, or a sine.
+ */
+const SHAPE_NAME = { square: 'on / off', triangle: 'triangle', saw: 'sawtooth', sine: 'sine' };
+function uAt(f) {
+  const { shape, duty: d } = state.s;
+  if (shape === 'square') return f < d ? 1 : 0;
+  if (shape === 'triangle') return f < d ? f / d : (1 - f) / (1 - d);
+  if (shape === 'saw') return f;
+  return 0.5 + 0.5 * Math.sin(2 * Math.PI * f);
+}
+
 const gauss = (x, c, w) => Math.exp(-4 * Math.LN2 * ((x - c) / w) ** 2);
 
 function compute() {
@@ -309,8 +323,11 @@ function compute() {
       stim[i] = j === 0 || j === nOn ? (i === 0 ? 0 : 0.5) : (j < nOn ? 1 : 0);
       held[i] = j < nOn ? 1 : 0;
     } else {
-      stim[i] = 0.5 + 0.5 * Math.sin(2 * Math.PI * j / M);
-      held[i] = 0.5 + 0.5 * Math.sin(2 * Math.PI * (j + 0.5) / M);
+      // ramps and the sine: the value at the sample, held as the value halfway
+      // through the interval (the mean, exact for straight pieces); the
+      // sawtooth's drop counts ½ at the sample it falls on
+      stim[i] = st.shape === 'saw' && j === 0 ? (i === 0 ? 0 : 0.5) : uAt(j / M);
+      held[i] = uAt((j + 0.5) / M);
     }
   }
   // concentrations, then band heights
@@ -396,7 +413,15 @@ function compute() {
  */
 function stimLag(k) {
   const st = state.s;
-  if (st.shape !== 'square') return k === 1 ? 0 : null;
+  if (st.shape === 'sine') return k === 1 ? 0 : null;
+  if (st.shape !== 'square') {
+    // read off the stimulus' own harmonic k: φ = atan2(Q, I), so it lags by −φ
+    let I = 0, Q = 0;
+    for (let j = 0; j < 4 * M; j++) { const f = (j + 0.5) / (4 * M), u = uAt(f), w = 2 * Math.PI * k * f; I += u * Math.sin(w); Q += u * Math.cos(w); }
+    if (Math.hypot(I, Q) / (4 * M) < 1e-6) return null;
+    const lag = -Math.atan2(Q, I);
+    return ((lag % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  }
   const f = (k * st.duty) % 1;
   if (f < 1e-9 || f > 1 - 1e-9) return null;
   const lag = (180 * f - 90) * Math.PI / 180;
@@ -427,8 +452,8 @@ function theoryTcon(s0, k) {
    --------------------------------------------------------------------------- */
 let S = null;
 
-/** End of the stimulus-on part of the period: the on fraction for on/off, half for the sine. */
-const onTime = () => (state.s.shape === 'square' ? state.s.duty : 0.5) * state.s.T;
+/** End of the stimulus-on (rising) part of the period: on fraction or rising fraction, all of it for the sawtooth, half for the sine. */
+const onTime = () => ({ square: state.s.duty, triangle: state.s.duty, saw: 1, sine: 0.5 }[state.s.shape]) * state.s.T;
 const fmtT = v => (state.s.unit === 'T' ? `${v.toFixed(3)} T` : `${v.toFixed(1)} min`);
 const timeLabel = () => (state.s.unit === 'T' ? 'time / *T*' : 'time / min');
 /**
@@ -446,11 +471,13 @@ function limits() {
   const hResp = Math.max(0.05 * hAll, ...resp);
   // harmonic k of an on/off wave carries 1/k of the fundamental's swing, so the
   // PSD axes follow k (a sine has no harmonics above 1: its axes stay at k = 1)
-  const psd = 0.75 * hResp / (st.shape === 'square' && !st.kUpTo ? st.k : 1);
+  // (on/off and sawtooth 1/k, triangle 1/k², the sine none above 1: its axes stay at k = 1)
+  const fall = { square: st.k, saw: st.k, triangle: st.k * st.k, sine: 1 }[st.shape];
+  const psd = 0.75 * hResp / (st.kUpTo ? 1 : fall);
   return {
     time: [-0.12 * hAll, 1.16 * hAll],
     spec: st.allPhi ? [-psd, psd] : [-psd, 1.12 * hAll],
-    phase: [-0.75 * hResp / (st.shape === 'square' ? st.k : 1), 0.75 * hResp / (st.shape === 'square' ? st.k : 1)],
+    phase: [-0.75 * hResp / fall, 0.75 * hResp / fall],
   };
 }
 
@@ -460,7 +487,7 @@ function limits() {
  * them are shown (and folded); time counts from the first of those.
  */
 function drawTime() {
-  const { st, T, dt, held, raw, conc } = S;
+  const { st, T, dt, held, stim, raw, conc } = S;
   const cyc = Math.min(st.cycles, 3), a = WARM * M, b = a + cyc * M;
   const ts = Array.from({ length: b - a }, (_, i) => i * dt);
   const cut = arr => Array.from(arr.subarray(a, b));
@@ -471,20 +498,22 @@ function drawTime() {
   });
   const tOn = onTime();
   for (let c = 0; c < cyc; c++) { p.shadeX(c * T, c * T + tOn, C['shade-on']); p.shadeX(c * T + tOn, (c + 1) * T, C['shade-off']); }
-  p.steps(ts, cut(held), C['data-stimulus']);
+  if (st.shape === 'square') p.steps(ts, cut(held), C['data-stimulus']);
+  else p.line(ts, cut(stim), C['data-stimulus'], CHART.lineThin, CHART.dash);
   for (const s of live().filter(s => !s.band)) p.line(ts, cut(conc[s.key]), colorOf(s), CHART.lineThin, CHART.dash);
   for (const s of S.banded) p.line(ts, cut(raw[s.key]), colorOf(s), CHART.lineThin);
   p.axes();
 }
 
 function drawFold() {
-  const { st, T, dt, held, conc } = S;
+  const { st, T, dt, held, stim, conc } = S;
   const tp = Array.from({ length: M }, (_, j) => j * dt);
   const yr = limits().time;
   const tk = st.unit === 'T' ? [[0, '0'], [0.25, 'T/4'], [0.5, 'T/2'], [0.75, '3T/4'], [1, 'T']] : ticks(0, T, 4);
   const p = plot($('cFold'), { scale: SC(), x: [0, T], y: yr, xlabel: st.unit === 'T' ? 'time in the period / *T*' : 'time in the period / min', ylabel: 'signal / –', xticks: tk, yticks: ticks(yr[0], yr[1], 4) });
   p.shadeX(0, onTime(), C['shade-on']); p.shadeX(onTime(), T, C['shade-off']);
-  p.steps(tp, Array.from(held.subarray(0, M)), C['data-stimulus']);
+  if (st.shape === 'square') p.steps(tp, Array.from(held.subarray(0, M)), C['data-stimulus']);
+  else p.line([...tp, T], [...Array.from(stim.subarray(M, 2 * M)), stim[M]], C['data-stimulus'], CHART.lineThin, CHART.dash);
   for (const s of live().filter(s => !s.band)) {
     const c = conc[s.key], avg = tp.map((_, j) => { let v = 0; for (let q = WARM; q < WARM + st.cycles; q++) v += c[q * M + j]; return v / st.cycles; });
     p.line(tp, avg, colorOf(s), CHART.lineThin, CHART.dash);
@@ -503,7 +532,7 @@ function drawFold() {
   p.ctx.beginPath(); p.ctx.moveTo(xs[0] - g, p.inner.t); p.ctx.lineTo(xs[0] + g, p.inner.t); p.ctx.lineTo(xs[0], p.inner.t + g * 1.4); p.ctx.closePath(); p.ctx.fill();
   FD = { p, xs, T, k: st.k };
   p.axes();
-  $('subFold').innerHTML = `${st.cycles} cycle${st.cycles > 1 ? 's' : ''} in quasi-steady state, averaged: the noise drops by about √${st.cycles}. Green: the delay the chosen <i>φ</i> reads, (360° − <i>φ</i>)/360° · <i>T</i>/<i>k</i>; drag it to set <i>φ</i>.`;
+  $('subFold').innerHTML = `${st.cycles} cycle${st.cycles > 1 ? 's' : ''} folded and averaged: the noise drops by about √${st.cycles}.`;
 }
 
 const psdAt = phi => {
@@ -659,8 +688,9 @@ function drawPhase() {
   PH = { p, pois, rx };
 }
 
+/** A legend under a plot: [label, colour, class] per entry ('dashed', 'bar', 'outline', 'dot', 'ring', …); falsy entries are skipped. */
 function legend(el, items) {
-  el.innerHTML = items.map(([label, color, dashed]) => `<span class="${dashed ? 'dashed' : ''}" style="--c:${color}">${label}</span>`).join('');
+  el.innerHTML = items.filter(Boolean).map(([label, color, cls]) => `<span class="${cls === true ? 'dashed' : cls || ''}" style="--c:${color}">${label}</span>`).join('');
 }
 
 /**
@@ -688,7 +718,7 @@ function drawValues() {
 
 function draw() {
   if (!S) return;
-  drawTime(); drawFold(); drawSpec(); drawPhase(); drawValues(); refreshVals();
+  drawTime(); drawFold(); drawSpec(); drawPhase(); drawValues(); refreshVals(); legends();
 }
 
 /** Recompute and redraw after any setting changed. */
@@ -756,9 +786,10 @@ function renderRail() {
       `<div class="fly-title">Case</div>${CASES.map((c, i) => flyItem('case', i, `${i + 1} · ${c.title}`, i === ci)).join('')}`),
     railBtn('reset', '↺', changed ? 'Reset to the case' : 'Nothing changed from the case', { disabled: !changed }),
     '<hr class="rail-rule">',
-    railBtn('shape', st.shape === 'square' ? '⊓' : '∿', st.shape === 'square' ? 'Stimulus on / off. Click for sine' : 'Stimulus sine. Click for on / off', { text: true }),
+    flyWrap('shape', railBtn('shFly', { square: '⊓', triangle: '⋀', saw: '◿', sine: '∿' }[st.shape], 'Stimulus shape', { text: true }),
+      `<div class="fly-title">Stimulus</div>${Object.entries(SHAPE_NAME).map(([v, n]) => flyItem('shape', v, n, v === st.shape)).join('')}`),
     flyWrap('k', railBtn('kFly', `k${st.k}`, 'Harmonic k', { text: true }),
-      `<div class="fly-title">Harmonic <i>k</i></div>${[1, 2, 3, 5].map(k => flyItem('k', k, `k = ${k}`, k === st.k)).join('')}`),
+      `<div class="fly-title">Harmonic <i>k</i></div>${[1, 2, 3, 4, 5, 10, 30].map(k => flyItem('k', k, `k = ${k}`, k === st.k)).join('')}`),
     railBtn('allPhi', '∥', st.allPhi ? 'Phase-resolved spectra shown. Click for the averaged period' : 'The averaged period shown. Click for the phase-resolved spectra', { on: st.allPhi, text: true }),
     railBtn('play', playing ? '❚❚' : '▶', playing ? 'Pause the sweep' : 'Sweep φ', { on: playing, text: true }),
     flyWrap('noise', railBtn('noiseFly', 'σ', 'Noise', { text: true, on: st.noise > 0 }),
@@ -784,7 +815,7 @@ $('rail').addEventListener('click', e => {
   if (r === 'open') { panels.left = true; setPanels(); return; }
   if (r === 'case') { flyOpen = null; selectCase(+b.dataset.v); return; }
   if (r === 'reset') { selectCase(state.caseIdx, false); return; }
-  if (r === 'shape') { st.shape = st.shape === 'square' ? 'sine' : 'square'; syncControls(); }
+  if (r === 'shape') { st.shape = b.dataset.v; flyOpen = null; syncControls(); }
   else if (r === 'k') { st.k = +b.dataset.v; flyOpen = null; syncControls(); }
   else if (r === 'allPhi') { st.allPhi = !st.allPhi; syncControls(); }
   else if (r === 'play') { $('play').click(); return; }
@@ -814,8 +845,6 @@ function syncControls() {
   $('allPhi').checked = st.allPhi;
   $('absSpec').checked = st.absSpec; $('absSpec').disabled = !st.allPhi;
   setSeg($('kMode'), st.kUpTo ? 'le' : 'eq');
-  $('subSpecMode').innerHTML = (st.kUpTo ? ` Summed: harmonics 1 … ${st.k} at <i>t</i> = (90° − <i>φ</i>)/360° · <i>T</i>${st.allPhi ? '' : ', plus the mean: the averaged spectrum at <i>t</i>, rebuilt'}.` : '')
-    + (st.allPhi && st.absSpec ? ' Dashed ink: the amplitude, which no <i>φ</i> exceeds.' : '');
   setSeg($('shape'), st.shape); setSeg($('harm'), st.k); setSeg($('unit'), st.unit);
   $('period').value = st.T; $('period').disabled = st.unit === 'T';
   $('axis').value = st.axis;
@@ -978,14 +1007,32 @@ $('addSpecies').addEventListener('click', () => {
 /* ---------------------------------------------------------------------------
    Legends, case texts as tooltips, case switching
    --------------------------------------------------------------------------- */
+/**
+ * The legends, one look per kind of line on every page: stimulus grey dashed,
+ * a species solid in its colour (a species without a band dashed), the chosen φ
+ * and its ruler green dashed, the spectrum at φ green, the other spectra faint
+ * grey, summed harmonics and the amplitude ink dashed; on and off as the
+ * red and blue background.
+ */
 function legends() {
-  const on = live();
-  const items = [['stimulus', C['data-stimulus'], true],
-    ...on.filter(s => !s.band).map(s => [s.label, colorOf(s), true]),
-    ...on.filter(s => s.band).map(s => [s.label, colorOf(s)])];
-  legend($('legTime'), items);
-  legend($('legFold'), items);
-  legend($('legPhase'), on.filter(s => s.band).map(s => [s.label, colorOf(s)]));
+  if (!state.s) return;
+  const on = live(), st = state.s;
+  const mix = c => `color-mix(in srgb, ${c} 30%, white)`;
+  const ramp = st.shape === 'triangle' || st.shape === 'saw';
+  const onOff = [[ramp ? 'rising' : 'on', mix(C['map-pos']), 'bar'], st.shape !== 'saw' && [ramp ? 'falling' : 'off', mix(C['map-neg']), 'bar']];
+  const sp = [['stimulus', C['data-stimulus'], 'dashed'],
+    ...on.filter(s => !s.band).map(s => [s.label, colorOf(s), 'dashed']),
+    ...on.filter(s => s.band).map(s => [s.label, colorOf(s), ''])];
+  legend($('legTime'), [...sp, ...onOff]);
+  legend($('legFold'), [...sp, ['delay at <i>φ</i>', C['data-highlight'], 'dashed'], ...onOff]);
+  const at = st.kUpTo ? `Σ <i>h</i> ≤ ${st.k} at <i>φ</i>` : `<i>A<sub>${st.k}</sub></i> at <i>φ</i>`;
+  legend($('legSpec'), [
+    [st.allPhi ? '<i>φ</i> = 0, 10, …, 170°' : 'averaged, through the period', C['data-faint'], ''],
+    [at, C['data-highlight'], ''],
+    st.allPhi && st.absSpec && ['amplitude', C['ink-700'], 'dashed'],
+  ]);
+  legend($('legPhase'), [...on.filter(s => s.band).map(s => [s.label, colorOf(s), '']),
+    ['chosen <i>φ</i>', C['data-highlight'], 'dashed'], ['<i>φ</i><sub>max</sub>', C['ink-700'], 'dot'], ['zero', C['ink-700'], 'ring']]);
 }
 
 /** The floating tooltip: one element for the case texts and the phase-domain points. */
@@ -1171,10 +1218,10 @@ const BIND = {
     caseV: () => sigmaFromSlider(caseS().noise), def: 0,
   },
   duty: {
-    label: 'on fraction of the period', unit: '', min: 0.1, max: 0.9, step: 0.05, redraw: 'update',
+    label: 'on (or rising) fraction of the period', unit: '', min: 0.1, max: 0.9, step: 0.05, redraw: 'update',
     get: () => state.s.duty, set: v => { state.s.duty = Math.round(clamp(v, 0.05, 0.95) * 20) / 20; },
     toR: v => v, fromR: r => +r, fmt: v => v.toFixed(2), caseV: () => caseS().duty ?? 0.5, def: 0.5,
-    off: () => state.s.shape !== 'square',
+    off: () => state.s.shape !== 'square' && state.s.shape !== 'triangle',
   },
   cycles: {
     label: 'cycles averaged', unit: '', min: 1, max: 12, step: 1, redraw: 'update',
@@ -1240,7 +1287,7 @@ function fillVctls(root) {
 function groupSummaries() {
   const st = state.s, sum = (g, t) => { const el = document.querySelector(`.sgroup[data-g="${g}"] .sg-sum`); if (el) el.innerHTML = t; };
   sum('case', `${state.caseIdx + 1} · ${CASES[state.caseIdx].title}`);
-  sum('measurement', `${st.shape === 'square' ? `on / off${st.duty !== 0.5 ? ` ${st.duty.toFixed(2)}` : ''}` : 'sine'} · <i>σ</i> ${sigmaFromSlider(st.noise).toFixed(3)} · ${st.cycles} cycles`);
+  sum('measurement', `${SHAPE_NAME[st.shape]}${(st.shape === 'square' || st.shape === 'triangle') && st.duty !== 0.5 ? ` ${st.duty.toFixed(2)}` : ''} · <i>σ</i> ${sigmaFromSlider(st.noise).toFixed(3)} · ${st.cycles} cycles`);
   sum('demodulation', `<i>k</i> ${st.kUpTo ? '≤' : '='} ${st.k} · <i>φ</i> = ${st.phi}°${st.allPhi ? ' · resolved' : ''}`);
   sum('species', live().map(s => s.label.split(',')[0]).join(' ') || 'none on');
 }
