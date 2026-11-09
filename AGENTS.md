@@ -20,23 +20,43 @@ should understand the idea by changing something and watching the response.
   - *Transformation*: the core operation on one signal, shown several ways,
     with an input selector (the simplest input first). It answers "what does
     the method do to a signal".
-  - *Cases*: the method on realistic spectra. Every setting the engine reads
-    has a control, the structure of the sample included (species, bands,
-    time constants). A case is nothing but a stored snapshot of those
-    settings plus a title and a text: picking it loads the snapshot, after
-    which everything is free, and the selector marks the case as changed.
-    Cases are ordered from the simplest (one signal, no delay, no noise) to
-    the realistic one.
+  - *Cases*: the method on realistic spectra, with every setting on screen
+    (see below). Cases are ordered from the simplest (one signal, no delay,
+    no noise) to the realistic one.
   A case or an input explains one idea in at most 130 words. A small topic
   with nothing to transform can stay one page.
-- **Short text above, explanation below.** A title and a lead of at most 50
-  words on the left two thirds, the case selector on the right third beside
-  them (closed it shows the current case, a click opens the menu), then the
-  controls and the plots. Under the plots the explanation and the equations,
-  and last the reference list, full width.
-- **Plot limits are fixed per case.** They follow from the case's bands, never
-  from a slider, the harmonic or the phase angle, so nothing rescales while the
-  reader changes a setting or sweeps φ.
+- **Every setting is always there; a case only sets values.** Every value the
+  engine reads has a control, the structure of the sample included: species
+  are a fixed set of slots, each switched on or off, never added or removed.
+  A case is a stored set of values for those controls plus a title and a
+  text. Picking it changes the values; it never adds, hides or removes a
+  control. The selector marks the case as changed once a value differs.
+- **Every value can be typed and reset.** A slider shows its value as a
+  number field: type to set it. A small ↺ beside it appears only while the
+  value differs from the case and puts the case's value back; a
+  double-click on the slider sets the page default (noise 0, φ 0°, …). A
+  group of values (a species slot) gets one ↺ for the whole group.
+- **The workbench layout, on a wide screen.** Under a short head (breadcrumb,
+  title, a lead of at most 50 words) three columns: the settings in a left
+  sidebar (case selector first), the plots in the centre, the values in a
+  right sidebar. The centre is sized to the window, so every plot is in
+  view without scrolling; the sidebars scroll on their own. Narrower, the
+  three stack. Under the workbench the explanation and the equations, last
+  the reference list, full width.
+- **Case texts are tooltips; the text below is general.** Hovering a case
+  in the selector shows its text. The explanation under the plots is the
+  same for every case: what the page shows and how to read and use it.
+- **Plots answer the pointer where a point means something.** A marked
+  point (a maximum, a zero) shows what it means on hover, previews its
+  effect in the other plots, and is kept on click; a cursor line that sets a
+  value can be dragged.
+- **Plot limits are fixed per case.** They follow from the bands, never from
+  a slider or the phase angle, so nothing rescales while the reader changes a
+  setting or sweeps φ. The one exception is the harmonic: the axes of
+  demodulated signals follow k (1/k for a square wave), or harmonics above
+  the first look empty.
+- **The presentation view of the workbench is not settled yet.** For now it
+  is the zoom of the shell, which stacks the three columns.
 
 ## How a demo is built
 

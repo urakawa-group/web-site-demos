@@ -1,11 +1,11 @@
 /**
- * MES-PSD cases: one engine, every setting on a control, and a case is
- * nothing but a stored snapshot of the settings. Picking a case loads its
- * snapshot; from there every control is free. See the comment block in
- * index.html for the model and the sources; the case texts carry the citations.
+ * MES-PSD cases: one engine, every setting on a control and always on
+ * screen. A case is a stored set of values for those settings: picking it
+ * changes the values, it never adds or removes a control. See the comment
+ * block in index.html for the model and the sources.
  */
 import { initShell } from '../../../../assets/shell.js';
-import { C, CHART } from '../../../../assets/tokens.js';
+import { C, CHART, typeFont } from '../../../../assets/tokens.js';
 import { plot, ticks } from '../../../../assets/plot.js';
 import { renderCitations } from '../../../../assets/cite.js';
 
@@ -27,105 +27,139 @@ const SOURCES = {
 };
 
 /* ---------------------------------------------------------------------------
-   Settings. Everything the engine reads is in one object, and a case is a
-   copy of it plus a title and a text:
+   Settings. Everything the engine reads is one object:
 
-   { unit, T, axis, noise, cycles, shape, k, phi, allPhi, species: [...] }
+   { unit, T, axis, noise, cycles, shape, k, phi, allPhi, species: [5 slots] }
 
      unit     'T' (time in periods, T = 1) or 'min' (T in minutes)
      axis     'generic' (spectral position 0 to 60) or 'ir' (wavenumber)
      noise    slider value 0 to 100
-     species  in drive order. Each one:
+     species  always five slots, s1 to s5, in drive order. Each one:
+       on     whether it is in the sample; a slot that is off keeps its values
        key, label, color ('data-a' | 'data-b' | 'data-c'; static and bandless
-         species draw in their own colour whatever is stored here)
+              species draw in their own colour whatever is stored here)
        band   [centre, fwhm, height] or null (a signal without a band, e.g.
               the gas in the cell)
-       drive  'stim', 'static' or the key of an earlier species
-       tau    time constant, in the unit of the case
-       invert falls while the stimulus is on
+       drive  'stim', 'static' or the key of an earlier slot; an earlier slot
+              that is off or static counts as the stimulus
+       tau    time constant, in the unit of the settings
+       invert antiphase: falls while the stimulus is on
        base   part of the band that never leaves, 0 to 0.95
+
+   A case is { id, title, eq, text, s }: a title, a text for the tooltip and
+   the values. Slots a case does not use are switched off at their defaults.
    --------------------------------------------------------------------------- */
 const AXES = {
   generic: { from: 0, to: 60, step: 0.5, label: 'spectral position / –', name: 'generic, 0 to 60', ticks: [0, 10, 20, 30, 40, 50, 60].map(v => [v, String(v)]) },
   ir: { from: 1800, to: 950, step: -5, label: 'wavenumber / cm⁻¹', name: 'IR, 1800 to 950 cm⁻¹', ticks: [1800, 1600, 1400, 1200, 1000].map(v => [v, String(v)]) },
 };
 const DYN_COLORS = ['data-a', 'data-b', 'data-c'];
-const MAX_SPECIES = 5;
+const SLOTS = 5;
 
-const sp = (key, label, color, band, drive, tau, extra = {}) => ({ key, label, color, band, drive, tau, invert: false, base: 0, ...extra });
+const sp = (label, color, band, drive, tau, extra = {}) => ({ label, color, band, drive, tau, invert: false, base: 0, ...extra });
+/** The slots in the generic axis, as a case that does not use them leaves them. */
+const DEFAULT_SLOTS = [
+  sp('A', 'data-a', [20, 10, 1], 'stim', 0.04),
+  sp('B', 'data-b', [38, 10, 0.4], 'stim', 0.04),
+  sp('C', 'data-c', [50, 8, 0.3], 's2', 0.1),
+  sp('D, static', 'data-a', [10, 6, 0.5], 'static', 0),
+  sp('E, static', 'data-a', [56, 5, 0.3], 'static', 0),
+];
+const mapAxis = (band, from, to) => {
+  if (!band) return band;
+  const a = AXES[from], b = AXES[to];
+  const c = b.from + (band[0] - a.from) / (a.to - a.from) * (b.to - b.from);
+  return [Math.round(c / Math.abs(b.step)) * Math.abs(b.step), band[1] * Math.abs((b.to - b.from) / (a.to - a.from)), band[2]];
+};
+/** Five slots: the case's species first, switched on; the rest off at their defaults. */
+function slots(list, axis) {
+  return Array.from({ length: SLOTS }, (_, i) => {
+    const key = `s${i + 1}`;
+    if (list[i]) return { key, on: true, ...list[i] };
+    const d = DEFAULT_SLOTS[i];
+    return { key, on: false, ...d, band: axis === 'generic' ? d.band : mapAxis(d.band, 'generic', axis) };
+  });
+}
 const base = { unit: 'T', T: 1, axis: 'generic', noise: 0, cycles: 4, shape: 'square', k: 1, phi: 0, allPhi: false };
+const settings = (extra, list) => ({ ...base, ...extra, species: slots(list, extra.axis ?? 'generic') });
 
 const CASES = [
   {
-    id: 'instant', eq: ['square'], title: 'One Band, No Delay',
-    s: { ...base, species: [sp('b', 'B', 'data-b', [30, 10, 1], 'stim', 0)] },
+    id: 'instant', title: 'One Band, No Delay',
+    s: settings({}, [sp('B', 'data-b', [30, 10, 1], 'stim', 0)]),
     text: `<p>The simplest response there is: one band that follows the stimulus at once. Phase-sensitive detection multiplies the averaged period by a sine of harmonic <i>k</i>, shifted by the phase angle <i>φ</i>, and integrates over one period [@handbook, Fig. 42.1, p. 969]. Anything constant over the period meets the sine with zero area and drops out, so the mean height of the band is gone and only its swing is left.</p>
       <p>An on/off square wave of height 1 is ½ plus odd sines, so at <i>k</i> = 1 the band comes out with amplitude 2/π ≈ 0.64, largest at <i>φ</i> = 0: no delay, <i>t</i><sub>con</sub> = 0. Try <i>k</i> = 3: amplitude 2/(3π) ≈ 0.21, still at <i>φ</i> = 0. Try <i>k</i> = 2: nothing, a square wave has no even harmonics [@handbook, Eq. 42.1, p. 970].</p>`,
   },
   {
-    id: 'lag', eq: ['lag'], title: 'One Band, First-Order Delay',
-    s: { ...base, species: [sp('b', 'B', 'data-b', [30, 10, 1], 'stim', 0.08)] },
+    id: 'lag', title: 'One Band, First-Order Delay',
+    s: settings({}, [sp('B', 'data-b', [30, 10, 1], 'stim', 0.08)]),
     text: `<p>Now the band follows through one first-order step, d<i>y</i>/d<i>t</i> = (<i>u</i> − <i>y</i>)/<i>τ</i>. For a linear step like this the fundamental lags the stimulus by <i>δ</i> = arctan(<i>ωτ</i>) and shrinks by 1/√(1 + (<i>ωτ</i>)²), with <i>ω</i> = 2π/<i>T</i>. In the phase domain the maximum moves from 0 to <i>φ</i><sub>max</sub> = 360° − <i>δ</i>, and the time value reads that delay back as a time [@weyel, Eq. 2].</p>
-      <p>Move <i>τ</i>. The time value is close to <i>τ</i> only while <i>ωτ</i> ≪ 1, and for one step it never passes <i>T</i>/4, however slow the species, while the amplitude keeps falling. So a period near 2π<i>τ</i> to 10<i>τ</i> suits the steps of interest. The table compares the simulated time value with the one-step formula.</p>`,
+      <p>Move <i>τ</i>. The time value is close to <i>τ</i> only while <i>ωτ</i> ≪ 1, and for one step it never passes <i>T</i>/4, however slow the species, while the amplitude keeps falling. So a period near 2π<i>τ</i> to 10<i>τ</i> suits the steps of interest.</p>`,
   },
   {
     id: 'static', title: 'Static Band and Noise',
-    s: { ...base, noise: 48, species: [
-      sp('a', 'A, static', 'data-a', [20, 10, 1], 'static', 0),
-      sp('b', 'B', 'data-b', [38, 10, 0.08], 'stim', 0.05),
-    ] },
+    s: settings({ noise: 48 }, [
+      sp('A, static', 'data-a', [20, 10, 1], 'static', 0),
+      sp('B', 'data-b', [38, 10, 0.08], 'stim', 0.05),
+    ]),
     text: `<p>What a measured spectrum looks like: a large band A that does not follow the stimulus (support, spectators), a small band B that does, and noise. In the time domain A dominates and B hides in the noise.</p>
       <p>Folding <i>N</i> cycles into one period cuts the noise by about √<i>N</i>. PSD then removes A exactly, because a constant integrates to zero against a sine, and keeps only what oscillates at <i>kω</i> [@handbook, Fig. 42.1, p. 969]. That is the sensitivity gain of MES: a band too small to see in the raw spectra stands out after PSD [@urakawa2008]. Raise the noise, then the number of cycles.</p>`,
   },
   {
-    id: 'synchronous', title: 'Two Bands, Synchronous',
-    s: { ...base, allPhi: true, species: [
-      sp('a', 'A', 'data-a', [20, 10, 1], 'stim', 0.04),
-      sp('b', 'B', 'data-b', [38, 10, 0.4], 'stim', 0.04),
-    ] },
+    id: 'synchronous', title: 'Two Bands, Same Kinetics',
+    s: settings({ allPhi: true }, [
+      sp('A', 'data-a', [20, 10, 1], 'stim', 0.04),
+      sp('B', 'data-b', [38, 10, 0.4], 'stim', 0.04),
+    ]),
     text: `<p>Two bands with the same kinetics. Every phase-resolved spectrum shows both with the same sign and the same ratio, and both curves in the phase domain cross zero and peak at the same angles [@handbook, Figs. 42.2 and 42.3, pp. 971–972].</p>
       <p>PSD cannot separate them: they are one species with two bands, or two species that happen to share their kinetics. Change one <i>τ</i> and the two maxima part.</p>`,
   },
   {
     id: 'retarded', title: 'Two Bands, A Retarded',
-    s: { ...base, allPhi: true, species: [
-      sp('a', 'A', 'data-a', [20, 10, 1], 'stim', 0.15),
-      sp('b', 'B', 'data-b', [38, 10, 0.4], 'stim', 0.03),
-    ] },
+    s: settings({ allPhi: true }, [
+      sp('A', 'data-a', [20, 10, 1], 'stim', 0.15),
+      sp('B', 'data-b', [38, 10, 0.4], 'stim', 0.03),
+    ]),
     text: `<p>A slow band A and a fast band B. Their phase-domain curves peak at different angles, so the phase-resolved spectra change shape with <i>φ</i>: at the angle where one band crosses zero, the spectrum contains only the other [@handbook, Figs. 42.2 and 42.3, pp. 971–972].</p>
-      <p>The set of 18 spectra from 0 to 170° is drawn the way the handbook draws it. Sweep <i>φ</i> and watch A vanish while B is still there, and the other way round. B has the smaller time value: it responds first.</p>`,
+      <p>Hover the rings in the phase domain: at one A is gone and B is still there, at the other the reverse. B has the smaller time value: it responds first.</p>`,
   },
   {
-    id: 'opposite', title: 'Two Bands, Opposite: A Turns into B',
-    s: { ...base, allPhi: true, species: [
-      sp('a', 'A', 'data-a', [20, 10, 1], 'stim', 0.04, { invert: true }),
-      sp('b', 'B', 'data-b', [38, 10, 0.4], 'stim', 0.04),
-    ] },
+    id: 'opposite', title: 'Two Bands in Antiphase: A Turns into B',
+    s: settings({ allPhi: true }, [
+      sp('A', 'data-a', [20, 10, 1], 'stim', 0.04, { invert: true }),
+      sp('B', 'data-b', [38, 10, 0.4], 'stim', 0.04),
+    ]),
     text: `<p>When the stimulus switches on, A falls while B grows, and back in the second half: one species turning into the other and back [@handbook, Figs. 42.2 and 42.3, pp. 971–972]. Every phase-resolved spectrum shows the two bands as lobes of opposite sign, and their phase-domain curves are mirror images, 180° apart.</p>
-      <p>A falling band therefore reads a time value later by <i>T</i>/2 at <i>k</i> = 1. Read the sign before reading the time.</p>`,
+      <p>A band in antiphase therefore reads a time value later by <i>T</i>/2 at <i>k</i> = 1. Read the sign before reading the time.</p>`,
   },
   {
     id: 'harmonics', eq: ['square'], title: 'Square-Wave Harmonics',
-    s: { ...base, k: 3, allPhi: true, species: [
-      sp('a', 'A', 'data-a', [20, 10, 1], 'stim', 0.15),
-      sp('b', 'B', 'data-b', [38, 10, 0.4], 'stim', 0.03),
-    ] },
+    s: settings({ k: 3, allPhi: true }, [
+      sp('A', 'data-a', [20, 10, 1], 'stim', 0.15),
+      sp('B', 'data-b', [38, 10, 0.4], 'stim', 0.03),
+    ]),
     text: `<p>A square wave is a sum of odd sines, (4/π) Σ sin[(2<i>n</i> − 1)<i>ωt</i>]/(2<i>n</i> − 1), so one square-wave experiment drives the sample at <i>ω</i>, 3<i>ω</i> and 5<i>ω</i> at once [@handbook, Eq. 42.1, p. 970]. Demodulating at <i>k</i> = 3 or 5 gives the response to a 3 or 5 times faster modulation, and the amplitude times <i>k</i> puts it on the scale of the fundamental. This holds exactly only while the response is linear [@handbook, p. 970].</p>
-      <p>Compare <i>k</i> = 1 and 3: at the faster frequency the slow band A falls further behind and loses more amplitude. <i>k</i> = 2 shows nothing. Switch the stimulus to sine and only <i>k</i> = 1 is left; how the stimulation shape enters the analysis is worked out in [@urakawa2008].</p>`,
+      <p>Compare <i>k</i> = 1 and 3: at the faster frequency the slow band A falls further behind and loses more amplitude. <i>k</i> = 2 shows nothing. Switch the stimulus to sine and only <i>k</i> = 1 is left [@urakawa2008].</p>`,
   },
   {
     id: 'sequence', title: 'A Sequence with a Spectator',
-    s: { ...base, unit: 'min', T: 60, axis: 'ir', noise: 35, species: [
-      sp('gas', 'gas in the cell', 'data-a', null, 'stim', 3.5),
-      sp('fast', 'fast species', 'data-b', [1600, 70, 1.0], 'gas', 1.1),
-      sp('slow', 'slow species', 'data-c', [1060, 60, 0.7], 'fast', 17.6, { base: 0.35 }),
-      sp('spec', 'spectator', 'data-a', [1430, 90, 0.9], 'static', 0),
-    ] },
+    s: settings({ unit: 'min', T: 60, axis: 'ir', noise: 35 }, [
+      sp('gas in the cell', 'data-a', null, 'stim', 3.5),
+      sp('fast species', 'data-b', [1600, 70, 1.0], 's1', 1.1),
+      sp('slow species', 'data-c', [1060, 60, 0.7], 's2', 17.6, { base: 0.35 }),
+      sp('spectator', 'data-a', [1430, 90, 0.9], 'static', 0),
+    ]),
     text: `<p>A catalyst bed switched between CO₂ + H₂ and H₂ every 30 min (<i>T</i> = 60 min). The gas in the cell follows the valve with its own lag, a fast surface species follows the gas, a slow one is fed by the fast one and keeps a part that never leaves, and a spectator sits there. The band positions and every number are illustrative.</p>
       <p>Delays in series add, so the slow species can come out later than <i>T</i>/4 although no single step can. The spectator is the largest band in the spectrum and vanishes after PSD. Time values read as an order: an intermediate responds after the reactant and before the product, and a signal later than the product is suspect [@weyel].</p>`,
   },
 ];
 
+/** The text under the plots: the same for every case; a case's own text is its tooltip. */
+const GENERAL = `<h2>What This Page Shows</h2>
+  <p>A modulation excitation experiment in four steps, from left to right and top to bottom: the spectra over time while a stimulus is switched on and off, the cycles folded into one averaged period, the spectra after phase-sensitive detection, and the phase domain, where each band becomes one cosine in <i>φ</i> [@handbook, Fig. 42.1, p. 969]. The values on the right read the phase domain back as the lag <i>δ</i> and the time value <i>t</i><sub>con</sub> [@weyel, Eq. 2], and compare them with the first-order formula.</p>
+  <p>Every setting is on the left and stays there. A case only sets their values, from one band without delay to a sequence of species with a spectator; hover a case for what it shows. Each species slot is on or off, follows the stimulus or an earlier species through one first-order step, in phase (rises while the stimulus is on) or in antiphase (falls).</p>
+  <h2>Using the Phase Domain</h2>
+  <p>Each dot marks <i>φ</i><sub>max</sub> of a band, labelled with its lag <i>δ</i> = 360° − <i>φ</i><sub>max</sub>. Each ring marks a <i>φ</i> where that band is gone, 90° from its maximum. Hover a dot or a ring and panel 3 shows the phase-resolved spectrum there, with a note on what each band does at that angle; click to keep it. Drag the green line, or anywhere in the plot, to set <i>φ</i> by hand.</p>`;
 /* Formula boxes: fractions stacked, an integral with its limits stacked.
    Running prose keeps the one-line form (2/π), as in IR-bands. */
 const frac = (num, den) => `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
@@ -192,6 +226,8 @@ const EQ = {
 };
 
 
+
+
 /* ---------------------------------------------------------------------------
    Engine
    --------------------------------------------------------------------------- */
@@ -201,16 +237,24 @@ const SIG_MAX = 0.06;
 
 const $ = id => document.getElementById(id);
 const clone = o => JSON.parse(JSON.stringify(o));
-/** state.s is the settings object; caseIdx says which snapshot it came from. */
-const state = { caseIdx: 0, s: null, seed: 1 };
+/** state.s is the settings object; caseIdx says which case it came from; preview is a hovered φ. */
+const state = { caseIdx: 0, s: null, seed: 1, speed: 80, preview: null };
 
 const tauFromSlider = (v, T) => (v <= 0 ? 0 : T * 0.003 * Math.pow(200, (v - 1) / 99));
 const sliderFromTau = (tau, T) => (tau <= 0 ? 0 : Math.max(1, Math.min(100, Math.round(1 + 99 * Math.log(tau / T / 0.003) / Math.log(200)))));
 const sigmaFromSlider = v => SIG_MAX * Math.pow(v / 100, 1.5);
 
-const isStatic = sp => sp.drive === 'static';
-const colorKey = sp => (!sp.band ? 'data-stimulus' : isStatic(sp) ? 'data-static' : sp.color);
-const colorOf = sp => C[colorKey(sp)];
+const isStatic = s => s.drive === 'static';
+const isDyn = s => s.on && s.band && !isStatic(s);
+const colorKey = s => (!s.band ? 'data-stimulus' : isStatic(s) ? 'data-static' : s.color);
+const colorOf = s => C[colorKey(s)];
+const live = () => state.s.species.filter(s => s.on);
+/** The slot a species follows: an earlier slot that is on and not static, else the stimulus. */
+function driverOf(s) {
+  if (s.drive === 'stim' || isStatic(s)) return null;
+  const sl = state.s.species, i = sl.indexOf(s), j = sl.findIndex(o => o.key === s.drive);
+  return j >= 0 && j < i && sl[j].on && !isStatic(sl[j]) ? sl[j] : null;
+}
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -253,11 +297,10 @@ function compute() {
     }
   }
   // concentrations, then band heights
-  const conc = { stim };
-  const height = {};
-  for (const s of st.species) {
-    conc[s.key] = isStatic(s) ? new Float64Array(n).fill(1)
-      : firstOrder(conc[s.drive] ?? stim, s.tau, dt, s.drive === 'stim' || !conc[s.drive] ? held : null);
+  const conc = { stim }, height = {}, on = live();
+  for (const s of on) {
+    const d = driverOf(s);
+    conc[s.key] = isStatic(s) ? new Float64Array(n).fill(1) : firstOrder(d ? conc[d.key] : stim, s.tau, dt, d ? null : held);
     if (!s.band) continue;
     const b0 = s.base ?? 0, c = conc[s.key], h = new Float64Array(n);
     for (let i = 0; i < n; i++) {
@@ -270,7 +313,7 @@ function compute() {
   const xs = [];
   for (let x = ax.from; ax.step > 0 ? x <= ax.to + 1e-9 : x >= ax.to - 1e-9; x += ax.step) xs.push(x);
   const nx = xs.length;
-  const banded = st.species.filter(s => s.band);
+  const banded = on.filter(s => s.band);
   const shapes = Object.fromEntries(banded.map(s => [s.key, xs.map(x => gauss(x, s.band[0], s.band[1]))]));
   const centre = Object.fromEntries(banded.map(s => [s.key, xs.reduce((b, x, i) => (Math.abs(x - s.band[0]) < Math.abs(xs[b] - s.band[0]) ? i : b), 0)]));
   const sigma = sigmaFromSlider(st.noise), g = rng(state.seed);
@@ -293,8 +336,11 @@ function compute() {
     for (let x = 0; x < nx; x++) { I[x] += 2 / M * fold[j][x] * sn; Q[x] += 2 / M * fold[j][x] * cs_; }
   }
   const phaseOf = (i, q) => {
-    const amp = Math.hypot(i, q), phiMax = ((Math.atan2(q, i) * 180 / Math.PI) + 360) % 360;
-    return { I: i, Q: q, amp, phiMax, tcon: ((360 - phiMax) % 360) / 360 * T / k };
+    const amp = Math.hypot(i, q);
+    // round to 1e-6° first, so a maximum a hair past 0° does not read as a lag of a whole period
+    const phiMax = (Math.round(((Math.atan2(q, i) * 180 / Math.PI) + 360) * 1e6) / 1e6) % 360;
+    const delta = (360 - phiMax) % 360;
+    return { I: i, Q: q, amp, phiMax, delta, tcon: delta / 360 * T / k };
   };
   // a signal without a band (stimulus, gas): PSD of its own folded trace
   const psdTrace = c => {
@@ -307,8 +353,8 @@ function compute() {
     }
     return phaseOf(i_, q_);
   };
-  const rows = [{ key: 'stim', label: 'stimulus', ...psdTrace(stim), theory: 0 }];
-  for (const s of st.species) {
+  const rows = [{ key: 'stim', label: 'stimulus', color: C['data-stimulus'], ...psdTrace(stim), theory: 0 }];
+  for (const s of on) {
     const r = s.band ? phaseOf(I[centre[s.key]], Q[centre[s.key]]) : psdTrace(conc[s.key]);
     rows.push({ key: s.key, label: s.label, color: colorOf(s), static: isStatic(s), sp: s, ...r, theory: theoryTcon(s, k) });
   }
@@ -318,12 +364,9 @@ function compute() {
 /** One-step (or chain) first-order time value at harmonic k: phases of steps in series add. */
 function theoryTcon(s0, k) {
   if (isStatic(s0)) return null;
-  const st = state.s, T = st.T, w = 2 * Math.PI * k / T;
+  const T = state.s.T, w = 2 * Math.PI * k / T;
   let phase = 0, s = s0;
-  while (s) {
-    phase += Math.atan(w * s.tau);
-    s = st.species.find(o => o.key === s.drive);
-  }
+  while (s) { phase += Math.atan(w * s.tau); s = driverOf(s); }
   if (s0.invert) phase += Math.PI;
   const period = T / k;
   return ((phase / (2 * Math.PI)) * period) % period;
@@ -337,29 +380,32 @@ let S = null;
 const fmtT = v => (state.s.unit === 'T' ? `${v.toFixed(3)} T` : `${v.toFixed(1)} min`);
 const timeLabel = () => (state.s.unit === 'T' ? 'time / T' : 'time / min');
 /**
- * Fixed y limits. They depend on the bands only (centre, width, height, the
- * part that stays), never on τ, noise, cycles, the harmonic or φ, so nothing
- * rescales while those change or while φ is swept. A trace that leaves them
- * (heavy noise) is clipped.
+ * Fixed y limits. They depend on the bands (centre, width, height, the part
+ * that stays), and the PSD axes on the harmonic, never on τ, noise, cycles or
+ * φ, so nothing rescales while those change or while φ is swept. A trace
+ * that leaves them (heavy noise) is clipped.
  *   hAll:  tallest band, static ones included (time, fold, spectra)
  *   hResp: tallest band that follows the stimulus (PSD can reach 2/π of it)
  */
-function limits(st) {
-  const banded = st.species.filter(s => s.band);
+function limits() {
+  const st = state.s, banded = live().filter(s => s.band);
   const hAll = Math.max(1, ...banded.map(s => s.band[2]));
   const resp = banded.filter(s => !isStatic(s)).map(s => s.band[2] * (1 - (s.base ?? 0)));
   const hResp = Math.max(0.05 * hAll, ...resp);
+  // harmonic k of an on/off wave carries 1/k of the fundamental's swing, so the
+  // PSD axes follow k (a sine has no harmonics above 1: its axes stay at k = 1)
+  const psd = 0.75 * hResp / (st.shape === 'square' ? st.k : 1);
   return {
     time: [-0.12 * hAll, 1.16 * hAll],
-    spec: [-0.72 * hResp, 1.12 * hAll],
-    phase: [-0.75 * hResp, 0.75 * hResp],
+    spec: st.allPhi ? [-psd, psd] : [-psd, 1.12 * hAll],
+    phase: [-psd, psd],
   };
 }
 
 function drawTime() {
   const { st, T, dt, n, held, raw, conc } = S;
   const shown = Math.min(n, (WARM + 3) * M), ts = Array.from({ length: shown }, (_, i) => i * dt);
-  const yr = limits(st).time;
+  const yr = limits().time;
   const p = plot($('cTime'), {
     x: [0, shown * dt], y: yr, xlabel: timeLabel(), ylabel: 'band height / –',
     xticks: ticks(0, shown * dt, 5, v => String(+v.toFixed(2))), yticks: ticks(yr[0], yr[1], 4),
@@ -368,94 +414,133 @@ function drawTime() {
   p.vline(WARM * T, C['ink-500'], 1, [3, 3]);
   p.text('warm-up, not averaged', WARM * T * 0.5, yr[1] - (yr[1] - yr[0]) * 0.07);
   p.steps(ts, Array.from(held.subarray(0, shown)), C['data-stimulus']);
-  for (const s of st.species.filter(s => !s.band)) p.line(ts, Array.from(conc[s.key].subarray(0, shown)), colorOf(s), CHART.lineThin, CHART.dash);
+  for (const s of live().filter(s => !s.band)) p.line(ts, Array.from(conc[s.key].subarray(0, shown)), colorOf(s), CHART.lineThin, CHART.dash);
   for (const s of S.banded) p.line(ts, Array.from(raw[s.key].subarray(0, shown)), colorOf(s), CHART.lineThin);
   p.axes();
-}
-
-function foldedAt(key) {
-  const ci = S.centre[key];
-  return S.fold.map(r => r[ci]);
 }
 
 function drawFold() {
   const { st, T, dt, held, conc } = S;
   const tp = Array.from({ length: M }, (_, j) => j * dt);
-  const yr = limits(st).time;
+  const yr = limits().time;
   const tk = st.unit === 'T' ? [[0, '0'], [0.25, 'T/4'], [0.5, 'T/2'], [0.75, '3T/4'], [1, 'T']] : ticks(0, T, 4);
   const p = plot($('cFold'), { x: [0, T], y: yr, xlabel: st.unit === 'T' ? 'time in the period / T' : 'time in the period / min', ylabel: 'band height / –', xticks: tk, yticks: ticks(yr[0], yr[1], 4) });
   p.shadeX(0, T / 2, C['shade-on']); p.shadeX(T / 2, T, C['shade-off']);
   p.steps(tp, Array.from(held.subarray(0, M)), C['data-stimulus']);
-  for (const s of st.species.filter(s => !s.band)) {
+  for (const s of live().filter(s => !s.band)) {
     const c = conc[s.key], avg = tp.map((_, j) => { let v = 0; for (let q = WARM; q < WARM + st.cycles; q++) v += c[q * M + j]; return v / st.cycles; });
     p.line(tp, avg, colorOf(s), CHART.lineThin, CHART.dash);
   }
-  for (const s of S.banded) p.line(tp, foldedAt(s.key), colorOf(s));
+  for (const s of S.banded) { const ci = S.centre[s.key]; p.line(tp, S.fold.map(r => r[ci]), colorOf(s)); }
   p.axes();
   $('subFold').textContent = `${st.cycles} cycle${st.cycles > 1 ? 's' : ''} averaged after ${WARM} warm-up cycles: the noise drops by about √${st.cycles}.`;
 }
 
-const psdAt = (phi) => {
+const psdAt = phi => {
   const r = phi * Math.PI / 180;
   return Array.from(S.I, (v, x) => v * Math.cos(r) + S.Q[x] * Math.sin(r));
 };
+const shownPhi = () => (state.preview ? state.preview.phi : state.s.phi);
+const bold = role => { const f = typeFont(role); return { ...f, font: f.font.replace(/^(italic )?\d+/, '$1700') }; };
 
 function drawSpec() {
-  const { st, xs } = S, ax = AXES[st.axis];
-  const cur = psdAt(st.phi);
+  const { st, xs } = S, ax = AXES[st.axis], phi = shownPhi();
+  const cur = psdAt(phi);
   const set = st.allPhi ? Array.from({ length: 18 }, (_, i) => psdAt(i * 10)) : [];
   const avg = st.allPhi ? [] : Array.from({ length: 12 }, (_, i) => Array.from(S.fold[i * (M / 12)]));
-  const yr = limits(st).spec;
+  const yr = limits().spec;
   const p = plot($('cSpec'), { x: [ax.from, ax.to], y: yr, xlabel: ax.label, ylabel: 'absorbance / –', xticks: ax.ticks, yticks: ticks(yr[0], yr[1], 4) });
   p.hline(0);
   for (const s of avg) p.line(xs, s, C['data-faint'], CHART.lineFaint);
   for (const s of set) p.line(xs, s, C['data-faint'], CHART.lineFaint);
   p.line(xs, cur, C['data-highlight'], CHART.lineHighlight);
   for (const s of S.banded) p.text(s.label.split(',')[0], s.band[0], yr[1] - (yr[1] - yr[0]) * 0.07, colorOf(s));
+  // the angle on show, bold green, top left
+  const f = bold('axis'), { ctx, inner } = p;
+  ctx.font = f.font; ctx.fillStyle = C['data-highlight']; ctx.textAlign = 'left';
+  ctx.fillText(`φ = ${Math.round(phi)}°${st.k > 1 ? `, k = ${st.k}` : ''}`, inner.l + 8, inner.t + 18);
   p.axes();
 }
+
+/* phase domain: the points of interest, kept for hover and click */
+let PH = null;
 
 function drawPhase() {
   const ph = Array.from({ length: 73 }, (_, i) => i * 5);
   const rows = S.rows.filter(r => r.sp && r.sp.band);
-  const yr = limits(S.st).phase, amp = yr[1];
+  const yr = limits().phase, amp = yr[1];
   const p = plot($('cPhase'), {
     x: [0, 360], y: yr, xlabel: 'phase angle φ / °', ylabel: 'phase-resolved absorbance / –',
     xticks: [0, 90, 180, 270, 360].map(v => [v, String(v)]), yticks: ticks(yr[0], yr[1], 4),
   });
   p.hline(0);
-  p.vline(S.st.phi, C['data-highlight'], 1.5, [4, 3]);
+  if (state.preview) p.vline(state.preview.phi, C['data-highlight'], 1, [2, 3]);
+  p.vline(state.s.phi, C['data-highlight'], 2, []);
+  const pois = [];
   for (const r of rows) {
     p.line(ph, ph.map(f => r.I * Math.cos(f * Math.PI / 180) + r.Q * Math.sin(f * Math.PI / 180)), r.color);
-    if (!r.static && r.amp > 0.01 * amp) p.dot(r.phiMax, r.amp, r.color);
+    if (r.static || r.amp < 0.01 * amp) continue;
+    pois.push({ kind: 'max', row: r, phi: r.phiMax, y: r.amp });
+    for (const z of [90, 270]) pois.push({ kind: 'zero', row: r, phi: (r.phiMax + z) % 360, y: 0 });
   }
+  const { ctx, X, Y } = p;
+  for (const q of pois) {
+    if (q.kind === 'max') p.dot(q.phi, q.y, q.row.color);
+    else {
+      ctx.strokeStyle = q.row.color; ctx.lineWidth = 1.8; ctx.fillStyle = C.surface;
+      ctx.beginPath(); ctx.arc(X(q.phi), Y(0), CHART.marker, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+    }
+    q.px = X(q.phi); q.py = Y(q.y);
+  }
+  // φmax and δ of each band, as a key in the top-right corner (labels on the
+  // dots collide as soon as two maxima are close)
+  const note = typeFont('annotation'), maxima = pois.filter(q => q.kind === 'max');
+  if (maxima.length) {
+    ctx.font = note.font;
+    const lines = maxima.map(q => [`${q.row.label.split(',')[0]}: φmax ${q.phi.toFixed(0)}°, δ ${q.row.delta.toFixed(0)}°`, q.row.color]);
+    const w = Math.max(...lines.map(([t]) => ctx.measureText(t).width)) + 12, lh = 15;
+    const x = p.inner.r - w - 6, y = p.inner.t + 6;
+    ctx.fillStyle = C.surface; ctx.globalAlpha = 0.9; ctx.fillRect(x, y, w, lh * lines.length + 6); ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
+    lines.forEach(([t, c], i) => { ctx.fillStyle = c; ctx.fillText(t, x + 6, y + 14 + i * lh); });
+  }
+  // the handle: a grip on the green line
+  ctx.fillStyle = C['data-highlight'];
+  ctx.fillRect(X(state.s.phi) - 4, p.inner.t, 8, 10);
   p.axes();
+  PH = { p, pois, x0: 0, x1: 360 };
 }
 
 function legend(el, items) {
   el.innerHTML = items.map(([label, color, dashed]) => `<span class="${dashed ? 'dashed' : ''}" style="--c:${color}">${label}</span>`).join('');
 }
 
-function drawTable() {
+/** Right sidebar: one card per signal. */
+function drawValues() {
   const { k, rows, st } = S;
   const square = st.shape === 'square';
   const strong = Math.max(...rows.filter(r => r.key !== 'stim').map(r => r.amp), 1e-9);
-  const head = `<tr><th>signal</th><th><i>τ</i></th><th><i>φ</i><sub>max</sub></th><th><i>t</i><sub>con</sub>, simulated</th><th><i>t</i><sub>con</sub>, first-order steps</th><th>|<i>A<sub>${k}</sub></i>|</th>${square && k > 1 ? `<th>${k} · |<i>A<sub>${k}</sub></i>|</th>` : ''}</tr>`;
-  const body = rows.map(r => {
-    const flat = r.static || r.amp < 0.01 * Math.max(strong, rows[0].amp);
+  $('vK').textContent = k;
+  $('values').innerHTML = rows.map(r => {
+    const flat = r.static || r.amp < 1e-4 || r.amp < 0.01 * Math.max(strong, rows[0].amp);
     const tau = r.sp ? (isStatic(r.sp) ? '–' : fmtT(r.sp.tau)) : '–';
-    return `<tr><td${r.color ? ` style="color:${r.color}"` : ''}>${r.label}</td><td>${tau}</td>
-      <td>${flat ? '–' : r.phiMax.toFixed(0) + '°'}</td><td>${flat ? '–' : fmtT(r.tcon)}</td>
-      <td>${r.theory == null || flat ? '–' : fmtT(r.theory)}</td><td>${r.amp.toFixed(3)}</td>
-      ${square && k > 1 ? `<td>${(k * r.amp).toFixed(3)}</td>` : ''}</tr>`;
+    const items = [
+      ['<i>τ</i>', tau],
+      ['<i>φ</i><sub>max</sub>', flat ? '–' : r.phiMax.toFixed(0) + '°'],
+      ['<i>δ</i>', flat ? '–' : r.delta.toFixed(0) + '°'],
+      ['<i>t</i><sub>con</sub>, simulated', flat ? '–' : fmtT(r.tcon)],
+      ['<i>t</i><sub>con</sub>, first-order', r.theory == null || flat ? '–' : fmtT(r.theory)],
+      [`|<i>A</i><sub>${k}</sub>|`, r.amp.toFixed(3)],
+      ...(square && k > 1 ? [[`${k} · |<i>A</i><sub>${k}</sub>|`, (k * r.amp).toFixed(3)]] : []),
+    ];
+    return `<div class="val-card" style="--c:${r.color}"><div class="val-name">${r.label}</div>
+      <dl>${items.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl></div>`;
   }).join('');
-  $('readout').innerHTML = head + body;
 }
 
 function draw() {
   if (!S) return;
-  $('vPhi').textContent = `${state.s.phi}°`;
-  drawTime(); drawFold(); drawSpec(); drawPhase(); drawTable();
+  drawTime(); drawFold(); drawSpec(); drawPhase(); drawValues(); refreshVals();
 }
 
 /** Recompute and redraw after any setting changed. */
@@ -473,178 +558,199 @@ function markChanged() {
 }
 
 /* ---------------------------------------------------------------------------
-   Controls: measurement settings
+   Workbench: on a wide screen the centre fills the window below its top, so
+   the four plots never need scrolling.
    --------------------------------------------------------------------------- */
-function setSeg(id, v) {
-  $(id).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v))));
+function fitWorkbench() {
+  const wb = $('workbench');
+  if (document.documentElement.dataset.w !== 'wide') { wb.style.height = ''; return; }
+  const zoom = parseFloat(document.body.style.zoom) || 1;
+  // from under the site header to the bottom of the window
+  wb.style.height = `${Math.max(560, window.innerHeight / zoom - wb.offsetTop)}px`;
+}
+
+/* ---------------------------------------------------------------------------
+   Controls: measurement and demodulation
+   --------------------------------------------------------------------------- */
+function setSeg(el, v) {
+  el.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v))));
 }
 
 /** Write every measurement control from state.s. */
 function syncControls() {
   const st = state.s;
-  $('noise').value = st.noise; $('cycles').value = st.cycles; $('phi').value = st.phi; $('allPhi').checked = st.allPhi;
-  $('vNoise').textContent = sigmaFromSlider(st.noise).toFixed(3);
-  $('vCycles').textContent = st.cycles;
-  setSeg('shape', st.shape); setSeg('harm', st.k); setSeg('unit', st.unit);
+  $('allPhi').checked = st.allPhi;
+  setSeg($('shape'), st.shape); setSeg($('harm'), st.k); setSeg($('unit'), st.unit);
   $('period').value = st.T; $('period').disabled = st.unit === 'T';
   $('axis').value = st.axis;
+  $('subSpecFold').hidden = st.allPhi; $('subSpecAll').hidden = !st.allPhi;
+}
+
+function setPhi(v) {
+  state.s.phi = ((Math.round(v) % 360) + 360) % 360;
+  draw();
 }
 
 /* ---------------------------------------------------------------------------
-   Controls: the species editor. One row per species, in drive order: a
-   species can only follow the stimulus or a species above it.
+   Controls: the species slots. Always five, in drive order: a slot can only
+   follow the stimulus or a slot above it. Off keeps the values.
    --------------------------------------------------------------------------- */
-const nextKey = () => { let i = 1; while (state.s.species.some(s => s.key === `s${i}`)) i++; return `s${i}`; };
-const freeColor = (except = null) => DYN_COLORS.find(c => !state.s.species.some(s => s !== except && s.band && !isStatic(s) && s.color === c));
+const freeColor = (except = null) => DYN_COLORS.find(c => !state.s.species.some(s => s !== except && isDyn(s) && s.color === c));
 const num = (v, d = 3) => String(+(+v).toFixed(d));
 
-function speciesRow(s, i) {
+function slotCard(s, i) {
   const st = state.s, ax = AXES[st.axis], lo = Math.min(ax.from, ax.to), hi = Math.max(ax.from, ax.to);
-  const earlier = st.species.slice(0, i).filter(o => !isStatic(o));
-  const dynFull = !freeColor(s) && (isStatic(s) || !s.band);
-  const opts = [['stim', 'the stimulus'], ...earlier.map(o => [o.key, o.label])]
+  const opts = [['stim', 'the stimulus'], ...st.species.slice(0, i).map(o => [o.key, `${o.label}${o.on ? '' : ' (off)'}`])]
     .map(([v, t]) => `<option value="${v}"${s.drive === v ? ' selected' : ''}>${t}</option>`).join('')
     + `<option value="static"${isStatic(s) ? ' selected' : ''}${!s.band ? ' disabled' : ''}>nothing (static)</option>`;
-  const dis = (on) => (on ? ' disabled' : '');
-  return `<div class="sp-row" data-i="${i}" style="--c:${colorOf(s)}">
-    <label class="sp-name"><span class="sp-swatch${s.band ? '' : ' dashed'}"></span><input type="text" data-f="label" value="${s.label}" aria-label="name"></label>
-    <label class="ctl"><span>follows</span><select data-f="drive"${dynFull && isStatic(s) ? ' title="three species already follow something"' : ''}>${opts}</select></label>
-    <label class="ctl"><span><i>τ</i>: <b data-v="tau">${isStatic(s) ? '–' : fmtT(s.tau)}</b></span><input type="range" min="0" max="100" data-f="tau" value="${sliderFromTau(s.tau, st.T)}"${dis(isStatic(s))}></label>
-    <label class="ctl check"><input type="checkbox" data-f="invert"${s.invert ? ' checked' : ''}${dis(isStatic(s))}><span>falls when on</span></label>
-    <label class="ctl check"><input type="checkbox" data-f="hasBand"${s.band ? ' checked' : ''}${dis(isStatic(s) || (!s.band && !freeColor(s)))}><span>band</span></label>
-    <label class="ctl num"><span>centre</span><input type="number" data-f="c" min="${lo}" max="${hi}" step="${Math.abs(ax.step)}" value="${s.band ? num(s.band[0], 1) : ''}"${dis(!s.band)}></label>
-    <label class="ctl num"><span>width</span><input type="number" data-f="w" min="${Math.abs(ax.step)}" max="${(hi - lo) / 2}" step="${Math.abs(ax.step)}" value="${s.band ? num(s.band[1], 1) : ''}"${dis(!s.band)}></label>
-    <label class="ctl num"><span>height</span><input type="number" data-f="h" min="0.01" max="2" step="0.01" value="${s.band ? num(s.band[2], 3) : ''}"${dis(!s.band)}></label>
-    <label class="ctl num"><span>stays</span><input type="number" data-f="base" min="0" max="0.95" step="0.05" value="${num(s.base ?? 0, 2)}"${dis(!s.band || isStatic(s))}></label>
-    <button type="button" class="btn sp-remove" data-f="remove" aria-label="Remove ${s.label}"${dis(st.species.length <= 1)}>×</button>
+  const dis = on => (on ? ' disabled' : '');
+  return `<div class="sp-card${s.on ? '' : ' off'}" data-i="${i}" style="--c:${colorOf(s)}">
+    <div class="sp-top">
+      <label class="switch" title="${s.on ? 'in the sample: click to take it out' : 'not in the sample: click to add it'}"><input type="checkbox" data-f="on"${s.on ? ' checked' : ''}><span></span></label>
+      <span class="sp-swatch${s.band ? '' : ' dashed'}"></span>
+      <input type="text" data-f="label" value="${s.label}" aria-label="name">
+      <button type="button" class="rst" data-f="resetSlot" title="this slot back to the case"${slotChanged(i) ? '' : ' hidden'}>↺</button>
+    </div>
+    <div class="sp-body">
+      <label class="ctl wide"><span>follows</span><select data-f="drive">${opts}</select></label>
+      <div class="ctl vctl wide" data-k="tau:${i}"></div>
+      <div class="ctl wide"><span>response</span><span class="seg" data-f="invert"><button type="button" data-v="0"${dis(isStatic(s))} aria-pressed="${!s.invert}" title="rises while the stimulus is on">in phase</button><button type="button" data-v="1"${dis(isStatic(s))} aria-pressed="${!!s.invert}" title="falls while the stimulus is on">antiphase</button></span></div>
+      <label class="ctl check"><input type="checkbox" data-f="hasBand"${s.band ? ' checked' : ''}${dis(isStatic(s))}><span>band</span></label>
+      <label class="ctl num"><span>centre</span><input type="number" data-f="c" min="${lo}" max="${hi}" step="${Math.abs(ax.step)}" value="${s.band ? num(s.band[0], 1) : ''}"${dis(!s.band)}></label>
+      <label class="ctl num"><span>width</span><input type="number" data-f="w" min="${Math.abs(ax.step)}" max="${(hi - lo) / 2}" step="${Math.abs(ax.step)}" value="${s.band ? num(s.band[1], 1) : ''}"${dis(!s.band)}></label>
+      <label class="ctl num"><span>height</span><input type="number" data-f="h" min="0.01" step="0.01" value="${s.band ? num(s.band[2], 3) : ''}"${dis(!s.band)}></label>
+      <label class="ctl num"><span>stays</span><input type="number" data-f="base" min="0" max="0.95" step="0.05" value="${num(s.base ?? 0, 2)}"${dis(!s.band || isStatic(s))}></label>
+    </div>
   </div>`;
 }
 
 function renderSpecies() {
-  const st = state.s;
-  $('species').innerHTML = st.species.map(speciesRow).join('');
-  $('addSpecies').disabled = st.species.length >= MAX_SPECIES;
+  $('species').innerHTML = state.s.species.map(slotCard).join('');
+  fillVctls($('species'));
   legends();
 }
 
-/** Keep the drive chain valid after a species changed or went away. */
-function repairDrives() {
-  const st = state.s;
-  st.species.forEach((s, i) => {
-    if (s.drive === 'stim' || s.drive === 'static') return;
-    const src = st.species.findIndex(o => o.key === s.drive);
-    if (src < 0 || src >= i || isStatic(st.species[src])) s.drive = 'stim';
-  });
+/** Turning a slot into a coloured band needs a free colour: A, B and C are the three there are. */
+function claimColor(s) {
+  if (!isDyn(s)) return true;
+  if (!state.s.species.some(o => o !== s && isDyn(o) && o.color === s.color)) return true;
+  const c = freeColor(s);
+  if (!c) return false;
+  s.color = c;
+  return true;
+}
+function refuse(card) {
+  card.classList.add('refused');
+  card.title = 'Three species already follow the stimulus with a band: A, B and C are the colours there are. Switch one off first.';
+  setTimeout(() => card.classList.remove('refused'), 900);
 }
 
 $('species').addEventListener('input', e => {
-  const t = e.target, f = t.dataset.f, row = t.closest('.sp-row');
-  if (!f || !row) return;
-  const st = state.s, s = st.species[+row.dataset.i];
+  const t = e.target, f = t.dataset.f, card = t.closest('.sp-card');
+  if (!f || !card || f === 'on' || f === 'hasBand' || t.closest('.vctl')) return;
+  const st = state.s, s = st.species[+card.dataset.i];
   const v = parseFloat(t.value);
   if (f === 'label') { s.label = t.value; legends(); update(); return; }
-  if (f === 'tau') { s.tau = tauFromSlider(+t.value, st.T); row.querySelector('b[data-v="tau"]').textContent = fmtT(s.tau); update(); return; }
   if (!Number.isFinite(v)) return;
   const ax = AXES[st.axis], lo = Math.min(ax.from, ax.to), hi = Math.max(ax.from, ax.to);
   if (f === 'c') s.band[0] = Math.min(hi, Math.max(lo, v));
   else if (f === 'w') s.band[1] = Math.max(Math.abs(ax.step), v);
-  else if (f === 'h') s.band[2] = Math.max(0.01, Math.min(2, v));
+  else if (f === 'h') s.band[2] = Math.max(0.01, v);
   else if (f === 'base') s.base = Math.max(0, Math.min(0.95, v));
   else return;
   update();
 });
 
 $('species').addEventListener('change', e => {
-  const t = e.target, f = t.dataset.f, row = t.closest('.sp-row');
-  if (!f || !row) return;
-  const st = state.s, s = st.species[+row.dataset.i];
-  if (f === 'drive') {
-    const wasStatic = isStatic(s);
-    s.drive = t.value;
-    if (wasStatic && !isStatic(s)) {
-      const c = freeColor(s);
-      if (!c) { s.drive = 'static'; t.value = 'static'; return; } // three species already follow something
-      s.color = c;
-    }
-    if (isStatic(s)) s.invert = false;
-    repairDrives();
-  } else if (f === 'invert') s.invert = t.checked;
+  const t = e.target, f = t.dataset.f, card = t.closest('.sp-card');
+  if (!f || !card) return;
+  const st = state.s, s = st.species[+card.dataset.i];
+  const before = clone(s);
+  if (f === 'on') s.on = t.checked;
+  else if (f === 'drive') { s.drive = t.value; if (isStatic(s)) s.invert = false; }
   else if (f === 'hasBand') {
     const ax = AXES[st.axis];
     s.band = t.checked ? [(ax.from + ax.to) / 2, Math.abs(ax.to - ax.from) / 6, 0.5] : null;
-    if (s.band && !isStatic(s)) s.color = freeColor(s) ?? s.color;
   } else return;
+  if (!claimColor(s)) { Object.assign(s, before); renderSpecies(); refuse($('species').children[+card.dataset.i]); return; }
   renderSpecies();
   update();
 });
 
 $('species').addEventListener('click', e => {
-  const b = e.target.closest('[data-f="remove"]');
+  const r = e.target.closest('[data-f="resetSlot"]');
+  if (r) {
+    const i = +r.closest('.sp-card').dataset.i;
+    state.s.species[i] = caseSlot(i);
+    renderSpecies(); update();
+    return;
+  }
+  const b = e.target.closest('[data-f="invert"] button');
   if (!b) return;
-  state.s.species.splice(+b.closest('.sp-row').dataset.i, 1);
-  repairDrives();
-  renderSpecies();
-  update();
-});
-
-$('addSpecies').addEventListener('click', () => {
-  const st = state.s, ax = AXES[st.axis], key = nextKey(), c = freeColor();
-  const letter = String.fromCharCode(65 + st.species.length);
-  st.species.push(sp(key, letter, c ?? 'data-a', [ax.from + (ax.to - ax.from) * 0.7, Math.abs(ax.to - ax.from) / 6, 0.5], c ? 'stim' : 'static', c ? 0.05 * st.T : 0));
-  renderSpecies();
+  const s = state.s.species[+b.closest('.sp-card').dataset.i];
+  s.invert = b.dataset.v === '1';
+  setSeg(b.parentElement, b.dataset.v);
   update();
 });
 
 /* ---------------------------------------------------------------------------
-   Case texts, legends, case switching
+   Legends, case texts as tooltips, case switching
    --------------------------------------------------------------------------- */
-function caseTexts() {
-  const cs = CASES[state.caseIdx];
-  $('caseText').innerHTML = `<h2>${cs.title}</h2>${cs.text}`;
-  $('equations').innerHTML = `<h2>Equations</h2>${EQ.psd}${EQ.tcon}${(cs.eq ?? []).map(k => EQ[k]).join('')}`;
-  subTexts();
-}
-
-function subTexts() {
-  $('subSpec').innerHTML = state.s.allPhi
-    ? `<i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].`
-    : `Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].`;
-  $('subPhase').innerHTML = `<i>A<sub>k</sub></i>(<i>φ</i>) at each band maximum. The dot is <i>φ</i><sub>max</sub>, read as <i>t</i><sub>con</sub> in the table [@weyel, Eq. 2].`;
-  renderCitations([$('subSpec'), $('subPhase'), $('caseText'), $('equations')], $('refs'), SOURCES);
-}
-
 function legends() {
-  const st = state.s;
+  const on = live();
   const items = [['stimulus', C['data-stimulus'], true],
-    ...st.species.filter(s => !s.band).map(s => [s.label, colorOf(s), true]),
-    ...st.species.filter(s => s.band).map(s => [s.label, colorOf(s)])];
+    ...on.filter(s => !s.band).map(s => [s.label, colorOf(s), true]),
+    ...on.filter(s => s.band).map(s => [s.label, colorOf(s)])];
   legend($('legTime'), items);
   legend($('legFold'), items);
-  legend($('legPhase'), st.species.filter(s => s.band).map(s => [s.label, colorOf(s)]));
+  legend($('legPhase'), on.filter(s => s.band).map(s => [s.label, colorOf(s)]));
 }
+
+/** The floating tooltip: one element for the case texts and the phase-domain points. */
+const tip = $('tip');
+function showTip(html, x, y, place = 'right') {
+  const zoom = parseFloat(document.body.style.zoom) || 1;
+  tip.innerHTML = html; tip.hidden = false;
+  const w = tip.offsetWidth, h = tip.offsetHeight, vw = window.innerWidth / zoom, vh = window.innerHeight / zoom;
+  let left = x / zoom + 14, top = y / zoom + 14;
+  if (place === 'right') top = y / zoom;
+  if (left + w > vw - 8) left = Math.max(8, x / zoom - w - 14);
+  if (top + h > vh - 8) top = Math.max(8, vh - h - 8);
+  tip.style.left = `${left}px`; tip.style.top = `${top}px`;
+}
+const hideTip = () => { tip.hidden = true; };
+const caseTip = i => `<div class="tip-title">${CASES[i].title}</div>${$('caseTexts').children[i].innerHTML}`;
 
 function selectCase(idx, push = true) {
   state.caseIdx = idx;
   const cs = CASES[idx];
   state.s = clone(cs.s);
+  state.preview = null;
   $('caseBtn').innerHTML = `<span class="n">${idx + 1}</span>${cs.title}<span class="changed-mark">changed</span><span class="caret" aria-hidden="true">▾</span>`;
   document.querySelectorAll('#caseMenu li').forEach((li, i) => li.setAttribute('aria-selected', String(i === idx)));
-  syncControls(); renderSpecies(); caseTexts();
+  syncControls(); renderSpecies();
   if (push) {
     try { const u = new URL(location.href); u.searchParams.set('case', cs.id); history.replaceState(null, '', u); } catch { /* not essential */ }
   }
   update();
 }
 
-/* the case selector: one button showing the current case, a menu on click */
+/* the case selector: one button showing the current case, a menu on click, the text on hover */
 $('caseMenu').innerHTML = CASES.map((c, i) => `<li role="option" tabindex="-1" data-i="${i}"><span class="n">${i + 1}</span>${c.title}</li>`).join('');
 const menuOpen = () => !$('caseMenu').hidden;
 function openMenu(on) {
   $('caseMenu').hidden = !on;
   $('caseBtn').setAttribute('aria-expanded', String(on));
+  if (!on) hideTip();
   if (on) (document.querySelector('#caseMenu li[aria-selected="true"]') ?? document.querySelector('#caseMenu li')).focus();
 }
+const tipBeside = (el, i) => { const r = el.getBoundingClientRect(); showTip(caseTip(i), r.right, r.top, 'right'); };
 $('caseBtn').addEventListener('click', () => openMenu(!menuOpen()));
+$('caseBtn').addEventListener('mouseenter', e => { if (!menuOpen()) tipBeside(e.currentTarget, state.caseIdx); });
+$('caseBtn').addEventListener('mouseleave', () => { if (!menuOpen()) hideTip(); });
+$('caseMenu').addEventListener('mouseover', e => { const li = e.target.closest('li'); if (li) tipBeside(li, +li.dataset.i); });
+$('caseMenu').addEventListener('focusin', e => { const li = e.target.closest('li'); if (li) tipBeside(li, +li.dataset.i); });
+$('caseMenu').addEventListener('mouseleave', hideTip);
 $('caseMenu').addEventListener('click', e => {
   const li = e.target.closest('li');
   if (!li) return;
@@ -660,27 +766,189 @@ $('caseMenu').addEventListener('keydown', e => {
 });
 document.addEventListener('click', e => { if (menuOpen() && !e.target.closest('#caseSelect')) openMenu(false); });
 $('resetCase').addEventListener('click', () => selectCase(state.caseIdx, false));
-$('copySettings').addEventListener('click', async () => {
-  const text = JSON.stringify({ ...state.s, phi: state.s.phi }, null, 2);
-  const btn = $('copySettings'), was = btn.textContent;
-  try { await navigator.clipboard.writeText(text); btn.textContent = 'copied'; }
-  catch { console.log(text); btn.textContent = 'in the console'; }
-  setTimeout(() => { btn.textContent = was; }, 1500);
+
+/* ---------------------------------------------------------------------------
+   Phase domain: hover a point to preview the spectrum there, click to keep
+   it, drag anywhere to set φ by hand.
+   --------------------------------------------------------------------------- */
+const pct = v => `${v >= 0 ? '+' : '−'}${Math.abs(Math.round(100 * v))} %`;
+function poiText(q) {
+  const r = q.row, others = S.rows.filter(o => o.sp && o.sp.band && !o.static && o !== r && o.amp > 1e-3);
+  const at = o => Math.cos((q.phi - o.phiMax) * Math.PI / 180);
+  const name = o => `<b style="color:${o.color}">${o.label.split(',')[0]}</b>`;
+  const rest = others.map(o => {
+    const v = at(o);
+    return Math.abs(v) < 0.05 ? `${name(o)} is gone here too: its maximum lies within a few degrees of this one (or opposite), so at this <i>φ</i> PSD cannot tell the two apart`
+      : `${name(o)} is at ${pct(v)} of its amplitude`;
+  });
+  const lagNote = `The lag <i>δ</i> = 360° − <i>φ</i><sub>max</sub> = ${r.delta.toFixed(0)}° reads as <i>t</i><sub>con</sub> = ${fmtT(r.tcon)}.`;
+  if (q.kind === 'max') {
+    const sign = r.sp.invert ? ' It falls while the stimulus is on (antiphase), so this maximum lies about 180° from where a rising band of the same <i>τ</i> would peak.' : '';
+    return `<div class="tip-title">${name(r)} at its maximum, <i>φ</i> = ${q.phi.toFixed(0)}°</div>
+      <p>The reference is in step with ${name(r)}, so the spectrum shows it at full size, |<i>A</i><sub>${S.k}</sub>| = ${r.amp.toFixed(3)}. ${lagNote}${sign}</p>
+      ${rest.length ? `<p>${rest.join('; ')}.</p>` : ''}<p class="tip-hint">click to keep this <i>φ</i></p>`;
+  }
+  return `<div class="tip-title">${name(r)} is gone, <i>φ</i> = ${q.phi.toFixed(0)}°</div>
+    <p>90° from its maximum the reference is a quarter period out of step with ${name(r)}: its product integrates to zero. What the spectrum shows here is only what responds at another time.</p>
+    ${rest.length ? `<p>${rest.join('; ')}.</p>` : '<p>No other band follows the stimulus, so the phase-resolved spectrum is flat.</p>'}<p class="tip-hint">click to keep this <i>φ</i></p>`;
+}
+
+const cPhase = $('cPhase');
+function local(e) {
+  const r = cPhase.getBoundingClientRect(), f = cPhase.clientWidth / r.width;
+  return { x: (e.clientX - r.left) * f, y: (e.clientY - r.top) * f };
+}
+function hit(e) {
+  if (!PH) return null;
+  const { x, y } = local(e);
+  let best = null, bd = 11;
+  for (const q of PH.pois) { const d = Math.hypot(q.px - x, q.py - y); if (d < bd) { bd = d; best = q; } }
+  return best;
+}
+function phiAt(e) {
+  const { x } = local(e), { inner } = PH.p;
+  return Math.max(0, Math.min(359, (x - inner.l) / (inner.r - inner.l) * 360));
+}
+let dragging = false;
+cPhase.addEventListener('pointermove', e => {
+  if (dragging) { setPhi(phiAt(e)); return; }
+  const q = hit(e);
+  cPhase.style.cursor = q ? 'pointer' : 'ew-resize';
+  const prev = state.preview?.poi;
+  if (q !== prev) {
+    state.preview = q ? { phi: q.phi, poi: q } : null;
+    draw();
+  }
+  if (q) showTip(poiText(q), e.clientX, e.clientY, 'cursor'); else hideTip();
+});
+cPhase.addEventListener('pointerleave', () => { if (dragging) return; state.preview = null; hideTip(); draw(); });
+cPhase.addEventListener('pointerdown', e => {
+  const q = hit(e);
+  if (q) { state.preview = null; hideTip(); setPhi(q.phi); return; }
+  dragging = true; cPhase.setPointerCapture(e.pointerId); hideTip(); state.preview = null; setPhi(phiAt(e));
+});
+cPhase.addEventListener('pointerup', e => { dragging = false; try { cPhase.releasePointerCapture(e.pointerId); } catch { /* already released */ } });
+
+/* ---------------------------------------------------------------------------
+   Value controls: a slider, the number it stands for (type to set it), a ↺
+   that appears when the value differs from the case and puts the case's
+   value back, and a double-click on the slider for the page default.
+   One table describes every one of them; `tau:<i>` is the τ of slot i.
+   --------------------------------------------------------------------------- */
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const caseS = () => CASES[state.caseIdx].s;
+/** A case's τ in the time unit on screen (a case in periods, the page in minutes, or the reverse). */
+const caseTau = i => caseS().species[i].tau * state.s.T / caseS().T;
+/** A slot as the case has it, in the time unit and on the axis on screen. */
+function caseSlot(i) {
+  const c = clone(caseS().species[i]);
+  c.tau *= state.s.T / caseS().T;
+  c.band = mapAxis(c.band, caseS().axis, state.s.axis);
+  return c;
+}
+const slotChanged = i => JSON.stringify(state.s.species[i]) !== JSON.stringify(caseSlot(i));
+
+const BIND = {
+  noise: {
+    label: 'noise <i>σ</i>', unit: '', min: 0, max: 100, step: 1, redraw: 'update',
+    get: () => sigmaFromSlider(state.s.noise), set: v => { state.s.noise = 100 * Math.pow(clamp(v, 0, SIG_MAX) / SIG_MAX, 2 / 3); },
+    toR: v => 100 * Math.pow(v / SIG_MAX, 2 / 3), fromR: r => sigmaFromSlider(r), fmt: v => v.toFixed(3),
+    caseV: () => sigmaFromSlider(caseS().noise), def: 0,
+  },
+  cycles: {
+    label: 'cycles averaged', unit: '', min: 1, max: 12, step: 1, redraw: 'update',
+    get: () => state.s.cycles, set: v => { state.s.cycles = Math.round(clamp(v, 1, 12)); },
+    toR: v => v, fromR: r => r, fmt: v => String(v), caseV: () => caseS().cycles, def: 4,
+  },
+  phi: {
+    label: 'phase angle <i>φ</i>', unit: '°', min: 0, max: 359, step: 1, redraw: 'draw',
+    get: () => state.s.phi, set: v => { state.s.phi = ((Math.round(v) % 360) + 360) % 360; },
+    toR: v => v, fromR: r => r, fmt: v => String(v), caseV: () => caseS().phi, def: 0,
+  },
+  speed: {
+    label: 'sweep speed', unit: '° s⁻¹', min: 10, max: 240, step: 10, redraw: 'none',
+    get: () => state.speed, set: v => { state.speed = Math.round(clamp(v, 1, 720)); },
+    toR: v => v, fromR: r => r, fmt: v => String(v), caseV: () => 80, def: 80,
+  },
+};
+function bindOf(key) {
+  if (BIND[key]) return BIND[key];
+  const i = +key.split(':')[1];
+  return {
+    label: '<i>τ</i>', unit: state.s.unit === 'T' ? 'T' : 'min', min: 0, max: 100, step: 1, redraw: 'update',
+    get: () => state.s.species[i].tau, set: v => { state.s.species[i].tau = clamp(v, 0, 2 * state.s.T); },
+    toR: v => sliderFromTau(v, state.s.T), fromR: r => tauFromSlider(r, state.s.T),
+    fmt: v => (state.s.unit === 'T' ? v.toFixed(3) : v.toFixed(1)), caseV: () => caseTau(i),
+    def: (DEFAULT_SLOTS[i].tau ?? 0) * state.s.T, off: () => isStatic(state.s.species[i]),
+  };
+}
+/** Build the markup of every value control under root. */
+function fillVctls(root) {
+  root.querySelectorAll('.vctl').forEach(el => {
+    const b = bindOf(el.dataset.k);
+    el.innerHTML = `<span class="vlab">${b.label}
+        <input class="val" type="text" inputmode="decimal" aria-label="${el.dataset.k} value">${b.unit ? `<span class="vunit">${b.unit}</span>` : ''}
+        <button type="button" class="rst" title="back to the case's value · double-click the slider for the default">↺</button></span>
+      <input type="range" min="${b.min}" max="${b.max}" step="${b.step}" title="double-click: default">`;
+  });
+  refreshVals();
+}
+/** Write every value control from the state: slider, number, and whether ↺ shows. */
+function refreshVals() {
+  if (!state.s) return;
+  document.querySelectorAll('.vctl').forEach(el => {
+    const b = bindOf(el.dataset.k), v = b.get(), off = b.off?.() ?? false;
+    const range = el.querySelector('input[type=range]'), val = el.querySelector('.val'), rst = el.querySelector('.rst');
+    if (!range) return;
+    range.value = b.toR(v);
+    range.disabled = off; val.disabled = off;
+    if (document.activeElement !== val) val.value = off ? '–' : b.fmt(v);
+    rst.hidden = off || b.fmt(v) === b.fmt(b.caseV());
+  });
+  document.querySelectorAll('.sp-card').forEach(c => {
+    const r = c.querySelector('[data-f="resetSlot"]');
+    if (r) r.hidden = !slotChanged(+c.dataset.i);
+  });
+}
+function applyVal(key, v) {
+  const b = bindOf(key);
+  b.set(v);
+  if (b.redraw === 'update') update(); else if (b.redraw === 'draw') draw(); else refreshVals();
+}
+document.addEventListener('input', e => {
+  const el = e.target.closest('.vctl');
+  if (el && e.target.type === 'range') applyVal(el.dataset.k, bindOf(el.dataset.k).fromR(+e.target.value));
+});
+document.addEventListener('change', e => {
+  const el = e.target.closest('.vctl');
+  if (!el || !e.target.classList.contains('val')) return;
+  const v = parseFloat(e.target.value.replace(',', '.'));
+  if (Number.isFinite(v)) applyVal(el.dataset.k, v);
+  e.target.blur(); refreshVals();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.classList?.contains('val')) e.target.dispatchEvent(new Event('change', { bubbles: true }));
+});
+document.addEventListener('click', e => {
+  const r = e.target.closest('.vctl .rst');
+  if (r) { const k = r.closest('.vctl').dataset.k; applyVal(k, bindOf(k).caseV()); }
+});
+document.addEventListener('dblclick', e => {
+  const el = e.target.closest('.vctl');
+  if (el && e.target.type === 'range') { const b = bindOf(el.dataset.k); applyVal(el.dataset.k, b.def); }
 });
 
-/* measurement controls */
-$('noise').addEventListener('input', e => { state.s.noise = +e.target.value; $('vNoise').textContent = sigmaFromSlider(state.s.noise).toFixed(3); update(); });
-$('cycles').addEventListener('input', e => { state.s.cycles = +e.target.value; $('vCycles').textContent = state.s.cycles; update(); });
-$('phi').addEventListener('input', e => { state.s.phi = +e.target.value; draw(); });
-$('allPhi').addEventListener('change', e => { state.s.allPhi = e.target.checked; caseTexts(); update(); });
-$('shape').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.shape = b.dataset.v; setSeg('shape', state.s.shape); update(); });
-$('harm').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.k = +b.dataset.v; setSeg('harm', state.s.k); update(); });
+/* ---------------------------------------------------------------------------
+   Measurement and demodulation controls
+   --------------------------------------------------------------------------- */
+$('allPhi').addEventListener('change', e => { state.s.allPhi = e.target.checked; syncControls(); update(); });
+$('shape').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.shape = b.dataset.v; setSeg($('shape'), state.s.shape); update(); });
+$('harm').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.k = +b.dataset.v; setSeg($('harm'), state.s.k); update(); });
 $('reseed').addEventListener('click', () => { state.seed += 1; update(); });
 
 /** Time unit: τ keeps its ratio to T, so the response does not change, only the numbers on the axis. */
 $('unit').addEventListener('click', e => {
-  const b = e.target.closest('button');
-  const st = state.s;
+  const b = e.target.closest('button'), st = state.s;
   if (!b || b.dataset.v === st.unit) return;
   const T = b.dataset.v === 'T' ? 1 : 60;
   for (const s of st.species) s.tau *= T / st.T;
@@ -694,31 +962,42 @@ $('period').addEventListener('change', e => {
   e.target.value = st.T;
   renderSpecies(); update();
 });
-/** Spectral axis: bands keep their place relative to the axis. */
+/** Spectral axis: bands keep their place relative to the axis, in every slot. */
 $('axis').addEventListener('change', e => {
-  const st = state.s, from = AXES[st.axis], to = AXES[e.target.value];
-  const map = x => to.from + (x - from.from) / (from.to - from.from) * (to.to - to.from);
-  const scale = Math.abs((to.to - to.from) / (from.to - from.from));
-  for (const s of st.species) if (s.band) s.band = [Math.round(map(s.band[0]) / Math.abs(to.step)) * Math.abs(to.step), s.band[1] * scale, s.band[2]];
+  const st = state.s;
+  for (const s of st.species) s.band = mapAxis(s.band, st.axis, e.target.value);
   st.axis = e.target.value;
   renderSpecies(); update();
 });
 
-let playing = false, raf = 0;
+/* sweep φ at the chosen speed, in degrees per second */
+let playing = false, raf = 0, acc = 0, last = 0;
 $('play').addEventListener('click', () => {
   playing = !playing;
   $('play').textContent = playing ? '❚❚ pause' : '▶ sweep φ';
-  let last = 0;
-  const stepFn = ts => {
+  last = 0; acc = state.s.phi;
+  const stepFn = t => {
     if (!playing) return;
-    if (ts - last > 60) { last = ts; state.s.phi = (state.s.phi + 5) % 360; $('phi').value = state.s.phi; draw(); }
+    if (last) {
+      acc = (acc + state.speed * (t - last) / 1000) % 360;
+      if (Math.round(acc) % 360 !== state.s.phi) setPhi(acc);
+    }
+    last = t;
     raf = requestAnimationFrame(stepFn);
   };
   if (playing) raf = requestAnimationFrame(stepFn); else cancelAnimationFrame(raf);
 });
-window.addEventListener('shell:resize', draw);
+window.addEventListener('shell:resize', () => { fitWorkbench(); draw(); });
 
+/* ---------------------------------------------------------------------------
+   Start: texts once (their citation markers are numbered once), then a case
+   --------------------------------------------------------------------------- */
 $('axis').innerHTML = Object.entries(AXES).map(([k, a]) => `<option value="${k}">${a.name}</option>`).join('');
+$('general').innerHTML = GENERAL;
+$('equations').innerHTML = `<h2>Equations</h2>${EQ.psd}${EQ.tcon}${EQ.lag}${EQ.square}`;
+$('caseTexts').innerHTML = CASES.map(c => `<div>${c.text}</div>`).join('');
+renderCitations([$('general'), $('subSpecFold'), $('subSpecAll'), $('subPhase'), $('equations'), $('caseTexts')], $('refs'), SOURCES);
+fillVctls(document);
 const wanted = new URLSearchParams(location.search).get('case');
 const start = Math.max(0, CASES.findIndex(c => c.id === wanted));
-(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => selectCase(start, false));
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { fitWorkbench(); selectCase(start, false); });
