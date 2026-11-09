@@ -168,7 +168,8 @@ body.wb-locked { overflow: hidden; }
 .right-tab:hover { background: var(--accent-tint); }
 .side-note { font-size: var(--t-footer-size); color: var(--t-footer-color); line-height: var(--t-panel-sub-lh); margin: 0; }
 
-.wb-main { min-height: 0; min-width: 0; overflow-y: auto; }
+.wb-main { min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.wb-side { overscroll-behavior: contain; }
 .wb-stage { display: flex; flex-direction: column; padding: var(--space-3) var(--space-4) var(--space-4); }
 .wb-below { padding: 0 var(--space-4); }
 .wb-below .explain { margin-top: var(--space-2); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5); }
@@ -255,8 +256,9 @@ table.readout.side td:first-child { font-weight: var(--t-control-value-weight); 
 #resetCase { align-self: stretch; }
 #resetCase:disabled { opacity: 0.45; cursor: default; }
 #caseBtn { min-height: 64px; }
-#caseBtn .changed-mark { visibility: hidden; font-size: var(--t-control-size); font-weight: var(--t-control-weight); color: var(--ink-500); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 6px; }
-.case-select.changed #caseBtn .changed-mark { visibility: visible; }
+.case-select-label { display: flex; justify-content: space-between; align-items: baseline; }
+.case-select .changed-mark { visibility: hidden; font-size: var(--t-control-size); font-weight: var(--t-control-weight); color: var(--ink-500); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 6px; }
+.case-select.changed .changed-mark { visibility: visible; }
 
 /* a value control: label, typed number, unit, ↺ back to the case; the slider under it */
 .vctl .vlab { display: flex; align-items: center; gap: var(--space-1); }
@@ -287,6 +289,8 @@ table.readout.side td:first-child { font-weight: var(--t-control-value-weight); 
 .sp-top input[type=text]:hover, .sp-top input[type=text]:focus { border-color: var(--line); outline: none; }
 .sp-swatch { display: inline-block; width: 16px; height: 0; border-top: 3px solid var(--c); }
 .sp-swatch.dashed { border-top-style: dashed; }
+.sp-top .sp-x { font: inherit; font-size: var(--t-control-size); color: var(--ink-500); background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 6px; line-height: 1.4; cursor: pointer; }
+.sp-top .sp-x:hover { background: var(--surface-hover); color: var(--ink-900); }
 .sp-note { margin: 0; font-size: var(--t-footer-size); color: var(--t-footer-color); line-height: var(--t-panel-sub-lh); }
 .sp-body { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-2); align-items: end; }
 .sp-body .wide { grid-column: 1 / -1; }

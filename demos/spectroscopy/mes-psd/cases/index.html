@@ -51,7 +51,7 @@
       <button type="button" class="side-toggle" id="leftToggle" title="Collapse the settings to quick switches">◀</button>
       <div class="side-open">
         <div class="case-select" id="caseSelect">
-          <span class="case-select-label">case</span>
+          <span class="case-select-label">case <span class="changed-mark">changed</span></span>
           <button type="button" id="caseBtn" aria-haspopup="listbox" aria-expanded="false"></button>
           <ul id="caseMenu" role="listbox" aria-label="Case" hidden></ul>
           <button class="btn" id="resetCase" type="button" disabled>reset to the case</button>
@@ -83,6 +83,7 @@
         <div class="side-group">
           <div class="side-title">species, in drive order</div>
           <div id="species"></div>
+          <button class="btn" id="addSpecies" type="button" title="Add a species below the others; added ones can be removed again">+ species</button>
         </div>
       </div>
       <div class="rail" id="rail" aria-label="Quick switches"></div>

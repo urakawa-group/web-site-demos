@@ -27,7 +27,9 @@ should understand the idea by changing something and watching the response.
   with nothing to transform can stay one page.
 - **Every setting is always there; a case only sets values.** Every value the
   engine reads has a control, the structure of the sample included: species
-  are a fixed set of slots, each switched on or off, never added or removed.
+  are a fixed set of slots, each switched on or off. The one exception: the
+  reader may add species below the fixed slots with a button, and remove
+  those again; a case never relies on them.
   A case is a stored set of values for those controls plus a title and a
   text. Picking it changes the values; it never adds, hides or removes a
   control. The selector marks the case as changed once a value differs.
@@ -51,9 +53,13 @@ should understand the idea by changing something and watching the response.
   IR-bands does: the case, its reset, the stimulus, k, all φ, the sweep, the
   noise, and one switch per species slot; a button names itself on hover,
   and a few open a small menu.
-- **Nothing moves when a setting changes.** Subtitles and legends keep a
-  fixed height, panel titles stay on one line, a mark that comes and goes
-  (changed, ↺) keeps its space. Only the panels' own content changes.
+- **Nothing moves when a setting changes.** No button, control or panel
+  shifts: a mark that comes and goes (changed, ↺) keeps its space and sits
+  where it cannot push anything (the "changed" mark beside the selector's
+  label, not inside the button), a card switched off greys out but keeps
+  its size and never opens on hover, subtitles and legends keep a fixed
+  height, panel titles stay on one line. Scrolling a panel scrolls only that
+  panel.
 - **Case texts are tooltips; the text below is general.** Hovering a case
   in the selector shows its text. The explanation under the plots is the
   same for every case: what the page shows and how to read and use it.

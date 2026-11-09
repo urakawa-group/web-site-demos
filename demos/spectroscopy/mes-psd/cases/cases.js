@@ -53,8 +53,9 @@ const AXES = {
   generic: { from: 0, to: 60, step: 0.5, label: 'spectral position / –', name: 'generic, 0 to 60', ticks: [0, 10, 20, 30, 40, 50, 60].map(v => [v, String(v)]) },
   ir: { from: 1800, to: 950, step: -5, label: 'wavenumber / cm⁻¹', name: 'IR, 1800 to 950 cm⁻¹', ticks: [1800, 1600, 1400, 1200, 1000].map(v => [v, String(v)]) },
 };
-const DYN_COLORS = ['data-a', 'data-b', 'data-c'];
-const SLOTS = 5;
+const DYN_COLORS = ['data-a', 'data-b', 'data-c', 'data-d', 'data-e'];
+const SLOTS = 5;          // always there; the reader can add more below them
+const MAX_SPECIES = 8;
 
 const sp = (label, color, band, drive, tau, extra = {}) => ({ label, color, band, drive, tau, invert: false, base: 0, ...extra });
 /** The slots in the generic axis, as a case that does not use them leaves them. */
@@ -692,7 +693,8 @@ function slotCard(s, i) {
       <label class="switch" title="${s.on ? 'in the sample: click to take it out' : 'not in the sample: click to add it'}"><input type="checkbox" data-f="on"${s.on ? ' checked' : ''}><span></span></label>
       <span class="sp-swatch${s.band ? '' : ' dashed'}"></span>
       <input type="text" data-f="label" value="${s.label}" aria-label="name">
-      <button type="button" class="rst" data-f="resetSlot" title="this slot back to the case"${slotChanged(i) ? '' : ' hidden'}>↺</button>
+      ${i < SLOTS ? `<button type="button" class="rst" data-f="resetSlot" title="this slot back to the case"${slotChanged(i) ? '' : ' hidden'}>↺</button>`
+        : '<button type="button" class="sp-x" data-f="remove" title="remove this added species">×</button>'}
     </div>
     <div class="sp-body">
       <label class="ctl wide"><span>follows</span><select data-f="drive">${opts}</select></label>
@@ -710,6 +712,7 @@ function slotCard(s, i) {
 
 function renderSpecies() {
   $('species').innerHTML = state.s.species.map(slotCard).join('');
+  $('addSpecies').disabled = state.s.species.length >= MAX_SPECIES;
   fillVctls($('species'));
   legends();
 }
@@ -762,6 +765,12 @@ $('species').addEventListener('change', e => {
 });
 
 $('species').addEventListener('click', e => {
+  const x = e.target.closest('[data-f="remove"]');
+  if (x) {
+    state.s.species.splice(+x.closest('.sp-card').dataset.i, 1);
+    renderSpecies(); update();
+    return;
+  }
   const r = e.target.closest('[data-f="resetSlot"]');
   if (r) {
     const i = +r.closest('.sp-card').dataset.i;
@@ -775,6 +784,20 @@ $('species').addEventListener('click', e => {
   s.invert = b.dataset.v === '1';
   setSeg(b.parentElement, b.dataset.v);
   update();
+});
+
+/* Adding a species: below the five slots that are always there. An added one
+   follows the stimulus with a free colour, or is static when none is left;
+   its card has a × to remove it again. */
+$('addSpecies').addEventListener('click', () => {
+  const st = state.s, ax = AXES[st.axis];
+  let n = st.species.length + 1;
+  while (st.species.some(s => s.key === `s${n}`)) n++;
+  const c = freeColor(), letter = String.fromCharCode(64 + st.species.length + 1);
+  const band = [ax.from + (ax.to - ax.from) * 0.75, Math.abs(ax.to - ax.from) / 8, 0.5];
+  st.species.push({ key: `s${n}`, on: true, ...sp(letter, c ?? 'data-a', band, c ? 'stim' : 'static', c ? 0.05 * st.T : 0) });
+  renderSpecies(); update();
+  $('species').lastElementChild?.scrollIntoView({ block: 'nearest' });
 });
 
 /* ---------------------------------------------------------------------------
@@ -810,7 +833,7 @@ function selectCase(idx, push = true) {
   const cs = CASES[idx];
   state.s = clone(cs.s);
   state.preview = null;
-  $('caseBtn').innerHTML = `<span class="n">${idx + 1}</span>${cs.title}<span class="changed-mark">changed</span><span class="caret" aria-hidden="true">▾</span>`;
+  $('caseBtn').innerHTML = `<span class="n">${idx + 1}</span>${cs.title}<span class="caret" aria-hidden="true">▾</span>`;
   document.querySelectorAll('#caseMenu li').forEach((li, i) => li.setAttribute('aria-selected', String(i === idx)));
   syncControls(); renderSpecies();
   if (push) {
@@ -930,15 +953,16 @@ cPhase.addEventListener('pointerup', e => { dragging = false; try { cPhase.relea
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const caseS = () => CASES[state.caseIdx].s;
 /** A case's τ in the time unit on screen (a case in periods, the page in minutes, or the reverse). */
-const caseTau = i => caseS().species[i].tau * state.s.T / caseS().T;
+const caseTau = i => (caseS().species[i] ? caseS().species[i].tau * state.s.T / caseS().T : state.s.species[i].tau);
 /** A slot as the case has it, in the time unit and on the axis on screen. */
 function caseSlot(i) {
+  if (!caseS().species[i]) return null;   // a slot the reader added
   const c = clone(caseS().species[i]);
   c.tau *= state.s.T / caseS().T;
   c.band = mapAxis(c.band, caseS().axis, state.s.axis);
   return c;
 }
-const slotChanged = i => JSON.stringify(state.s.species[i]) !== JSON.stringify(caseSlot(i));
+const slotChanged = i => { const c = caseSlot(i); return !!c && JSON.stringify(state.s.species[i]) !== JSON.stringify(c); };
 
 const BIND = {
   noise: {
@@ -974,7 +998,7 @@ function bindOf(key) {
     label: 'or its lag <i>δ</i> at <i>k</i> = 1', unit: '°', min: 0, max: 89, step: 1, redraw: 'update',
     get: () => lagOf(state.s.species[i].tau), set: v => { state.s.species[i].tau = tauOfLag(v); },
     toR: v => Math.round(v), fromR: r => r, fmt: v => v.toFixed(1),
-    caseV: () => lagOf(caseTau(i)), def: lagOf((DEFAULT_SLOTS[i].tau ?? 0) * state.s.T),
+    caseV: () => lagOf(caseTau(i)), def: lagOf((DEFAULT_SLOTS[i]?.tau ?? 0.05) * state.s.T),
     off: () => isStatic(state.s.species[i]),
   };
   return {
@@ -982,7 +1006,7 @@ function bindOf(key) {
     get: () => state.s.species[i].tau, set: v => { state.s.species[i].tau = clamp(v, 0, 2 * state.s.T); },
     toR: v => sliderFromTau(v, state.s.T), fromR: r => tauFromSlider(r, state.s.T),
     fmt: v => (state.s.unit === 'T' ? v.toFixed(3) : v.toFixed(1)), caseV: () => caseTau(i),
-    def: (DEFAULT_SLOTS[i].tau ?? 0) * state.s.T, off: () => isStatic(state.s.species[i]),
+    def: (DEFAULT_SLOTS[i]?.tau ?? 0.05) * state.s.T, off: () => isStatic(state.s.species[i]),
   };
 }
 /** Build the markup of every value control under root. */

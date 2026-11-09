@@ -103,6 +103,8 @@ export const COLOR_GROUPS = [
       'data-a':         { value: SCHEME.ink.base, usage: 'Signal or band A, the first species of a case' },
       'data-b':         { value: SCHEME.orange.line, usage: 'Signal or band B, the second species' },
       'data-c':         { value: SCHEME.purple.line, usage: 'A third species, where a case has one' },
+      'data-d':         { value: SCHEME.pink.line, usage: 'A fourth species that follows the stimulus, e.g. one the reader adds' },
+      'data-e':         { value: SCHEME.sand.darkest, usage: 'A fifth species that follows the stimulus' },
       'data-static':    { value: SCHEME.grey.line, usage: 'Static signal: support, spectators, anything that does not follow the stimulus' },
       'data-stimulus':  { value: SCHEME.grey.dark, usage: 'The stimulus trace itself, drawn dashed' },
       'data-highlight': { value: SCHEME.green.line, usage: 'The one trace the reader should look at: the phase-resolved spectrum at the chosen angle' },
