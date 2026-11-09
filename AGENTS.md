@@ -68,6 +68,14 @@ should understand the idea by changing something and watching the response.
   effect in the other plots, and is kept on click. A ruler that sets a value
   (the phase angle) is drawn dashed with a grip and moves only when grabbed;
   a click anywhere else in the plot does nothing.
+- **The left panel folds by group.** Each group (case, measurement,
+  demodulation, species) folds on its heading and then shows what it is set
+  to; each species card folds to its name row. The case heading also holds
+  the "changed" mark and the button that collapses the whole panel.
+- **Labels in a plot set quantities in italic** (`*φ*`, `*T*`) and subscripts
+  as subscripts (`*φ*_max_`), through `plot.js`. In Source Sans 3 the
+  italic φ is the looped form, as in the text. Values read off a plot are
+  written in it, beside what they belong to, not in a key.
 - **Names in a case.** Species are lettered in drive order, A first
   (`A, gas in the cell`, `B, fast species`). A quantity a reader may know
   from another method is named generically: the signal, not the band
@@ -116,8 +124,10 @@ guide cannot drift from the site.
   guide shows next to it, so write it for a reader. A new text style is a new
   type role in `TYPE_GROUPS`, never a one-off size.
 - **Colours come from the PhD colour scheme** (`SCHEME`, copied from phd_ui).
-  The data roles keep the meaning of the MES tutorial figures: red the
-  stimulus-on half, blue the off half, A black, B orange.
+  Data roles: red the stimulus-on half, blue the off half, the first species
+  (A) orange, the second (B) ink grey, then purple, pink and sand. A page
+  with a single signal draws it in A's orange. (The phd_ui MES tutorial
+  figures still draw A black and B orange.)
 - **Responsive rules key off `<html data-w>`** (`compact`, `mid`, `wide`), set by
   the shell from the width it actually has, never off `@media (max-width)`.
   Otherwise the layout stays wide while the presentation zoom makes the content

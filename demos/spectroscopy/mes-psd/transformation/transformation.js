@@ -247,7 +247,7 @@ function drawRef() {
   shadeHalves(p); p.hline(0);
   p.steps(ts, Array.from(S.stim), C['data-stimulus']);
   p.line(ts, ts.map((_, j) => refAt(j)), C['data-highlight'], CHART.lineData, CHART.dash);
-  p.line(ts, Array.from(S.A), C['data-b']);
+  p.line(ts, Array.from(S.A), C['data-a']);
   if (state.cursor < 1) p.vline(state.cursor * T, C['ink-700'], 1, []);
   p.axes();
 }
@@ -274,12 +274,12 @@ function drawInt() {
   const jc = cursorJ(), end = run[M];
   const p = plot($('cInt'), { x: [0, T], y: Y_INT, xlabel: XLAB_T, ylabel: '(2/T) ∫ A · reference dt / –', xticks: T_TICKS, yticks: ticks(Y_INT[0], Y_INT[1], 4) });
   p.hline(0);
-  p.line(ts.slice(0, jc + 1), run.slice(0, jc + 1), C['data-b']);
+  p.line(ts.slice(0, jc + 1), run.slice(0, jc + 1), C['data-a']);
   if (state.cursor >= 1) {
     p.hline(end, C['data-highlight'], 1);
     p.dot(T, end, C['data-highlight']);
     p.text(`A${sub(state.k)}(φ) = ${end.toFixed(3)}`, T * 0.97, end + (end > 0.6 ? -0.14 : 0.1), C['data-highlight'], 'right');
-  } else p.dot(ts[jc], run[jc], C['data-b']);
+  } else p.dot(ts[jc], run[jc], C['data-a']);
   p.axes();
   $('subInt').innerHTML = `(2/<i>T</i>)∫<sub>0</sub><sup><i>t</i></sup> of the product. At <i>t</i> = <i>T</i> it is <i>A<sub>${state.k}</sub></i>(${state.phi}°) = ${at(S.p, state.phi).toFixed(3)}, the number PSD returns.`;
 }
@@ -320,8 +320,8 @@ function drawPhasor() {
   p.line([0, v * ux], [0, v * uy], C['data-highlight'], CHART.lineHighlight);
   p.dot(v * ux, v * uy, C['data-highlight']);
   // I and Q as the two components
-  p.line([0, I], [0, 0], C['data-b'], 1, [2, 3]); p.line([I, I], [0, Q], C['data-b'], 1, [2, 3]);
-  if (amp > 1e-4) arrow(p, 0, 0, I, Q, C['data-b']);
+  p.line([0, I], [0, 0], C['data-a'], 1, [2, 3]); p.line([I, I], [0, Q], C['data-a'], 1, [2, 3]);
+  if (amp > 1e-4) arrow(p, 0, 0, I, Q, C['data-a']);
   const lr = 0.8 * Math.min(rg.x[1], rg.y[1]);
   p.text('φ axis', lr * ux, lr * uy, C['data-highlight']);
   p.axes();
@@ -333,8 +333,8 @@ function drawPhase() {
   const p = plot($('cPhase'), { x: [0, 360], y: Y_PHASE, xlabel: 'phase angle φ / °', ylabel: 'phase-resolved absorbance / –', xticks: PHI_TICKS, yticks: ticks(Y_PHASE[0], Y_PHASE[1], 4) });
   p.hline(0);
   p.vline(state.phi, C['data-highlight'], 1.5, [4, 3]);
-  p.line(ph, ph.map(f => at(S.p, f)), C['data-b']);
-  if (S.p.amp > 1e-3) p.dot(S.p.phiMax, S.p.amp, C['data-b']);
+  p.line(ph, ph.map(f => at(S.p, f)), C['data-a']);
+  if (S.p.amp > 1e-3) p.dot(S.p.phiMax, S.p.amp, C['data-a']);
   p.dot(state.phi, at(S.p, state.phi), C['data-highlight']);
   p.axes();
 }
@@ -344,7 +344,7 @@ function drawHarm() {
   const { ctx, X, Y } = p, bw = (X(1) - X(0)) * 0.6;
   S.harm.forEach((h, i) => {
     const kk = i + 1, a = Math.min(h.amp, Y_HARM[1]);
-    ctx.fillStyle = kk === state.k ? C['data-highlight'] : kk <= state.nh ? C['data-b'] : C['data-faint'];
+    ctx.fillStyle = kk === state.k ? C['data-highlight'] : kk <= state.nh ? C['data-a'] : C['data-faint'];
     ctx.fillRect(X(kk) - bw / 2, Y(a), bw, Y(0) - Y(a));
   });
   p.axes();
@@ -358,7 +358,7 @@ function drawRebuild() {
   const p = plot($('cRebuild'), { x: [0, T], y: Y_SIG, xlabel: XLAB_T, ylabel: 'signal / –', xticks: T_TICKS, yticks: ticks(Y_SIG[0], Y_SIG[1], 4) });
   shadeHalves(p); p.hline(0);
   p.hline(S.mean, C['data-static'], 1);
-  p.line(ts, Array.from(S.A), C['data-b']);
+  p.line(ts, Array.from(S.A), C['data-a']);
   p.line(ts, rb, C['data-highlight'], CHART.lineHighlight);
   p.text(`mean a₀ = ${S.mean.toFixed(2)}`, 0.03, S.mean + 0.12, C['data-static'], 'left');
   p.axes();
@@ -369,7 +369,7 @@ function drawDist() {
   const p = plot($('cDist'), { x: [0, T], y: Y_SIG, xlabel: XLAB_T, ylabel: 'signal / –', xticks: T_TICKS, yticks: ticks(Y_SIG[0], Y_SIG[1], 4) });
   shadeHalves(p); p.hline(0);
   p.line(ts, Array.from(S.y), C['data-faint'], CHART.lineData);
-  p.line(ts, Array.from(S.A), C['data-b']);
+  p.line(ts, Array.from(S.A), C['data-a']);
   p.axes();
 }
 
@@ -380,7 +380,7 @@ function drawLeak() {
   p.hline(0);
   p.line(ph, ph.map(f => at(pd, f)), C['data-static'], CHART.lineThin);
   p.line(ph, ph.map(f => at(S.pc, f)), C['data-faint'], CHART.lineData);
-  p.line(ph, ph.map(f => at(S.p, f)), C['data-b']);
+  p.line(ph, ph.map(f => at(S.p, f)), C['data-a']);
   p.axes();
   const dT = S.pc.amp > 1e-3 && S.p.amp > 1e-3 ? ((S.p.tcon - S.pc.tcon + 1.5 * T / state.k) % (T / state.k)) - 0.5 * T / state.k : null;
   $('subLeak').innerHTML = `Grey thick: clean. Orange: disturbed. Grey thin: the disturbance alone, the part that leaks. Amplitude ${S.pc.amp.toFixed(3)} → ${S.p.amp.toFixed(3)}${dT == null ? '' : `, time value shifted by ${dT >= 0 ? '+' : '−'}${Math.abs(dT).toFixed(3)} T`}.`;
@@ -438,7 +438,7 @@ function drawTable() {
   const row = (label, q, color) => `<tr><td${color ? ` style="color:${color}"` : ''}>${label}</td><td>${fmt(q.I)}</td><td>${fmt(q.Q)}</td><td>${fmt(q.amp)}</td><td>${flat(q) ? '–' : q.phiMax.toFixed(0) + '°'}</td><td>${flat(q) || q.tcon == null ? '–' : fmt(q.tcon) + ' T'}</td></tr>`;
   $('readout').innerHTML = `<tr><th>at <i>k</i> = ${k}</th><th><i>I<sub>k</sub></i></th><th><i>Q<sub>k</sub></i></th><th>|<i>A<sub>k</sub></i>|</th><th><i>φ</i><sub>max</sub></th><th><i>t</i><sub>con</sub></th></tr>`
     + row('response alone', pc, C['ink-500'])
-    + row('with offset, drift, noise', p, C['data-b'])
+    + row('with offset, drift, noise', p, C['data-a'])
     + (th ? `<tr><td>first-order formula</td><td>–</td><td>–</td><td>${fmt(th.amp)}</td><td>–</td><td>${th.amp < 1e-3 || th.tcon == null ? '–' : fmt(th.tcon) + ' T'}</td></tr>` : '');
 }
 

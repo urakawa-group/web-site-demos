@@ -96,12 +96,12 @@ export const COLOR_GROUPS = [
   {
     key: 'data',
     title: 'Data Roles',
-    note: 'What a colour means in a demo plot, the same in every demo and in the phd_ui figures of the MES tutorials: red is the first half-period (stimulus on), blue the second, A black, B orange.',
+    note: 'What a colour means in a demo plot, the same in every demo and in the phd_ui figures of the MES tutorials: red is the first half-period (stimulus on), blue the second, the first species orange, the second ink grey.',
     tokens: {
       'data-on':        { value: SCHEME.red.line, usage: 'Stimulus on: the first half-period, its shading and its spectra' },
       'data-off':       { value: SCHEME.blue.line, usage: 'Stimulus off: the second half-period' },
-      'data-a':         { value: SCHEME.ink.base, usage: 'Signal or band A, the first species of a case' },
-      'data-b':         { value: SCHEME.orange.line, usage: 'Signal or band B, the second species' },
+      'data-a':         { value: SCHEME.orange.line, usage: 'Signal or band A, the first species of a case, and the one signal of a page that has only one' },
+      'data-b':         { value: SCHEME.ink.base, usage: 'Signal or band B, the second species' },
       'data-c':         { value: SCHEME.purple.line, usage: 'A third species, where a case has one' },
       'data-d':         { value: SCHEME.pink.line, usage: 'A fourth species that follows the stimulus, e.g. one the reader adds' },
       'data-e':         { value: SCHEME.sand.darkest, usage: 'A fifth species that follows the stimulus' },

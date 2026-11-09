@@ -10,8 +10,38 @@
  * text, e.g. CHART.workbenchScale for the plots of a workbench page.
  * p.font(role, weight) is a type role's font at that scale, for text a page
  * draws itself.
+ *
+ * Axis labels and p.text() take *…* for italic, the way quantities are set
+ * in text, and _…_ for a subscript: 'phase angle *φ* / °', '*φ*_max_'. In
+ * Source Sans 3 the italic φ is the looped form (varphi); the upright one is
+ * the stroked form.
  */
 import { C, CHART, typeFont } from './tokens.js';
+
+/**
+ * Draw text with *…* runs in italic and _…_ runs as a subscript (smaller,
+ * lowered; *…* works inside it): '*φ*_max_ = 317°', '*A*_*k*_(*φ*)'. align
+ * as canvas textAlign; the runs are laid out from one measured start point,
+ * so mixed text centres correctly. With draw = false it only measures.
+ */
+export function richText(ctx, s, x, y, font, align = 'left', draw = true) {
+  const size = parseFloat(font.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? 12);
+  const base = font.replace(/^italic /, '');
+  const runs = [];
+  String(s).split('_').forEach((chunk, si) => chunk.split('*').forEach((t, ii) => {
+    if (!t) return;
+    let f = si % 2 ? base.replace(/(\d+(?:\.\d+)?)px/, `${(size * 0.72).toFixed(2)}px`) : base;
+    if (ii % 2) f = `italic ${f}`;
+    runs.push({ t, f, dy: si % 2 ? size * 0.28 : 0 });
+  }));
+  let w = 0;
+  for (const r of runs) { ctx.font = r.f; r.w = ctx.measureText(r.t).width; w += r.w; }
+  if (!draw) return w;
+  let cx = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x;
+  ctx.textAlign = 'left';
+  for (const r of runs) { ctx.font = r.f; ctx.fillText(r.t, cx, y + r.dy); cx += r.w; }
+  return w;
+}
 
 export function plot(canvas, o) {
   const W = canvas.clientWidth, H = canvas.clientHeight;
@@ -83,13 +113,12 @@ export function plot(canvas, o) {
     },
     /** A label on the data, on a surface-coloured box so a trace under it does not cut it. */
     text(s, x, y, color = note.color, align = 'center', font = note.font) {
-      ctx.font = font; ctx.textAlign = align;
-      const w = ctx.measureText(s).width, px = X(x), py = Y(y);
+      const w = richText(ctx, s, 0, 0, font, 'left', false), px = X(x), py = Y(y);
       const left = align === 'center' ? px - w / 2 : align === 'right' ? px - w : px;
       ctx.fillStyle = C.surface; ctx.globalAlpha = 0.85;
       ctx.fillRect(left - 3, py - 12 * sc, w + 6, 16 * sc);
       ctx.globalAlpha = 1; ctx.fillStyle = color;
-      ctx.fillText(s, px, py);
+      richText(ctx, s, px, py, font, align);
     },
     /** Frame, ticks and labels. Call last, so the frame sits on top. */
     axes() {
@@ -110,10 +139,10 @@ export function plot(canvas, o) {
         ctx.fillText(s, inner.l - 7, py + 4 * sc);
       }
       ctx.font = axis.font; ctx.fillStyle = axis.color; ctx.textAlign = 'center';
-      if (o.xlabel) ctx.fillText(o.xlabel, (inner.l + inner.r) / 2, H - 5);
+      if (o.xlabel) richText(ctx, o.xlabel, (inner.l + inner.r) / 2, H - 5, axis.font, 'center');
       if (o.ylabel) {
         ctx.save(); ctx.translate(13 * sc, (inner.t + inner.b) / 2); ctx.rotate(-Math.PI / 2);
-        ctx.fillText(o.ylabel, 0, 0); ctx.restore();
+        richText(ctx, o.ylabel, 0, 0, axis.font, 'center'); ctx.restore();
       }
     },
   };

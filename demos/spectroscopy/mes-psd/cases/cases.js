@@ -6,7 +6,7 @@
  */
 import { initShell } from '../../../../assets/shell.js';
 import { C, CHART, typeFont } from '../../../../assets/tokens.js';
-import { plot, ticks } from '../../../../assets/plot.js';
+import { plot, ticks, richText } from '../../../../assets/plot.js';
 import { renderCitations } from '../../../../assets/cite.js';
 
 initShell({ page: 'demo', views: true });
@@ -379,7 +379,7 @@ function theoryTcon(s0, k) {
 let S = null;
 
 const fmtT = v => (state.s.unit === 'T' ? `${v.toFixed(3)} T` : `${v.toFixed(1)} min`);
-const timeLabel = () => (state.s.unit === 'T' ? 'time / T' : 'time / min');
+const timeLabel = () => (state.s.unit === 'T' ? 'time / *T*' : 'time / min');
 /**
  * Fixed y limits. They depend on the bands (centre, width, height, the part
  * that stays), and the PSD axes on the harmonic, never on τ, noise, cycles or
@@ -403,20 +403,25 @@ function limits() {
   };
 }
 
+/**
+ * Time domain in quasi-steady state: the engine runs WARM cycles first so the
+ * response no longer depends on where it started, and only the cycles after
+ * them are shown (and folded); time counts from the first of those.
+ */
 function drawTime() {
-  const { st, T, dt, n, held, raw, conc } = S;
-  const shown = Math.min(n, (WARM + 3) * M), ts = Array.from({ length: shown }, (_, i) => i * dt);
+  const { st, T, dt, held, raw, conc } = S;
+  const cyc = Math.min(st.cycles, 3), a = WARM * M, b = a + cyc * M;
+  const ts = Array.from({ length: b - a }, (_, i) => i * dt);
+  const cut = arr => Array.from(arr.subarray(a, b));
   const yr = limits().time;
   const p = plot($('cTime'), { scale: SC(),
-    x: [0, shown * dt], y: yr, xlabel: timeLabel(), ylabel: 'signal / –',
-    xticks: ticks(0, shown * dt, 5, v => String(+v.toFixed(2))), yticks: ticks(yr[0], yr[1], 4),
+    x: [0, cyc * T], y: yr, xlabel: timeLabel(), ylabel: 'signal / –',
+    xticks: ticks(0, cyc * T, 5, v => String(+v.toFixed(2))), yticks: ticks(yr[0], yr[1], 4),
   });
-  for (let c = 0; c < shown / M; c++) { p.shadeX(c * T, c * T + T / 2, C['shade-on']); p.shadeX(c * T + T / 2, (c + 1) * T, C['shade-off']); }
-  p.vline(WARM * T, C['ink-500'], 1, [3, 3]);
-  p.text('warm-up, not averaged', WARM * T * 0.5, yr[1] - (yr[1] - yr[0]) * 0.07);
-  p.steps(ts, Array.from(held.subarray(0, shown)), C['data-stimulus']);
-  for (const s of live().filter(s => !s.band)) p.line(ts, Array.from(conc[s.key].subarray(0, shown)), colorOf(s), CHART.lineThin, CHART.dash);
-  for (const s of S.banded) p.line(ts, Array.from(raw[s.key].subarray(0, shown)), colorOf(s), CHART.lineThin);
+  for (let c = 0; c < cyc; c++) { p.shadeX(c * T, c * T + T / 2, C['shade-on']); p.shadeX(c * T + T / 2, (c + 1) * T, C['shade-off']); }
+  p.steps(ts, cut(held), C['data-stimulus']);
+  for (const s of live().filter(s => !s.band)) p.line(ts, cut(conc[s.key]), colorOf(s), CHART.lineThin, CHART.dash);
+  for (const s of S.banded) p.line(ts, cut(raw[s.key]), colorOf(s), CHART.lineThin);
   p.axes();
 }
 
@@ -425,7 +430,7 @@ function drawFold() {
   const tp = Array.from({ length: M }, (_, j) => j * dt);
   const yr = limits().time;
   const tk = st.unit === 'T' ? [[0, '0'], [0.25, 'T/4'], [0.5, 'T/2'], [0.75, '3T/4'], [1, 'T']] : ticks(0, T, 4);
-  const p = plot($('cFold'), { scale: SC(), x: [0, T], y: yr, xlabel: st.unit === 'T' ? 'time in the period / T' : 'time in the period / min', ylabel: 'signal / –', xticks: tk, yticks: ticks(yr[0], yr[1], 4) });
+  const p = plot($('cFold'), { scale: SC(), x: [0, T], y: yr, xlabel: st.unit === 'T' ? 'time in the period / *T*' : 'time in the period / min', ylabel: 'signal / –', xticks: tk, yticks: ticks(yr[0], yr[1], 4) });
   p.shadeX(0, T / 2, C['shade-on']); p.shadeX(T / 2, T, C['shade-off']);
   p.steps(tp, Array.from(held.subarray(0, M)), C['data-stimulus']);
   for (const s of live().filter(s => !s.band)) {
@@ -434,7 +439,16 @@ function drawFold() {
   }
   for (const s of S.banded) { const ci = S.centre[s.key]; p.line(tp, S.fold.map(r => r[ci]), colorOf(s)); }
   p.axes();
-  $('subFold').textContent = `${st.cycles} cycle${st.cycles > 1 ? 's' : ''} averaged after ${WARM} warm-up cycles: the noise drops by about √${st.cycles}.`;
+  // the chosen φ in the time domain: where a band that peaks at φ switches on,
+  // t = (360° − φ)/360° · T/k, once in each of the k periods of the reference
+  const mark = (phi, w, dash) => {
+    const t0 = ((360 - phi) % 360) / 360 * T / st.k;
+    for (let m = 0; m < st.k; m++) p.vline(t0 + m * T / st.k, C['data-highlight'], w, dash);
+  };
+  if (state.preview) mark(state.preview.phi, 1, [1, 3]);
+  mark(st.phi, 1.5, [4, 3]);
+  p.axes();
+  $('subFold').innerHTML = `${st.cycles} cycle${st.cycles > 1 ? 's' : ''} in quasi-steady state, averaged: the noise drops by about √${st.cycles}. Green: the delay the chosen <i>φ</i> reads, (360° − <i>φ</i>)/360° · <i>T</i>/<i>k</i>.`;
 }
 
 const psdAt = phi => {
@@ -459,8 +473,8 @@ function drawSpec() {
   for (const s of S.banded) p.text(s.label.split(',')[0], s.band[0], yr[1] - (yr[1] - yr[0]) * 0.07, colorOf(s));
   // the angle on show, bold green, top left
   const { ctx, inner } = p;
-  ctx.font = p.font('axis', 700); ctx.fillStyle = C['data-highlight']; ctx.textAlign = 'left';
-  ctx.fillText(`φ = ${Math.round(phi)}°${st.k > 1 ? `, k = ${st.k}` : ''}`, inner.l + 8, inner.t + 18 * p.scale);
+  ctx.fillStyle = C['data-highlight'];
+  richText(ctx, `*φ* = ${Math.round(phi)}°${st.k > 1 ? `, *k* = ${st.k}` : ''}`, inner.l + 8, inner.t + 18 * p.scale, p.font('axis', 700));
   p.axes();
 }
 
@@ -472,7 +486,7 @@ function drawPhase() {
   const rows = S.rows.filter(r => r.sp && r.sp.band);
   const yr = limits().phase, amp = yr[1];
   const p = plot($('cPhase'), { scale: SC(),
-    x: [0, 360], y: yr, xlabel: 'phase angle φ / °', ylabel: 'Aₖ(φ) / –',
+    x: [0, 360], y: yr, xlabel: 'phase angle *φ* / °', ylabel: '*A*_*k*_(*φ*) / –',
     xticks: [0, 90, 180, 270, 360].map(v => [v, String(v)]), yticks: ticks(yr[0], yr[1], 4),
   });
   p.hline(0);
@@ -494,18 +508,18 @@ function drawPhase() {
     }
     q.px = X(q.phi); q.py = Y(q.y);
   }
-  // φmax and δ of each band, as a key in the top-right corner (labels on the
-  // dots collide as soon as two maxima are close)
-  const maxima = pois.filter(q => q.kind === 'max');
-  if (maxima.length) {
-    ctx.font = p.font('annotation');
-    const lines = maxima.map(q => [`${q.row.label.split(',')[0]}: φmax ${q.phi.toFixed(0)}°, δ ${q.row.delta.toFixed(0)}°`, q.row.color]);
-    const w = Math.max(...lines.map(([t]) => ctx.measureText(t).width)) + 12, lh = 15 * p.scale;
-    const x = p.inner.r - w - 6, y = p.inner.t + 6;
-    ctx.fillStyle = C.surface; ctx.globalAlpha = 0.9; ctx.fillRect(x, y, w, lh * lines.length + 6); ctx.globalAlpha = 1;
-    ctx.textAlign = 'left';
-    lines.forEach(([t, c], i) => { ctx.fillStyle = c; ctx.fillText(t, x + 6, y + lh - 1 + i * lh); });
-  }
+  // each maximum read off in the plot: a drop line to the φ axis carries
+  // φmax, a line to the right edge (360°) carries the lag δ = 360° − φmax
+  const maxima = pois.filter(q => q.kind === 'max'), span = yr[1] - yr[0];
+  maxima.forEach((q, i) => {
+    const c = q.row.color, name = q.row.label.split(',')[0];
+    p.line([q.phi, q.phi], [q.y, yr[0]], c, 1, [3, 3]);
+    p.line([q.phi, 360], [q.y, q.y], c, 1, [3, 3]);
+    // φmax at the foot of the drop line, stacked upwards if there are several;
+    // δ beside its own dot, on the side away from the right edge
+    p.text(`*φ*_max_ = ${q.phi.toFixed(0)}°`, q.phi - 2, yr[0] + span * (0.1 + 0.13 * i), c, 'right');
+    p.text(`${name}: *δ* = ${q.row.delta.toFixed(0)}°`, q.phi - 4, q.y + span * 0.1, c, 'right');
+  });
   // the ruler's grip: a small triangle on top of the dashed line, to grab it by
   const rx = X(state.s.phi), g = 6;
   ctx.fillStyle = C['data-highlight'];
@@ -605,6 +619,8 @@ function renderRail() {
   if (panels.left || !state.s) { $('rail').innerHTML = ''; return; }
   const st = state.s, ci = state.caseIdx, changed = $('caseSelect').classList.contains('changed');
   $('rail').innerHTML = [
+    railBtn('open', '▶', 'Open the settings', { text: true }),
+    '<hr class="rail-rule">',
     flyWrap('case', railBtn('caseFly', String(ci + 1), 'Case', { text: true, on: true }),
       `<div class="fly-title">Case</div>${CASES.map((c, i) => flyItem('case', i, `${i + 1} · ${c.title}`, i === ci)).join('')}`),
     railBtn('reset', '↺', changed ? 'Reset to the case' : 'Nothing changed from the case', { disabled: !changed }),
@@ -634,6 +650,7 @@ $('rail').addEventListener('click', e => {
   const b = e.target.closest('[data-r]');
   if (!b) return;
   const r = b.dataset.r, st = state.s;
+  if (r === 'open') { panels.left = true; setPanels(); return; }
   if (r === 'case') { flyOpen = null; selectCase(+b.dataset.v); return; }
   if (r === 'reset') { selectCase(state.caseIdx, false); return; }
   if (r === 'shape') { st.shape = st.shape === 'square' ? 'sine' : 'square'; syncControls(); }
@@ -679,6 +696,10 @@ function setPhi(v) {
    Controls: the species slots. Always five, in drive order: a slot can only
    follow the stimulus or a slot above it. Off keeps the values.
    --------------------------------------------------------------------------- */
+/** Species cards folded to their name row: the slots that are off at first, then the reader's choice. */
+const folded = new Set();
+let foldedInit = false;
+
 const freeColor = (except = null) => DYN_COLORS.find(c => !state.s.species.some(s => s !== except && isDyn(s) && s.color === c));
 const num = (v, d = 3) => String(+(+v).toFixed(d));
 
@@ -688,11 +709,12 @@ function slotCard(s, i) {
     .map(([v, t]) => `<option value="${v}"${s.drive === v ? ' selected' : ''}>${t}</option>`).join('')
     + `<option value="static"${isStatic(s) ? ' selected' : ''}${!s.band ? ' disabled' : ''}>nothing (static)</option>`;
   const dis = on => (on ? ' disabled' : '');
-  return `<div class="sp-card${s.on ? '' : ' off'}" data-i="${i}" style="--c:${colorOf(s)}">
+  return `<div class="sp-card${s.on ? '' : ' off'}${folded.has(s.key) ? ' folded' : ''}" data-i="${i}" style="--c:${colorOf(s)}">
     <div class="sp-top">
       <label class="switch" title="${s.on ? 'in the sample: click to take it out' : 'not in the sample: click to add it'}"><input type="checkbox" data-f="on"${s.on ? ' checked' : ''}><span></span></label>
       <span class="sp-swatch${s.band ? '' : ' dashed'}"></span>
       <input type="text" data-f="label" value="${s.label}" aria-label="name">
+      <button type="button" class="sp-fold" data-f="fold" aria-expanded="${!folded.has(s.key)}" title="${folded.has(s.key) ? 'Show the settings of this species' : 'Fold this species to its name'}">${folded.has(s.key) ? '▸' : '▾'}</button>
       ${i < SLOTS ? `<button type="button" class="rst" data-f="resetSlot" title="this slot back to the case"${slotChanged(i) ? '' : ' hidden'}>↺</button>`
         : '<button type="button" class="sp-x" data-f="remove" title="remove this added species">×</button>'}
     </div>
@@ -711,6 +733,7 @@ function slotCard(s, i) {
 }
 
 function renderSpecies() {
+  if (!foldedInit) { state.s.species.forEach(s => { if (!s.on) folded.add(s.key); }); foldedInit = true; }
   $('species').innerHTML = state.s.species.map(slotCard).join('');
   $('addSpecies').disabled = state.s.species.length >= MAX_SPECIES;
   fillVctls($('species'));
@@ -765,6 +788,13 @@ $('species').addEventListener('change', e => {
 });
 
 $('species').addEventListener('click', e => {
+  const fb = e.target.closest('[data-f="fold"]');
+  if (fb) {
+    const key = state.s.species[+fb.closest('.sp-card').dataset.i].key;
+    if (folded.has(key)) folded.delete(key); else folded.add(key);
+    renderSpecies();
+    return;
+  }
   const x = e.target.closest('[data-f="remove"]');
   if (x) {
     state.s.species.splice(+x.closest('.sp-card').dataset.i, 1);
@@ -1021,8 +1051,22 @@ function fillVctls(root) {
   refreshVals();
 }
 /** Write every value control from the state: slider, number, and whether ↺ shows. */
+/** What each folded group is set to, at the right of its heading. */
+function groupSummaries() {
+  const st = state.s, sum = (g, t) => { const el = document.querySelector(`.sgroup[data-g="${g}"] .sg-sum`); if (el) el.innerHTML = t; };
+  sum('case', `${state.caseIdx + 1} · ${CASES[state.caseIdx].title}`);
+  sum('measurement', `${st.shape === 'square' ? 'on / off' : 'sine'} · <i>σ</i> ${sigmaFromSlider(st.noise).toFixed(3)} · ${st.cycles} cycles`);
+  sum('demodulation', `<i>k</i> = ${st.k} · <i>φ</i> = ${st.phi}°`);
+  sum('species', live().map(s => s.label.split(',')[0]).join(' ') || 'none on');
+}
+document.querySelectorAll('.sg-toggle').forEach(b => b.addEventListener('click', () => {
+  const g = b.closest('.sgroup'), closed = g.classList.toggle('closed');
+  b.setAttribute('aria-expanded', String(!closed));
+}));
+
 function refreshVals() {
   if (!state.s) return;
+  groupSummaries();
   document.querySelectorAll('.vctl').forEach(el => {
     const b = bindOf(el.dataset.k), v = b.get(), off = b.off?.() ?? false;
     const range = el.querySelector('input[type=range]'), val = el.querySelector('.val'), rst = el.querySelector('.rst');
