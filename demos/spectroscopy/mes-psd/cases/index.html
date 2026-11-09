@@ -49,9 +49,9 @@
     <!-- left: every setting, always there; collapsed, a rail of quick switches -->
     <aside class="wb-side wb-left" id="left" aria-label="Settings">
       <div class="side-open">
-        <section class="sgroup closed" data-g="case" id="caseSelect">
+        <section class="sgroup" data-g="case" id="caseSelect">
           <div class="sg-head">
-            <button type="button" class="sg-toggle" aria-expanded="false" title="The case: a stored set of values for every setting below. Click to fold"><span class="sg-name">case</span><span class="sg-sum"></span></button>
+            <button type="button" class="sg-toggle" aria-expanded="true" title="The case: a stored set of values for every setting below. Click to fold"><span class="sg-name">case</span><span class="sg-sum"></span></button>
             <span class="changed-mark" title="A setting differs from the case">changed</span>
             <button type="button" class="side-toggle" id="leftToggle" title="Collapse the settings to quick switches">◀</button>
           </div>
@@ -85,8 +85,11 @@
           <div class="sg-body">
             <div class="ctl"><span>harmonic <i>k</i></span>
               <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="5">5</button></span></div>
+            <div class="ctl"><span>figure 3 shows</span>
+              <span class="seg" id="kMode"><button type="button" data-v="eq" title="The harmonic k alone">only <i>k</i></button><button type="button" data-v="le" title="Harmonics 1 … k added, each at the phase of the same moment: the averaged period rebuilt, closer to its shape the more are added">summed 1 … <i>k</i></button></span></div>
             <div class="ctl vctl" data-k="phi"></div>
-            <label class="ctl check"><input id="allPhi" type="checkbox"><span>all <i>φ</i> from 0 to 170°</span></label>
+            <label class="ctl check" title="Figure 3 shows the phase-resolved spectra at φ = 0, 10, …, 170° instead of the averaged period"><input id="allPhi" type="checkbox"><span>phase-resolved</span></label>
+            <label class="ctl check sub-check" title="Also the amplitude spectrum |A_k| = √(I² + Q²): the envelope no φ exceeds"><input id="absSpec" type="checkbox"><span>amplitude, |<i>A<sub>k</sub></i>|</span></label>
             <div class="ctl vctl" data-k="speed"></div>
             <button class="btn primary" id="play" type="button">▶ sweep φ</button>
           </div>
@@ -127,7 +130,7 @@
           <section class="panel">
             <h3>3 · Spectra</h3>
             <div class="sub-row">
-              <p class="sub"><span id="subSpecFold">Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].</span><span id="subSpecAll" hidden><i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].</span></p>
+              <p class="sub"><span id="subSpecFold">Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].</span><span id="subSpecAll" hidden>Phase-resolved: <i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].</span><span id="subSpecMode"></span></p>
               <label class="phi-field" title="The phase angle on show: type a value, or move the ruler in figure 2 or 4"><i>φ</i> = <input id="phiField" type="text" inputmode="decimal" aria-label="phase angle">°<span id="kField"></span></label>
             </div>
             <canvas id="cSpec"></canvas>

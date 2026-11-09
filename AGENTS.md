@@ -70,8 +70,8 @@ should understand the idea by changing something and watching the response.
   a click anywhere else in the plot does nothing.
 - **The left panel folds by group.** Each group (case, measurement,
   demodulation, species) folds on its heading and then shows what it is set
-  to; each species card folds to its name row. The page opens with case and
-  measurement folded, demodulation and species open, every species card
+  to; each species card folds to its name row. The page opens with measurement
+  folded; case, demodulation and species open; every species card
   folded. A folded card opens on a click anywhere but its switch; its name
   can be edited only while it is open. The case heading also holds
   the "changed" mark and the button that collapses the whole panel.
@@ -79,6 +79,12 @@ should understand the idea by changing something and watching the response.
   as subscripts (`*φ*_max_`), through `plot.js`. In Source Sans 3 the
   italic φ is the looped form, as in the text. Values read off a plot are
   written in it, beside what they belong to, not in a key.
+- **Figure 3 of a PSD page offers three views of the demodulated spectra.**
+  Phase-resolved (the set over φ) or the averaged period; the amplitude
+  |A_k| = √(I² + Q²) as the envelope no φ exceeds; and the harmonic k alone or
+  1 … k summed, each harmonic at the phase of the same moment
+  (t = (90° − φ)/360° · T, φ_h = 90° − h (90° − φ)), which rebuilds the
+  averaged period and comes closer to its shape with every harmonic added.
 - **Names in a case.** Species are lettered in drive order, A first
   (`A, gas in the cell`, `B, fast species`). A quantity a reader may know
   from another method is named generically: the signal, not the band

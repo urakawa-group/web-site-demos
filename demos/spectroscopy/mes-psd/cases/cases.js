@@ -35,6 +35,9 @@ const SOURCES = {
      axis     'generic' (spectral position 0 to 60) or 'ir' (wavenumber)
      noise    slider value 0 to 100
      duty     on fraction of the period, for the on/off stimulus (½ by default)
+     kUpTo    figure 3 shows every harmonic up to k, not k alone
+     allPhi   figure 3 phase-resolved: the spectra at φ = 0, 10, …, 170°
+     absSpec  with allPhi, also the amplitude spectrum |A_k| = √(I² + Q²)
      species  always five slots, s1 to s5, in drive order. Each one:
        on     whether it is in the sample; a slot that is off keeps its values
        key, label, color ('data-a' | 'data-b' | 'data-c'; static and bandless
@@ -84,7 +87,7 @@ function slots(list, axis) {
     return { key, on: false, ...d, band: axis === 'generic' ? d.band : mapAxis(d.band, 'generic', axis) };
   });
 }
-const base = { unit: 'T', T: 1, axis: 'generic', noise: 0, cycles: 4, shape: 'square', duty: 0.5, k: 1, phi: 0, allPhi: false };
+const base = { unit: 'T', T: 1, axis: 'generic', noise: 0, cycles: 4, shape: 'square', duty: 0.5, k: 1, kUpTo: false, phi: 0, allPhi: false, absSpec: false };
 const settings = (extra, list) => ({ ...base, ...extra, species: slots(list, extra.axis ?? 'generic') });
 
 const CASES = [
@@ -343,12 +346,20 @@ function compute() {
       row[x] += a / st.cycles;
     }
   }
-  // PSD at harmonic k: in-phase and quadrature per spectral point
-  const k = st.k, I = new Float64Array(nx), Q = new Float64Array(nx);
-  for (let j = 0; j < M; j++) {
-    const wt = 2 * Math.PI * k * j / M, sn = Math.sin(wt), cs_ = Math.cos(wt);
-    for (let x = 0; x < nx; x++) { I[x] += 2 / M * fold[j][x] * sn; Q[x] += 2 / M * fold[j][x] * cs_; }
-  }
+  // PSD per spectral point: in-phase and quadrature parts, at k and, for
+  // figure 3 in "k ≤" mode, at every harmonic below it
+  const k = st.k;
+  const demod = h => {
+    const I_ = new Float64Array(nx), Q_ = new Float64Array(nx);
+    for (let j = 0; j < M; j++) {
+      const wt = 2 * Math.PI * h * j / M, sn = Math.sin(wt), cs_ = Math.cos(wt);
+      for (let x = 0; x < nx; x++) { I_[x] += 2 / M * fold[j][x] * sn; Q_[x] += 2 / M * fold[j][x] * cs_; }
+    }
+    return { I: I_, Q: Q_ };
+  };
+  const harm = {};
+  for (const h of st.kUpTo ? Array.from({ length: k }, (_, i) => i + 1) : [k]) harm[h] = demod(h);
+  const { I, Q } = harm[k];
   const phaseOf = (i, q) => {
     const amp = Math.hypot(i, q);
     // round to 1e-6° first, so a maximum a hair past 0° does not read as a lag of a whole period
@@ -373,7 +384,7 @@ function compute() {
     const r = s.band ? phaseOf(I[centre[s.key]], Q[centre[s.key]]) : psdTrace(conc[s.key]);
     rows.push({ key: s.key, label: s.label, color: colorOf(s), static: isStatic(s), sp: s, ...r, theory: theoryTcon(s, k) });
   }
-  return { st, T, dt, n, stim, held, conc, raw, height, xs, fold, I, Q, centre, banded, rows, sigma, k };
+  return { st, T, dt, n, stim, held, conc, raw, height, xs, fold, I, Q, harm, centre, banded, rows, sigma, k };
 }
 
 /** One-step (or chain) first-order time value at harmonic k: phases of steps in series add. */
@@ -435,11 +446,11 @@ function limits() {
   const hResp = Math.max(0.05 * hAll, ...resp);
   // harmonic k of an on/off wave carries 1/k of the fundamental's swing, so the
   // PSD axes follow k (a sine has no harmonics above 1: its axes stay at k = 1)
-  const psd = 0.75 * hResp / (st.shape === 'square' ? st.k : 1);
+  const psd = 0.75 * hResp / (st.shape === 'square' && !st.kUpTo ? st.k : 1);
   return {
     time: [-0.12 * hAll, 1.16 * hAll],
     spec: st.allPhi ? [-psd, psd] : [-psd, 1.12 * hAll],
-    phase: [-psd, psd],
+    phase: [-0.75 * hResp / (st.shape === 'square' ? st.k : 1), 0.75 * hResp / (st.shape === 'square' ? st.k : 1)],
   };
 }
 
@@ -480,21 +491,16 @@ function drawFold() {
   }
   for (const s of S.banded) { const ci = S.centre[s.key]; p.line(tp, S.fold.map(r => r[ci]), colorOf(s)); }
   p.axes();
-  // the chosen φ in the time domain: where a band that peaks at φ switches on,
-  // t = (360° − φ)/360° · T/k, once in each of the k periods of the reference
-  const mark = (phi, w, dash) => {
-    const t0 = ((360 - phi) % 360) / 360 * T / st.k;
-    for (let m = 0; m < st.k; m++) p.vline(t0 + m * T / st.k, C['data-highlight'], w, dash);
-  };
+  // the chosen φ in the time domain: the delay it reads, t = (360° − φ)/360° · T/k.
+  // The reference repeats every T/k, so later copies of that delay exist; only
+  // the first, the time value itself, is drawn
+  const mark = (phi, w, dash) => p.vline(((360 - phi) % 360) / 360 * T / st.k, C['data-highlight'], w, dash);
   if (state.preview) mark(state.preview.phi, 1, [1, 3]);
   mark(st.phi, 1.5, [4, 3]);
-  // grips on top of the lines, to grab the ruler by
-  const t0 = ((360 - st.phi) % 360) / 360 * T / st.k, g = 6, xs = [];
+  // a grip on top of the line, to grab the ruler by
+  const g = 6, xs = [p.X(((360 - st.phi) % 360) / 360 * T / st.k)];
   p.ctx.fillStyle = C['data-highlight'];
-  for (let m = 0; m < st.k; m++) {
-    const x = p.X(t0 + m * T / st.k); xs.push(x);
-    p.ctx.beginPath(); p.ctx.moveTo(x - g, p.inner.t); p.ctx.lineTo(x + g, p.inner.t); p.ctx.lineTo(x, p.inner.t + g * 1.4); p.ctx.closePath(); p.ctx.fill();
-  }
+  p.ctx.beginPath(); p.ctx.moveTo(xs[0] - g, p.inner.t); p.ctx.lineTo(xs[0] + g, p.inner.t); p.ctx.lineTo(xs[0], p.inner.t + g * 1.4); p.ctx.closePath(); p.ctx.fill();
   FD = { p, xs, T, k: st.k };
   p.axes();
   $('subFold').innerHTML = `${st.cycles} cycle${st.cycles > 1 ? 's' : ''} in quasi-steady state, averaged: the noise drops by about √${st.cycles}. Green: the delay the chosen <i>φ</i> reads, (360° − <i>φ</i>)/360° · <i>T</i>/<i>k</i>; drag it to set <i>φ</i>.`;
@@ -508,18 +514,38 @@ const shownPhi = () => (state.preview ? state.preview.phi : state.s.phi);
 /** Text scale of the centre: CHART.workbenchScale on a wide screen, where the plots fill the window. */
 const SC = () => (document.documentElement.dataset.w === 'wide' ? CHART.workbenchScale : 1);
 
+/* dash patterns that tell the lower harmonics apart in "k ≤" mode, k itself solid */
+const HARM_DASH = [[], [8, 4], [2, 3], [10, 3, 2, 3], [5, 5]];
+
+/**
+ * Figure 3. Averaged spectra through the period (grey) or, phase-resolved,
+ * A_k(φ) for φ = 0, 10, …, 170° (grey); in both the spectrum at the chosen φ
+ * (green). "k ≤" adds the lower harmonics at the same φ, dashed; "absolute"
+ * adds the amplitude spectrum |A_k| = √(I² + Q²), which no φ exceeds.
+ */
 function drawSpec() {
-  const { st, xs } = S, ax = AXES[st.axis], phi = shownPhi();
-  const cur = psdAt(phi);
+  const { st, xs } = S, ax = AXES[st.axis], phi = shownPhi(), r = phi * Math.PI / 180;
+  const at = h => Array.from(S.harm[h].I, (v, x) => v * Math.cos(r) + S.harm[h].Q[x] * Math.sin(r));
+  const amp = h => Array.from(S.harm[h].I, (v, x) => Math.hypot(v, S.harm[h].Q[x]));
+  const hs = Object.keys(S.harm).map(Number).sort((a_, b_) => a_ - b_);
   const set = st.allPhi ? Array.from({ length: 18 }, (_, i) => psdAt(i * 10)) : [];
   const avg = st.allPhi ? [] : Array.from({ length: 12 }, (_, i) => Array.from(S.fold[i * (M / 12)]));
   const yr = limits().spec;
-  const p = plot($('cSpec'), { scale: SC(), x: [ax.from, ax.to], y: yr, xlabel: ax.label, ylabel: st.allPhi ? '*A*_*k*_(*φ*) / –' : 'signal / –', xticks: ax.ticks, yticks: ticks(yr[0], yr[1], 4) });
+  const ylabel = st.allPhi ? (st.kUpTo ? '*A*_*k*_(*φ*) / –' : `*A*_${st.k}_(*φ*) / –`) : 'signal / –';
+  const p = plot($('cSpec'), { scale: SC(), x: [ax.from, ax.to], y: yr, xlabel: ax.label, ylabel, xticks: ax.ticks, yticks: ticks(yr[0], yr[1], 4) });
   p.hline(0);
-  for (const s of avg) p.line(xs, s, C['data-faint'], CHART.lineFaint);
-  for (const s of set) p.line(xs, s, C['data-faint'], CHART.lineFaint);
-  p.line(xs, cur, C['data-highlight'], CHART.lineHighlight);
-  for (const s of S.banded) p.text(s.label.split(',')[0], s.band[0], yr[1] - (yr[1] - yr[0]) * 0.07, colorOf(s));
+  for (const s_ of avg) p.line(xs, s_, C['data-faint'], CHART.lineFaint);
+  for (const s_ of set) p.line(xs, s_, C['data-faint'], CHART.lineFaint);
+  if (st.allPhi && st.absSpec) for (const h of hs) p.line(xs, amp(h), C['ink-700'], CHART.lineData, HARM_DASH[(st.k - h) % HARM_DASH.length]);
+  for (const h of hs) {
+    const y = at(h);
+    p.line(xs, y, C['data-highlight'], h === st.k ? CHART.lineHighlight : CHART.lineData, HARM_DASH[(st.k - h) % HARM_DASH.length]);
+    if (hs.length > 1) {
+      let im = 0; y.forEach((v, i) => { if (Math.abs(v) > Math.abs(y[im])) im = i; });
+      p.text(`*k* = ${h}`, xs[im], y[im] + (y[im] >= 0 ? 1 : -1.6) * (yr[1] - yr[0]) * 0.05, C['data-highlight']);
+    }
+  }
+  for (const s_ of S.banded) p.text(s_.label.split(',')[0], s_.band[0], yr[1] - (yr[1] - yr[0]) * 0.07, colorOf(s_));
   p.axes();
 }
 
@@ -584,16 +610,33 @@ function drawPhase() {
     p.line([q.phi, 360], [q.y, q.y], c, 1, [3, 3]);
     placed.push({ l: X(q.phi) - 6, r: X(q.phi) + 6, t: Y(q.y) - 6, b: Y(q.y) + 6 });   // the dot itself
   }
-  // the angle above its dot, or below it where the dot is close to the top of the frame
+  // φmax on its drop line near the φ axis, turned to read upwards. Every label
+  // ends at the same height, so units, tens and hundreds of all of them line up
+  ctx.font = font;
+  const lineH = 15 * sc, endAt = richText(ctx, '360°', 0, 0, font, 'left', false) + 6;
   for (const q of maxima) {
-    const above = Y(q.y) - 9 * sc, below = Y(q.y) + 21 * sc;
-    put(`${q.phi.toFixed(0)}°`, X(q.phi), above - 12 * sc < p.inner.t + 2 ? below : above, 'center', q.row.color, 'x');
+    const txt = `${q.phi.toFixed(0)}°`, w = richText(ctx, txt, 0, 0, font, 'left', false), x = X(q.phi), y0 = p.inner.b - 4;
+    ctx.save(); ctx.translate(x, y0); ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = C.surface; ctx.globalAlpha = 0.85; ctx.fillRect(endAt - w - 3, -lineH / 2, w + 6, lineH); ctx.globalAlpha = 1;
+    ctx.fillStyle = q.row.color; richText(ctx, txt, endAt, 4 * sc, font, 'right');
+    ctx.restore();
+    placed.push({ l: x - lineH / 2, r: x + lineH / 2, t: y0 - endAt - 3, b: y0 });
   }
+  // δ: the first free spot of: on its line halfway to the right edge (where
+  // the line is long enough), left of its dot, then one row up or down of each
   for (const q of maxima) {
     const txt = `*δ* = ${q.row.delta.toFixed(0)}°`, w = richText(ctx, txt, 0, 0, font, 'left', false);
-    const room = X(360) - X(q.phi) - 10;
-    if (room >= w + 6) put(txt, (X(q.phi) + X(360)) / 2, Y(q.y) - 4 * sc, 'center', q.row.color, 'y');
-    else put(txt, X(q.phi) - 9, Y(q.y) + 5 * sc, 'right', q.row.color, 'y');
+    const row = 17 * sc, xd = X(q.phi), yd = Y(q.y), room = X(360) - xd - 10;
+    const on = [(xd + X(360)) / 2, yd - 4 * sc, 'center'], left = [xd - 9, yd + 5 * sc, 'right'];
+    const firsts = room >= w + 6 ? [on, left] : [left];
+    const cands = [];
+    for (const dy of [0, -row, row, -2 * row, 2 * row]) for (const [x, y, al] of firsts) cands.push([x, y + dy, al]);
+    const inFrame = bx => bx.t >= p.inner.t && bx.b <= p.inner.b && bx.l >= p.inner.l;
+    const pick = cands.find(([x, y, al]) => { const bx = boxOf(txt, x, y, al); return inFrame(bx) && !hits(bx); }) ?? cands[0];
+    const bx = boxOf(txt, ...pick);
+    placed.push(bx);
+    ctx.fillStyle = C.surface; ctx.globalAlpha = 0.85; ctx.fillRect(bx.l, bx.t, bx.r - bx.l, bx.b - bx.t); ctx.globalAlpha = 1;
+    ctx.fillStyle = q.row.color; richText(ctx, txt, pick[0], pick[1], font, pick[2]);
   }
   // the ruler's grip: a small triangle on top of the dashed line, to grab it by
   const rx = X(state.s.phi), g = 6;
@@ -703,7 +746,7 @@ function renderRail() {
     railBtn('shape', st.shape === 'square' ? '⊓' : '∿', st.shape === 'square' ? 'Stimulus on / off. Click for sine' : 'Stimulus sine. Click for on / off', { text: true }),
     flyWrap('k', railBtn('kFly', `k${st.k}`, 'Harmonic k', { text: true }),
       `<div class="fly-title">Harmonic <i>k</i></div>${[1, 2, 3, 5].map(k => flyItem('k', k, `k = ${k}`, k === st.k)).join('')}`),
-    railBtn('allPhi', '∥', st.allPhi ? 'All φ from 0 to 170° shown. Click for the period' : 'The averaged period shown. Click for all φ', { on: st.allPhi, text: true }),
+    railBtn('allPhi', '∥', st.allPhi ? 'Phase-resolved spectra shown. Click for the averaged period' : 'The averaged period shown. Click for the phase-resolved spectra', { on: st.allPhi, text: true }),
     railBtn('play', playing ? '❚❚' : '▶', playing ? 'Pause the sweep' : 'Sweep φ', { on: playing, text: true }),
     flyWrap('noise', railBtn('noiseFly', 'σ', 'Noise', { text: true, on: st.noise > 0 }),
       `<div class="fly-title">Noise, <i>σ</i> = ${sigmaFromSlider(st.noise).toFixed(3)}</div>${flyItem('noise', 'new', 'new noise')}${flyItem('noise', 'off', 'no noise', st.noise === 0)}${flyItem('noise', 'case', 'the case’s noise', st.noise === caseS().noise)}`),
@@ -756,6 +799,10 @@ function setSeg(el, v) {
 function syncControls() {
   const st = state.s;
   $('allPhi').checked = st.allPhi;
+  $('absSpec').checked = st.absSpec; $('absSpec').disabled = !st.allPhi;
+  setSeg($('kMode'), st.kUpTo ? 'le' : 'eq');
+  $('subSpecMode').innerHTML = (st.kUpTo && st.k > 1 ? ` Dashed green: <i>k</i> = 1 … ${st.k - 1} at the same <i>φ</i>.` : '')
+    + (st.allPhi && st.absSpec ? ' Ink: the amplitude |<i>A<sub>k</sub></i>|, which no <i>φ</i> exceeds.' : '');
   setSeg($('shape'), st.shape); setSeg($('harm'), st.k); setSeg($('unit'), st.unit);
   $('period').value = st.T; $('period').disabled = st.unit === 'T';
   $('axis').value = st.axis;
@@ -1181,7 +1228,7 @@ function groupSummaries() {
   const st = state.s, sum = (g, t) => { const el = document.querySelector(`.sgroup[data-g="${g}"] .sg-sum`); if (el) el.innerHTML = t; };
   sum('case', `${state.caseIdx + 1} · ${CASES[state.caseIdx].title}`);
   sum('measurement', `${st.shape === 'square' ? `on / off${st.duty !== 0.5 ? ` ${st.duty.toFixed(2)}` : ''}` : 'sine'} · <i>σ</i> ${sigmaFromSlider(st.noise).toFixed(3)} · ${st.cycles} cycles`);
-  sum('demodulation', `<i>k</i> = ${st.k} · <i>φ</i> = ${st.phi}°`);
+  sum('demodulation', `<i>k</i> ${st.kUpTo ? '≤' : '='} ${st.k} · <i>φ</i> = ${st.phi}°${st.allPhi ? ' · resolved' : ''}`);
   sum('species', live().map(s => s.label.split(',')[0]).join(' ') || 'none on');
 }
 document.querySelectorAll('.sg-toggle').forEach(b => b.addEventListener('click', () => {
@@ -1248,6 +1295,8 @@ document.addEventListener('dblclick', e => {
    Measurement and demodulation controls
    --------------------------------------------------------------------------- */
 $('allPhi').addEventListener('change', e => { state.s.allPhi = e.target.checked; syncControls(); update(); });
+$('absSpec').addEventListener('change', e => { state.s.absSpec = e.target.checked; syncControls(); update(); });
+$('kMode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.kUpTo = b.dataset.v === 'le'; syncControls(); update(); });
 $('shape').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.shape = b.dataset.v; setSeg($('shape'), state.s.shape); update(); refreshVals(); });
 $('harm').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.s.k = +b.dataset.v; setSeg($('harm'), state.s.k); update(); });
 $('reseed').addEventListener('click', () => { state.seed += 1; update(); });
