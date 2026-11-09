@@ -187,6 +187,8 @@ body.wb-locked { overflow: hidden; }
 .wb-center .panel .sub-row .sub, .sub-row .sub { flex: 1 1 0; min-width: 0; }
 .phi-field { flex: none; white-space: nowrap; margin-right: var(--space-3); color: var(--data-highlight); font-weight: var(--t-control-value-weight); font-size: var(--t-panel-sub-size); }
 [data-w="wide"] .phi-field { font-size: calc(var(--t-panel-sub-size) * var(--wb-text-scale)); }
+.sub-row .view-seg { flex: none; margin-right: var(--space-3); }
+[data-w="wide"] .sub-row .view-seg button { font-size: calc(var(--t-control-size) * 1.2); }
 .phi-field input {
   font: inherit; color: inherit; width: 3.2em; text-align: right; font-variant-numeric: tabular-nums;
   border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); padding: 0 4px; margin: 0 1px;

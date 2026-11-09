@@ -1,12 +1,17 @@
 /**
- * MES-PSD transformation: one averaged period A(t), turned into A_k(phi) and
- * shown five ways. See the comment block in index.html for the model and the
- * sources; the input texts carry the citations.
+ * MES-PSD transformation: one averaged period A(t), turned into A_k(φ), on
+ * the workbench. An input is a stored set of values for every setting, as a
+ * case is on the cases page. See the comment block in index.html for the
+ * model and the sources; the input texts carry the citations.
  */
 import { initShell } from '../../../../assets/shell.js';
 import { C, CHART } from '../../../../assets/tokens.js';
-import { plot, ticks } from '../../../../assets/plot.js';
+import { plot, ticks, richText } from '../../../../assets/plot.js';
 import { renderCitations } from '../../../../assets/cite.js';
+import {
+  fitWorkbench, initWorkbench, valueControls, foldingGroups, caseSelector, tooltip,
+  setSeg, rail, markMaxima, grip, dragRuler, localIn, clamp,
+} from '../../../../assets/workbench.js';
 
 initShell({ page: 'demo', views: true });
 
@@ -20,46 +25,71 @@ const SOURCES = {
 };
 
 /* ---------------------------------------------------------------------------
-   Inputs. Each is a stimulus shape plus a chain of first-order steps; `taus`
-   names the time constants it has, with their starting values in T.
+   Settings. Everything the engine reads is one object; an input is a copy of
+   it with a title and a text (the tooltip of the input selector).
+
+   { shape, duty, tau, tauOff, tau2, invert, offset, drift, noise,
+     k, phi, clean, rebuild, nh, view3, view4 }
+
+     shape   'square' (on/off, on for a fraction duty of the period),
+             'triangle' (rising for a fraction duty, then falling),
+             'saw' (rising over the whole period, then back at once), 'sine'
+     tau     time constant of the first step, in T; 0 = no delay
+     tauOff  its time constant while decaying, or null for the same as tau
+     tau2    time constant of a second step in series, or null for none
+     invert  antiphase: the signal falls while the stimulus rises
+     offset, drift, noise   what a measurement adds: a constant, a ramp of
+             drift over one period, Gaussian noise (slider 0 to 100)
+     clean   draw the clean signal beside the disturbed one
+     rebuild, nh   draw the period rebuilt from its mean and n harmonics
+     view3   'cos' | 'phasor';  view4   'bars' | 'mapT' | 'mapP'
    --------------------------------------------------------------------------- */
+const base = {
+  shape: 'square', duty: 0.5, tau: 0, tauOff: null, tau2: null, invert: false,
+  offset: 0, drift: 0, noise: 0, k: 1, phi: 0, clean: false, rebuild: false, nh: 3, view3: 'cos', view4: 'bars',
+};
+/** What a reader changes only to look, not to change the experiment: no "changed" mark for these. */
+const DISPLAY_ONLY = ['phi', 'clean', 'rebuild', 'nh', 'view3', 'view4'];
+
 const INPUTS = [
   {
-    id: 'square', title: 'Square Wave, No Delay', shape: 'square', taus: {},
+    id: 'square', title: 'Square Wave, No Delay', s: { ...base },
     text: `<p>The stimulus itself: 1 in the first half-period, 0 in the second. It is ½ plus odd sines [@handbook, Eq. 42.1, p. 970], so the product with the reference has more amber than purple area at <i>k</i> = 1, <i>φ</i> = 0, and the integral ends at 2/π ≈ 0.64.</p>
-      <p>Set <i>φ</i> = 90°: amber and purple balance and the integral ends at zero. That angle is where the signal and the reference are out of step. At <i>k</i> = 2 every lobe of the reference meets as much amber as purple, so the amplitude is zero at every <i>φ</i>: no even harmonics.</p>`,
+      <p>Drag the reference a quarter period: amber and purple balance and the integral ends at zero. At <i>k</i> = 2 every lobe of the reference meets as much amber as purple, so the amplitude is zero at every <i>φ</i>: no even harmonics.</p>`,
   },
   {
-    id: 'lag', title: 'Square Wave, First-Order Delay', shape: 'square', taus: { tau: 0.08 },
-    text: `<p>The band follows through one first-order step. The period is a rounded square, and its fundamental is shifted later by <i>δ</i> = arctan(<i>ωτ</i>). On the phasor that is a clockwise turn of the arrow, so <i>φ</i><sub>max</sub> = 360° − <i>δ</i> and the time value reads the delay back [@weyel, Eq. 2].</p>
+    id: 'lag', title: 'Square Wave, First-Order Delay', s: { ...base, tau: 0.08 },
+    text: `<p>The signal follows through one first-order step. The period is a rounded square, and its fundamental is shifted later by <i>δ</i> = arctan(<i>ωτ</i>). On the phasor that is a clockwise turn of the arrow, so <i>φ</i><sub>max</sub> = 360° − <i>δ</i> and the time value reads the delay back [@weyel, Eq. 2].</p>
       <p>Raise <i>τ</i>: the arrow turns and shrinks. The higher harmonics shrink much faster than the fundamental, because the step smooths the corners, and the rebuilt period needs fewer of them.</p>`,
   },
   {
-    id: 'falling', title: 'Square Wave, Falling Band', shape: 'square', taus: { tau: 0.08 }, invert: true,
-    text: `<p>A band that falls when the stimulus switches on, through the same step: 1 − <i>y</i>(<i>t</i>). The constant 1 drops out in the integral, so only −<i>y</i> is left, and the arrow points the other way: <i>φ</i><sub>max</sub> moves by 180° and the time value by <i>T</i>/2 at <i>k</i> = 1.</p>
-      <p>In the phase-resolved spectra this band is a lobe of the opposite sign. Compare with the rising band of the same <i>τ</i>: same length of arrow, opposite direction.</p>`,
+    id: 'falling', title: 'Square Wave, Antiphase', s: { ...base, tau: 0.08, invert: true },
+    text: `<p>A signal that falls when the stimulus switches on, through the same step: 1 − <i>y</i>(<i>t</i>). The constant 1 drops out in the integral, so only −<i>y</i> is left, and the arrow points the other way: <i>φ</i><sub>max</sub> moves by 180° and the time value by <i>T</i>/2 at <i>k</i> = 1.</p>
+      <p>In the phase-resolved spectra this band is a lobe of the opposite sign. Compare with the in-phase signal of the same <i>τ</i>: same length of arrow, opposite direction.</p>`,
   },
   {
-    id: 'chain', title: 'Two Steps in Series', shape: 'square', taus: { tau: 0.05, tau2: 0.12 },
+    id: 'chain', title: 'Two Steps in Series', s: { ...base, tau: 0.05, tau2: 0.12 },
     text: `<p>A species fed by another one: the stimulus drives the first step, the first step drives the second. The phase lags of steps in series add, arctan(<i>ωτ</i>₁) + arctan(<i>ωτ</i>₂), so the arrow can turn past 90° and the time value past <i>T</i>/4, which one step alone never does.</p>
-      <p>The amplitudes multiply, so a late signal is also a small one. Watch the amber and purple lobes of the product shift as the period turns into an S-shaped rise.</p>`,
+      <p>The amplitudes multiply, so a late signal is also a small one. Watch the amber and purple areas shift as the period turns into an S-shaped rise.</p>`,
   },
   {
-    id: 'asym', title: 'Fast Up, Slow Down', shape: 'square', taus: { tauOn: 0.02, tauOff: 0.2 },
-    text: `<p>A band that rises fast while the stimulus is on and decays slowly when it is off, as for fast adsorption and slow desorption. One step with two time constants is no longer linear in the stimulus: rise and fall have different shapes.</p>
-      <p>Now <i>k</i> = 2 is not empty. Even harmonics appear, and the harmonic bars show them. Reading <i>k</i> = 3 or 5 as the response to a faster modulation needs a linear response [@handbook, p. 970], so with this input that reading fails. Set both time constants equal and the even bars vanish again.</p>`,
+    id: 'asym', title: 'Fast Up, Slow Down', s: { ...base, tau: 0.02, tauOff: 0.2, k: 2 },
+    text: `<p>A signal that builds up fast while the stimulus is on and decays slowly when it is off, as for fast adsorption and slow desorption. The off half is no longer the mirror image of the on half, so the response is not linear in the stimulus, and <i>k</i> = 2 is not empty: the bars show it.</p>
+      <p>Reading <i>k</i> = 3 or 5 as the response to a faster modulation needs a linear response [@handbook, p. 970], so with this input that reading fails, and the first-order formula gives nothing. Untick "decays at a different rate" and the even bars vanish.</p>`,
   },
   {
-    id: 'sine', title: 'Sine Stimulus, First-Order Delay', shape: 'sine', taus: { tau: 0.08 },
+    id: 'sine', title: 'Sine Stimulus, First-Order Delay', s: { ...base, shape: 'sine', tau: 0.08 },
     text: `<p>The stimulus is ½ + ½ sin(<i>ωt</i>). A linear step turns a sine into a sine of the same frequency, smaller and later, so the period holds only the fundamental: every bar but <i>k</i> = 1 is zero, and one harmonic rebuilds the period exactly.</p>
       <p>Its amplitude is ½ for no delay, against 2/π for the square wave, because the square wave puts more of its swing into the fundamental [@handbook, Eq. 42.1, p. 970].</p>`,
   },
+  {
+    id: 'ramp', title: 'Ramping the Feed', s: { ...base, shape: 'saw', tau: 0.05 },
+    text: `<p>Instead of switching between two feeds, a flow is ramped up slowly over the period and set back at once: a sawtooth. Every harmonic is in it, the even ones too, each smaller by its order, so <i>k</i> = 2 carries signal although the response is linear. The outlined bars are the stimulus; the filled ones the signal.</p>
+      <p>Switch to the triangle (up, then down) and the even harmonics go again, because a symmetric triangle mirrors itself every half period. The first-order formula holds for every shape: it reads the stimulus' own phase first, then adds the lags of the steps.</p>`,
+  },
 ];
 
-const TAU_LABEL = { tau: '<i>τ</i>', tau2: '<i>τ</i>₂', tauOn: '<i>τ</i> rising', tauOff: '<i>τ</i> falling' };
-const TAU_LABEL_CHAIN = { tau: '<i>τ</i>₁' };
-
-/* Formula boxes, as on the cases page */
+/* Formula boxes */
 const frac = (num, den) => `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
 const integral = (lo, hi) => `<span class="int">∫<span class="lims"><span>${hi}</span><span>${lo}</span></span></span>`;
 const sum = (lo, hi) => `<span class="int">Σ<span class="lims"><span>${hi}</span><span>${lo}</span></span></span>`;
@@ -107,26 +137,28 @@ const EQUATIONS = [
   }),
 ];
 
-const VIEWS_TEXT = `<h2>Reading the Five Views</h2>
-  <p><b>1.</b> PSD is a weighted area. Where signal and reference have the same sign the area counts up, where they differ it counts down; <i>A<sub>k</sub></i>(<i>φ</i>) is what is left at <i>t</i> = <i>T</i>. <b>2.</b> Two of those areas, at <i>φ</i> = 0° and 90°, are the whole story: they are the arrow, and every other <i>φ</i> is its shadow on a turning axis. <b>3.</b> Each <i>k</i> is one term of the Fourier series of the period. <b>4.</b> An offset drops out exactly; a drift does not, because a ramp has a sine part. <b>5.</b> All of this, done at every spectral position at once, is the step from the time-resolved to the phase-resolved spectra.</p>`;
+const GENERAL = `<h2>What This Page Shows</h2>
+  <p>Phase-sensitive detection is a weighted area. Panel 1 multiplies the averaged period <i>A</i>(<i>t</i>) by the reference sin(<i>kωt</i> + <i>φ</i>); where the two have the same sign the area counts up (amber), where they differ it counts down (purple). Panel 2 adds that area up over the period; what is left at <i>t</i> = <i>T</i> is <i>A<sub>k</sub></i>(<i>φ</i>) [@handbook, Fig. 42.1, p. 969]. Two of those areas, at <i>φ</i> = 0° and 90°, are the whole story: they are the arrow of the phasor in panel 3, and every other <i>φ</i> is its shadow on a turning axis. Each <i>k</i> is one term of the Fourier series of the period, panel 4.</p>
+  <p>Every setting is on the left and stays there; an input only sets their values, hover it for what it shows. The disturbances show what PSD removes and what it does not: an offset drops out exactly, a drift does not, because a ramp has a sine part.</p>
+  <h2>Using the Plots</h2>
+  <p>Drag the reference in panel 1 by its peak, or the ruler in panel 3, or type <i>φ</i> above panel 1. ▶ integrate runs the cursor through the period in panels 1 and 2 together. Hover a dot or a ring in panel 3 for what happens at that angle; click to keep it. The view switches above panels 3 and 4 show the same result as a phasor, or the whole spectrum as a map.</p>`;
 
 /* ---------------------------------------------------------------------------
    Engine: one period on M samples, T = 1
    --------------------------------------------------------------------------- */
 const M = 240, T = 1, dt = T / M, WARM = 12;
-const NH = 15;                      // harmonics computed for section 3
+const NH = 15;
 const NOISE_MAX = 0.25;
-const ts = Array.from({ length: M + 1 }, (_, j) => j * dt);   // closed: t = 0 … T
+const ts = Array.from({ length: M + 1 }, (_, j) => j * dt);
 
 const $ = id => document.getElementById(id);
-const state = {
-  inputIdx: 1, k: 1, phi: 0, offset: 0, drift: 0, noise: 0, seed: 1, nh: 3, cursor: 1,
-  taus: Object.fromEntries(INPUTS.map(inp => [inp.id, { ...inp.taus }])),
-};
+const clone = o => JSON.parse(JSON.stringify(o));
+const state = { idx: 1, s: null, seed: 1, speed: 80, cursor: 1, preview: null };
 
 const tauFromSlider = v => (v <= 0 ? 0 : 0.003 * Math.pow(200, (v - 1) / 99));
-const sliderFromTau = tau => (tau <= 0 ? 0 : Math.round(1 + 99 * Math.log(tau / 0.003) / Math.log(200)));
+const sliderFromTau = tau => (tau <= 0 ? 0 : clamp(Math.round(1 + 99 * Math.log(tau / 0.003) / Math.log(200)), 1, 100));
 const noiseSigma = v => NOISE_MAX * Math.pow(v / 100, 1.5);
+const SHAPE_NAME = { square: 'on / off', triangle: 'triangle', saw: 'sawtooth', sine: 'sine' };
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -134,167 +166,227 @@ function rng(seed) {
   return () => Math.sqrt(-2 * Math.log(u() || 1e-12)) * Math.cos(2 * Math.PI * u());
 }
 
-/** Stimulus value held over sample interval j of a period, and at the sample time (½ on a jump). */
-const heldAt = (shape, j) => (shape === 'square' ? (j < M / 2 ? 1 : 0) : 0.5 + 0.5 * Math.sin(2 * Math.PI * (j + 0.5) / M));
-const pointAt = (shape, j) => (shape === 'square' ? (j === 0 || j === M / 2 ? 0.5 : j < M / 2 ? 1 : 0) : 0.5 + 0.5 * Math.sin(2 * Math.PI * j / M));
+/** The stimulus at a fraction f of the period, 0 to 1. */
+function uAt(f) {
+  const { shape, duty: d } = state.s;
+  if (shape === 'square') return f < d ? 1 : 0;
+  if (shape === 'triangle') return f < d ? f / d : (1 - f) / (1 - d);
+  if (shape === 'saw') return f;
+  return 0.5 + 0.5 * Math.sin(2 * Math.PI * f);
+}
+/** Its value held over sample interval j: the mean over the interval (exact for the straight pieces). */
+const heldAt = j => (state.s.shape === 'square' ? (j < Math.round(state.s.duty * M) ? 1 : 0) : uAt((j + 0.5) / M));
+/** Its value at sample j; at a jump the mean of the two sides, as the trapezoid rule wants. */
+function pointAt(j) {
+  const { shape } = state.s;
+  if (shape === 'square') { const nOn = Math.round(state.s.duty * M); return j === 0 || j === nOn ? 0.5 : j < nOn ? 1 : 0; }
+  if (shape === 'saw' && j % M === 0) return 0.5;
+  return uAt((j % M) / M);
+}
 
 /**
- * One first-order step run to the periodic steady state. `input(j)` is the
- * value held over interval j; `tauOf(u)` the time constant for that input
- * (two values make the step rise and fall at different rates). Returns the
+ * One first-order step run to the periodic steady state: rising towards its
+ * input with tau, falling with tauOff (the same unless given). Returns the
  * response at the M + 1 sample times of one period.
  */
-function step(input, tauOf) {
+function step(input, tau, tauOff = null) {
+  const off = tauOff ?? tau;
+  const eOn = tau > 0 ? Math.exp(-dt / tau) : 0, eOff = off > 0 ? Math.exp(-dt / off) : 0;
   let y = 0;
   const out = new Float64Array(M + 1);
   for (let c = 0; c <= WARM; c++) {
     for (let j = 0; j < M; j++) {
       if (c === WARM) out[j] = y;
-      const u = input(j), tau = tauOf(u, y);
-      y = tau > 0 ? u + (y - u) * Math.exp(-dt / tau) : u;
+      const u = input(j);
+      y = u + (y - u) * (u >= y ? eOn : eOff);
     }
   }
   out[M] = out[0];
   return out;
 }
 
-/** The response of the chosen input, 0 to 1, at the M + 1 sample times. */
-function response(inp, taus) {
-  const sh = inp.shape;
-  let y;
-  if (inp.id === 'square') y = Float64Array.from(ts, (_, j) => pointAt(sh, j % M));
-  else if (inp.id === 'asym') y = step(j => heldAt(sh, j), (u, yy) => (u > yy ? taus.tauOn : taus.tauOff));
-  else {
-    const tau = taus.tau;
-    y = tau > 0 ? step(j => heldAt(sh, j), () => tau) : Float64Array.from(ts, (_, j) => pointAt(sh, j % M));
-    if (inp.id === 'chain') {
-      const y1 = y;
-      y = taus.tau2 > 0 ? step(j => 0.5 * (y1[j] + y1[j + 1]), () => taus.tau2) : y1;
-    }
-  }
-  return inp.invert ? Float64Array.from(y, v => 1 - v) : y;
+function response() {
+  const st = state.s;
+  const points = Float64Array.from(ts, (_, j) => pointAt(j));
+  const y1 = st.tau > 0 || (st.tauOff ?? 0) > 0 ? step(heldAt, st.tau, st.tauOff) : points;
+  const y = st.tau2 > 0 ? step(j => 0.5 * (y1[j] + y1[j + 1]), st.tau2) : y1;
+  return { stim: points, y: st.invert ? Float64Array.from(y, v => 1 - v) : y };
 }
 
-/** Offset, drift (a ramp centred on the period) and noise on the averaged period. */
-function disturbance(seedShift = 0) {
-  const g = rng(state.seed + seedShift), sig = noiseSigma(state.noise);
-  const d = Float64Array.from(ts, t => state.offset + state.drift * (t / T - 0.5) + sig * g());
-  // t = T: the ramp has reached its end, the noise repeats that of t = 0
-  d[M] = state.offset + state.drift * 0.5 + (d[0] - state.offset + state.drift * 0.5);
+/** Offset, drift (a ramp centred on the period) and noise; at t = T the ramp has reached its end, the noise repeats. */
+function disturbance() {
+  const st = state.s, g = rng(state.seed), sig = noiseSigma(st.noise);
+  const d = Float64Array.from(ts, t => st.offset + st.drift * (t / T - 0.5) + sig * g());
+  d[M] = st.offset + st.drift * 0.5 + (d[0] - st.offset + st.drift * 0.5);
   return d;
 }
+const disturbed = () => state.s.offset !== 0 || state.s.drift !== 0 || state.s.noise !== 0;
 
-/**
- * Trapezoid over the closed period. For a periodic signal this is the plain
- * sum over j = 0 … M−1, the rule the cases page uses.
- */
 const trap = f => { let s = 0; for (let j = 0; j < M; j++) s += 0.5 * (f(j) + f(j + 1)); return s * dt; };
-
-/** Sine and cosine parts at harmonic k, the mean, and what follows from them. */
 function parts(A, k) {
   const w = 2 * Math.PI * k / T;
   const I = 2 / T * trap(j => A[j] * Math.sin(w * ts[j]));
   const Q = 2 / T * trap(j => A[j] * Math.cos(w * ts[j]));
-  const amp = Math.hypot(I, Q), phiMax = ((Math.atan2(Q, I) * 180 / Math.PI) + 360) % 360;
-  return { I, Q, amp, phiMax, tcon: ((360 - phiMax) % 360) / 360 * T / k };
+  const amp = Math.hypot(I, Q);
+  const phiMax = (Math.round((Math.atan2(Q, I) * 180 / Math.PI + 360) * 1e6) / 1e6) % 360;
+  const delta = (360 - phiMax) % 360;
+  return { I, Q, amp, phiMax, delta, tcon: delta / 360 * T / k };
 }
 const at = (p, phi) => p.I * Math.cos(phi * Math.PI / 180) + p.Q * Math.sin(phi * Math.PI / 180);
 
-/** First-order prediction of the fundamental, linear inputs only (null where it does not apply). */
-function theory(inp, taus, k) {
-  if (inp.id === 'asym') return null;
-  if (inp.shape === 'sine' && k !== 1) return { amp: 0 };
-  if (inp.shape === 'square' && k % 2 === 0) return { amp: 0 };
+/**
+ * First-order prediction at harmonic k, for linear steps only: the stimulus'
+ * own harmonic (read numerically, so it holds for every shape), turned by the
+ * lag of each step and scaled by its amplitude ratio; antiphase adds 180°.
+ */
+function theory(ps, k) {
+  const st = state.s;
+  if (st.tauOff != null && st.tauOff !== st.tau) return null;
+  if (ps.amp < 1e-6) return { amp: 0 };
   const w = 2 * Math.PI * k / T;
-  const steps = inp.id === 'square' ? [] : inp.id === 'chain' ? [taus.tau, taus.tau2] : [taus.tau];
-  const a0 = inp.shape === 'square' ? 2 / (Math.PI * k) : 0.5;
-  let delta = 0, amp = a0;
-  for (const tau of steps) { delta += Math.atan(w * tau); amp /= Math.sqrt(1 + (w * tau) ** 2); }
-  if (inp.invert) delta += Math.PI;
-  const period = T / k, tcon = ((delta / (2 * Math.PI)) * period) % period;
-  return { amp, tcon };
+  let lag = 0, amp = ps.amp;
+  for (const tau of [st.tau, st.tau2 ?? 0]) { lag += Math.atan(w * tau); amp /= Math.sqrt(1 + (w * tau) ** 2); }
+  let phiMax = ps.phiMax - lag * 180 / Math.PI + (st.invert ? 180 : 0);
+  phiMax = ((phiMax % 360) + 360) % 360;
+  const delta = (360 - phiMax) % 360;
+  return { amp, phiMax, delta, tcon: delta / 360 * T / k };
 }
 
 let S = null;
 function compute() {
-  const inp = INPUTS[state.inputIdx], taus = state.taus[inp.id];
-  const y = response(inp, taus), d = disturbance();
+  const st = state.s;
+  const { stim, y } = response(), d = disturbance();
   const A = Float64Array.from(y, (v, j) => v + d[j]);
-  const stim = Float64Array.from(ts, (_, j) => heldAt(inp.shape, j % M));
   const harm = Array.from({ length: NH }, (_, i) => parts(A, i + 1));
   const harmClean = Array.from({ length: NH }, (_, i) => parts(y, i + 1));
-  const mean = trap(j => A[j]) / T;
-  S = { inp, taus, y, d, A, stim, harm, harmClean, mean, p: harm[state.k - 1], pc: harmClean[state.k - 1], th: theory(inp, taus, state.k) };
+  const harmStim = Array.from({ length: NH }, (_, i) => parts(stim, i + 1));
+  const k = st.k, ps = harmStim[k - 1];
+  S = {
+    stim, y, d, A, harm, harmClean, harmStim,
+    p: harm[k - 1], pc: harmClean[k - 1], ps, pd: parts(d, k), th: theory(ps, k),
+    mean: trap(j => A[j]) / T,
+  };
 }
 
 /* ---------------------------------------------------------------------------
-   Drawing. Every y limit below is fixed: it never follows an input, τ, k or φ.
+   Drawing
    --------------------------------------------------------------------------- */
-const Y_SIG = [-1.1, 1.9], Y_PROD = [-1.9, 1.9], Y_INT = [-1.0, 1.0], Y_PHASE = [-0.9, 0.9], Y_HARM = [0, 0.75];
+const SC = () => (document.documentElement.dataset.w === 'wide' ? CHART.workbenchScale : 1);
+const Y_SIG = [-1.1, 1.9], Y_INT = [-1.0, 1.0], Y_HARM = [0, 0.75];
 const T_TICKS = [[0, '0'], [0.25, 'T/4'], [0.5, 'T/2'], [0.75, '3T/4'], [1, 'T']];
 const PHI_TICKS = [0, 90, 180, 270, 360].map(v => [v, String(v)]);
-const XLAB_T = 'time in the period / T';
-
+const XLAB_T = 'time in the period / *T*';
 const hexRgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
 const rgba = (hex, a) => `rgba(${hexRgb(hex).join(',')},${a})`;
-const refAt = j => Math.sin(2 * Math.PI * state.k * ts[j] / T + state.phi * Math.PI / 180);
+
+const shownPhi = () => (state.preview ? state.preview.phi : state.s.phi);
+const refAt = j => Math.sin(2 * Math.PI * state.s.k * ts[j] / T + shownPhi() * Math.PI / 180);
 const cursorJ = () => Math.round(state.cursor * M);
+/** End of the rising (on) part of the period. */
+const onTime = () => ({ square: state.s.duty, triangle: state.s.duty, saw: 1, sine: 0.5 }[state.s.shape]) * T;
+/** Phase-domain limits: from the stimulus' own harmonic at k (they follow k, never φ). */
+const phaseLim = () => Math.max(0.15, 1.25 * S.ps.amp + 0.1 * Math.abs(state.s.drift));
 
-function shadeHalves(p) { p.shadeX(0, T / 2, C['shade-on']); p.shadeX(T / 2, T, C['shade-off']); }
+function shade(p) { const t = onTime(); p.shadeX(0, t, C['shade-on']); if (t < T) p.shadeX(t, T, C['shade-off']); }
 
-function drawRef() {
-  const p = plot($('cRef'), { x: [0, T], y: Y_SIG, xlabel: XLAB_T, ylabel: 'signal / –', xticks: T_TICKS, yticks: ticks(Y_SIG[0], Y_SIG[1], 4) });
-  shadeHalves(p); p.hline(0);
-  p.steps(ts, Array.from(S.stim), C['data-stimulus']);
-  p.line(ts, ts.map((_, j) => refAt(j)), C['data-highlight'], CHART.lineData, CHART.dash);
-  p.line(ts, Array.from(S.A), C['data-a']);
-  if (state.cursor < 1) p.vline(state.cursor * T, C['ink-700'], 1, []);
-  p.axes();
-}
-
-function drawProd() {
-  const prod = ts.map((_, j) => S.A[j] * refAt(j)), jc = cursorJ();
-  const p = plot($('cProd'), { x: [0, T], y: Y_PROD, xlabel: XLAB_T, ylabel: 'A · reference / –', xticks: T_TICKS, yticks: ticks(Y_PROD[0], Y_PROD[1], 4) });
-  const { ctx, X, Y } = p, pos = rgba(C['map-pos'], 0.45), neg = rgba(C['map-neg'], 0.35);
+/* panel 1: the period, the reference and their product */
+let P1 = null;
+function drawSig() {
+  const st = state.s, jc = cursorJ(), sc = SC();
+  const p = plot($('cSig'), { scale: sc, x: [0, T], y: Y_SIG, xlabel: XLAB_T, ylabel: 'signal / –', xticks: T_TICKS, yticks: ticks(Y_SIG[0], Y_SIG[1], 4) });
+  shade(p);
+  // the product as area, up to the cursor
+  const prod = ts.map((_, j) => S.A[j] * refAt(j));
+  const { ctx, X, Y } = p, pos = rgba(C['map-pos'], 0.4), neg = rgba(C['map-neg'], 0.3);
   for (let j = 0; j < jc; j++) {
     const a = prod[j], b = prod[j + 1];
     ctx.fillStyle = a + b >= 0 ? pos : neg;
     ctx.beginPath(); ctx.moveTo(X(ts[j]), Y(0)); ctx.lineTo(X(ts[j]), Y(a)); ctx.lineTo(X(ts[j + 1]), Y(b)); ctx.lineTo(X(ts[j + 1]), Y(0)); ctx.closePath(); ctx.fill();
   }
   p.hline(0);
-  p.line(ts, prod, C['data-faint'], CHART.lineFaint);
-  p.line(ts.slice(0, jc + 1), prod.slice(0, jc + 1), C['ink-700'], CHART.lineThin);
+  if (st.shape === 'square') p.steps(ts, ts.map((_, j) => heldAt(j % M)), C['data-stimulus']);
+  else p.line(ts, Array.from(S.stim), C['data-stimulus'], CHART.lineThin, CHART.dash);
+  if (st.clean && disturbed()) p.line(ts, Array.from(S.y), C['data-faint'], CHART.lineData);
+  if (st.rebuild) {
+    const w = 2 * Math.PI / T;
+    const rb = ts.map(t => { let v = S.mean; for (let i = 0; i < st.nh; i++) v += S.harm[i].I * Math.sin((i + 1) * w * t) + S.harm[i].Q * Math.cos((i + 1) * w * t); return v; });
+    p.line(ts, rb, C['ink-700'], CHART.lineData, [6, 3]);
+  }
+  p.line(ts, Array.from(S.A), C['data-a']);
+  p.line(ts, ts.map((_, j) => refAt(j)), C['data-highlight'], CHART.lineData, CHART.dash);
+  // the reference's peaks: grab one to move the reference, which sets φ
+  const t0 = (((90 - st.phi) / 360) % 1 + 1) % 1 * T / st.k, xs = [];
+  for (let m = 0; m < st.k; m++) {
+    const t = t0 + m * T / st.k; xs.push(X(t));
+    p.dot(t, 1, C['data-highlight']);
+  }
+  grip(p, xs[0], C['data-highlight']);
   if (state.cursor < 1) p.vline(state.cursor * T, C['ink-700'], 1, []);
   p.axes();
+  P1 = { p, xs };
+  $('subSig').innerHTML = `<i>A</i>(<i>t</i>) times the reference (green, drag a peak): amber counts up, purple down.${st.rebuild ? ` Dashed: rebuilt from ${st.nh}.` : ''}`;
 }
 
+/* panel 2: the running integral */
 function drawInt() {
   const run = [0];
   for (let j = 1; j <= M; j++) run.push(run[j - 1] + 2 / T * 0.5 * (S.A[j - 1] * refAt(j - 1) + S.A[j] * refAt(j)) * dt);
-  const jc = cursorJ(), end = run[M];
-  const p = plot($('cInt'), { x: [0, T], y: Y_INT, xlabel: XLAB_T, ylabel: '(2/T) ∫ A · reference dt / –', xticks: T_TICKS, yticks: ticks(Y_INT[0], Y_INT[1], 4) });
+  const jc = cursorJ(), end = run[M], k = state.s.k;
+  const p = plot($('cInt'), { scale: SC(), x: [0, T], y: Y_INT, xlabel: XLAB_T, ylabel: 'running integral / –', xticks: T_TICKS, yticks: ticks(Y_INT[0], Y_INT[1], 4) });
   p.hline(0);
   p.line(ts.slice(0, jc + 1), run.slice(0, jc + 1), C['data-a']);
   if (state.cursor >= 1) {
     p.hline(end, C['data-highlight'], 1);
     p.dot(T, end, C['data-highlight']);
-    p.text(`A${sub(state.k)}(φ) = ${end.toFixed(3)}`, T * 0.97, end + (end > 0.6 ? -0.14 : 0.1), C['data-highlight'], 'right');
+    p.text(`*A*_${k}_(*φ*) = ${end.toFixed(3)}`, T * 0.97, end + (end > 0.6 ? -0.16 : 0.1), C['data-highlight'], 'right');
   } else p.dot(ts[jc], run[jc], C['data-a']);
   p.axes();
-  $('subInt').innerHTML = `(2/<i>T</i>)∫<sub>0</sub><sup><i>t</i></sup> of the product. At <i>t</i> = <i>T</i> it is <i>A<sub>${state.k}</sub></i>(${state.phi}°) = ${at(S.p, state.phi).toFixed(3)}, the number PSD returns.`;
+  $('subInt').innerHTML = `(2/<i>T</i>)∫<sub>0</sub><sup><i>t</i></sup> of the product. At <i>T</i>: <i>A<sub>${k}</sub></i>(${Math.round(shownPhi())}°) = ${at(S.p, shownPhi()).toFixed(3)}, what PSD returns.`;
 }
 
-const SUBS = '₀₁₂₃₄₅₆₇₈₉';
-const sub = n => String(n).split('').map(c => SUBS[+c]).join('');
+/* panel 3: the phase domain, as a cosine or as a phasor */
+let P3 = null;
+function drawPhase() {
+  const st = state.s, lim = phaseLim(), sc = SC();
+  if (st.view3 === 'phasor') { drawPhasor(lim); return; }
+  const ph = Array.from({ length: 73 }, (_, i) => i * 5), yr = [-lim, lim];
+  const p = plot($('cPhase'), { scale: sc, x: [0, 360], y: yr, xlabel: 'phase angle *φ* / °', ylabel: `*A*_${st.k}_(*φ*) / –`, xticks: PHI_TICKS, yticks: ticks(yr[0], yr[1], 4) });
+  p.hline(0);
+  if (state.preview) p.vline(state.preview.phi, C['data-highlight'], 1, [1, 3]);
+  p.vline(st.phi, C['data-highlight'], 1.5, [4, 3]);
+  if (st.clean && disturbed()) {
+    p.line(ph, ph.map(f => at(S.pd, f)), C['data-static'], CHART.lineThin);
+    p.line(ph, ph.map(f => at(S.pc, f)), C['data-faint'], CHART.lineData);
+  }
+  p.line(ph, ph.map(f => at(S.p, f)), C['data-a']);
+  const pois = [];
+  if (S.p.amp > 0.01 * lim) {
+    pois.push({ kind: 'max', phi: S.p.phiMax, y: S.p.amp });
+    for (const z of [90, 270]) pois.push({ kind: 'zero', phi: (S.p.phiMax + z) % 360, y: 0 });
+  }
+  const { ctx, X, Y } = p;
+  for (const q of pois) {
+    if (q.kind === 'max') p.dot(q.phi, q.y, C['data-a']);
+    else {
+      ctx.strokeStyle = C['data-a']; ctx.lineWidth = 1.8; ctx.fillStyle = C.surface;
+      ctx.beginPath(); ctx.arc(X(q.phi), Y(0), CHART.marker, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+    }
+    q.px = X(q.phi); q.py = Y(q.y);
+  }
+  markMaxima(p, pois.filter(q => q.kind === 'max').map(q => ({ phi: q.phi, y: q.y, delta: S.p.delta, color: C['data-a'] })), yr);
+  grip(p, X(st.phi), C['data-highlight']);
+  p.axes();
+  P3 = { p, pois, rx: X(st.phi) };
+  $('subPhase').innerHTML = `<i>A<sub>k</sub></i>(<i>φ</i>) = |<i>A<sub>k</sub></i>| cos(<i>φ</i> − <i>φ</i><sub>max</sub>). Hover the dot or a ring, drag the ruler.${st.clean && disturbed() ? ' Grey: clean; thin: the part that leaks.' : ''}`;
+}
 
 /** Plot ranges with one unit the same length on both axes. */
-function squareRange(canvas, r) {
-  const m = CHART.margin, w = canvas.clientWidth - m.l - m.r, h = canvas.clientHeight - m.t - m.b;
+function squareRange(canvas, r, sc) {
+  const m = CHART.margin, w = canvas.clientWidth - m.l * sc - m.r, h = canvas.clientHeight - m.t - m.b * sc;
   return w > h ? { x: [-r * w / h, r * w / h], y: [-r, r] } : { x: [-r, r], y: [-r * h / w, r * h / w] };
 }
-
-function arrow(p, x0, y0, x1, y1, color, w = CHART.lineData) {
-  const { ctx, X, Y } = p, ax = X(x1), ay = Y(y1), bx = X(x0), by = Y(y0);
+function arrow(p, x1, y1, color, w = CHART.lineData) {
+  const { ctx, X, Y } = p, ax = X(x1), ay = Y(y1), bx = X(0), by = Y(0);
   const ang = Math.atan2(ay - by, ax - bx), L = Math.min(11, Math.hypot(ax - bx, ay - by) * 0.4);
   ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w; ctx.setLineDash([]);
   ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(ax - Math.cos(ang) * L * 0.6, ay - Math.sin(ang) * L * 0.6); ctx.stroke();
@@ -302,101 +394,37 @@ function arrow(p, x0, y0, x1, y1, color, w = CHART.lineData) {
   ctx.lineTo(ax - L * Math.cos(ang - 0.4), ay - L * Math.sin(ang - 0.4));
   ctx.lineTo(ax - L * Math.cos(ang + 0.4), ay - L * Math.sin(ang + 0.4)); ctx.closePath(); ctx.fill();
 }
-
-function drawPhasor() {
-  const c = $('cPhasor'), rg = squareRange(c, 0.85), { I, Q, amp } = S.p;
-  const p = plot(c, { ...rg, xlabel: 'sine part I / –', ylabel: 'cosine part Q / –', xticks: ticks(rg.x[0], rg.x[1], 4), yticks: ticks(rg.y[0], rg.y[1], 4) });
+function drawPhasor(lim) {
+  const st = state.s, sc = SC(), c = $('cPhase'), rg = squareRange(c, lim, sc), { I, Q, amp } = S.p;
+  const p = plot(c, { scale: sc, ...rg, xlabel: 'sine part *I* / –', ylabel: 'cosine part *Q* / –', xticks: ticks(rg.x[0], rg.x[1], 4), yticks: ticks(rg.y[0], rg.y[1], 4) });
   const { ctx, X, Y } = p;
-  p.hline(0); p.ctx.strokeStyle = C['line-zero']; ctx.beginPath(); ctx.moveTo(X(0), Y(rg.y[0])); ctx.lineTo(X(0), Y(rg.y[1])); ctx.stroke();
-  // circle of radius |A_k|: where the arrow can point
-  ctx.strokeStyle = C['data-faint']; ctx.lineWidth = 1; ctx.setLineDash([]);
-  ctx.beginPath(); ctx.ellipse(X(0), Y(0), Math.abs(X(amp) - X(0)), Math.abs(Y(amp) - Y(0)), 0, 0, 2 * Math.PI); ctx.stroke();
-  // the reference axis at φ, through the origin
-  const r = state.phi * Math.PI / 180, ux = Math.cos(r), uy = Math.sin(r), far = 3;
+  p.hline(0);
+  ctx.strokeStyle = C['line-zero']; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(0), Y(rg.y[0])); ctx.lineTo(X(0), Y(rg.y[1])); ctx.stroke();
+  ctx.strokeStyle = C['data-faint']; ctx.beginPath(); ctx.ellipse(X(0), Y(0), Math.abs(X(amp) - X(0)), Math.abs(Y(amp) - Y(0)), 0, 0, 2 * Math.PI); ctx.stroke();
+  const r = shownPhi() * Math.PI / 180, ux = Math.cos(r), uy = Math.sin(r), far = 3 * lim;
   p.line([-far * ux, far * ux], [-far * uy, far * uy], C['data-highlight'], 1, CHART.dash);
-  // projection of the arrow on that axis: A_k(φ)
   const v = I * ux + Q * uy;
   p.line([I, v * ux], [Q, v * uy], C['ink-500'], 1, [2, 3]);
   p.line([0, v * ux], [0, v * uy], C['data-highlight'], CHART.lineHighlight);
   p.dot(v * ux, v * uy, C['data-highlight']);
-  // I and Q as the two components
+  if (st.clean && disturbed() && S.pc.amp > 1e-4) arrow(p, S.pc.I, S.pc.Q, C['data-faint']);
   p.line([0, I], [0, 0], C['data-a'], 1, [2, 3]); p.line([I, I], [0, Q], C['data-a'], 1, [2, 3]);
-  if (amp > 1e-4) arrow(p, 0, 0, I, Q, C['data-a']);
+  if (amp > 1e-4) arrow(p, I, Q, C['data-a']);
   const lr = 0.8 * Math.min(rg.x[1], rg.y[1]);
-  p.text('φ axis', lr * ux, lr * uy, C['data-highlight']);
+  p.text('*φ* axis', lr * ux, lr * uy, C['data-highlight']);
   p.axes();
-  $('subPhasor').innerHTML = `Arrow: (<i>I</i>, <i>Q</i>) = (${I.toFixed(3)}, ${Q.toFixed(3)}), length |<i>A<sub>${state.k}</sub></i>| = ${amp.toFixed(3)}, angle <i>φ</i><sub>max</sub> = ${amp > 1e-3 ? S.p.phiMax.toFixed(0) + '°' : '–'}. Green: its shadow on the axis at <i>φ</i>, which is <i>A<sub>${state.k}</sub></i>(<i>φ</i>).`;
+  P3 = null;
+  $('subPhase').innerHTML = `The arrow (<i>I</i>, <i>Q</i>) = (${I.toFixed(3)}, ${Q.toFixed(3)}), length |<i>A<sub>${st.k}</sub></i>| = ${amp.toFixed(3)}. Green: its shadow on the axis at <i>φ</i>, which is <i>A<sub>${st.k}</sub></i>(<i>φ</i>).`;
 }
 
-function drawPhase() {
-  const ph = Array.from({ length: 73 }, (_, i) => i * 5);
-  const p = plot($('cPhase'), { x: [0, 360], y: Y_PHASE, xlabel: 'phase angle φ / °', ylabel: 'phase-resolved absorbance / –', xticks: PHI_TICKS, yticks: ticks(Y_PHASE[0], Y_PHASE[1], 4) });
-  p.hline(0);
-  p.vline(state.phi, C['data-highlight'], 1.5, [4, 3]);
-  p.line(ph, ph.map(f => at(S.p, f)), C['data-a']);
-  if (S.p.amp > 1e-3) p.dot(S.p.phiMax, S.p.amp, C['data-a']);
-  p.dot(state.phi, at(S.p, state.phi), C['data-highlight']);
-  p.axes();
-}
-
-function drawHarm() {
-  const p = plot($('cHarm'), { x: [0.3, NH + 0.7], y: Y_HARM, xlabel: 'harmonic k / –', ylabel: '|A_k| / –', xticks: Array.from({ length: NH }, (_, i) => [i + 1, String(i + 1)]), yticks: ticks(Y_HARM[0], Y_HARM[1], 3) });
-  const { ctx, X, Y } = p, bw = (X(1) - X(0)) * 0.6;
-  S.harm.forEach((h, i) => {
-    const kk = i + 1, a = Math.min(h.amp, Y_HARM[1]);
-    ctx.fillStyle = kk === state.k ? C['data-highlight'] : kk <= state.nh ? C['data-a'] : C['data-faint'];
-    ctx.fillRect(X(kk) - bw / 2, Y(a), bw, Y(0) - Y(a));
-  });
-  p.axes();
-  const even = S.harm.filter((_, i) => (i + 1) % 2 === 0).reduce((m, h) => Math.max(m, h.amp), 0);
-  $('subHarm').innerHTML = `|<i>A<sub>k</sub></i>| for <i>k</i> = 1 to ${NH}. Green: the <i>k</i> demodulated above; orange: the ones used to rebuild the period. Largest even harmonic: ${even.toFixed(3)}.`;
-}
-
-function drawRebuild() {
-  const w = 2 * Math.PI / T;
-  const rb = ts.map(t => { let v = S.mean; for (let i = 0; i < state.nh; i++) v += S.harm[i].I * Math.sin((i + 1) * w * t) + S.harm[i].Q * Math.cos((i + 1) * w * t); return v; });
-  const p = plot($('cRebuild'), { x: [0, T], y: Y_SIG, xlabel: XLAB_T, ylabel: 'signal / –', xticks: T_TICKS, yticks: ticks(Y_SIG[0], Y_SIG[1], 4) });
-  shadeHalves(p); p.hline(0);
-  p.hline(S.mean, C['data-static'], 1);
-  p.line(ts, Array.from(S.A), C['data-a']);
-  p.line(ts, rb, C['data-highlight'], CHART.lineHighlight);
-  p.text(`mean a₀ = ${S.mean.toFixed(2)}`, 0.03, S.mean + 0.12, C['data-static'], 'left');
-  p.axes();
-  $('vNh').textContent = state.nh;
-}
-
-function drawDist() {
-  const p = plot($('cDist'), { x: [0, T], y: Y_SIG, xlabel: XLAB_T, ylabel: 'signal / –', xticks: T_TICKS, yticks: ticks(Y_SIG[0], Y_SIG[1], 4) });
-  shadeHalves(p); p.hline(0);
-  p.line(ts, Array.from(S.y), C['data-faint'], CHART.lineData);
-  p.line(ts, Array.from(S.A), C['data-a']);
-  p.axes();
-}
-
-function drawLeak() {
-  const ph = Array.from({ length: 73 }, (_, i) => i * 5);
-  const pd = parts(S.d, state.k);
-  const p = plot($('cLeak'), { x: [0, 360], y: Y_PHASE, xlabel: 'phase angle φ / °', ylabel: 'phase-resolved absorbance / –', xticks: PHI_TICKS, yticks: ticks(Y_PHASE[0], Y_PHASE[1], 4) });
-  p.hline(0);
-  p.line(ph, ph.map(f => at(pd, f)), C['data-static'], CHART.lineThin);
-  p.line(ph, ph.map(f => at(S.pc, f)), C['data-faint'], CHART.lineData);
-  p.line(ph, ph.map(f => at(S.p, f)), C['data-a']);
-  p.axes();
-  const dT = S.pc.amp > 1e-3 && S.p.amp > 1e-3 ? ((S.p.tcon - S.pc.tcon + 1.5 * T / state.k) % (T / state.k)) - 0.5 * T / state.k : null;
-  $('subLeak').innerHTML = `Grey thick: clean. Orange: disturbed. Grey thin: the disturbance alone, the part that leaks. Amplitude ${S.pc.amp.toFixed(3)} → ${S.p.amp.toFixed(3)}${dT == null ? '' : `, time value shifted by ${dT >= 0 ? '+' : '−'}${Math.abs(dT).toFixed(3)} T`}.`;
-}
-
-/* section 5: a static band A at 20 and the input as band B at 40 */
+/* panel 4: the harmonic content, or the whole spectrum as a map */
 const XS = Array.from({ length: 121 }, (_, i) => i * 0.5);
 const gauss = (x, c, w) => Math.exp(-4 * Math.LN2 * ((x - c) / w) ** 2);
 const GA = XS.map(x => gauss(x, 20, 10)), GB = XS.map(x => gauss(x, 40, 10));
-const MAP_T = 1.9, MAP_P = 0.75;
-
 function colourOf(v, max) {
-  const t = Math.max(-1, Math.min(1, v / max)), [r, g, b] = hexRgb(t >= 0 ? C['map-pos'] : C['map-neg']), [sr, sg, sb] = hexRgb(C.surface), a = Math.abs(t);
+  const t = clamp(v / max, -1, 1), [r, g, b] = hexRgb(t >= 0 ? C['map-pos'] : C['map-neg']), [sr, sg, sb] = hexRgb(C.surface), a = Math.abs(t);
   return [sr + (r - sr) * a, sg + (g - sg) * a, sb + (b - sb) * a];
 }
-
 function heatmap(canvas, opts, rows, cols, valueAt, max, after) {
   const p = plot(canvas, opts);
   const off = document.createElement('canvas'); off.width = cols; off.height = rows;
@@ -406,140 +434,314 @@ function heatmap(canvas, opts, rows, cols, valueAt, max, after) {
     img.data[o] = R; img.data[o + 1] = G; img.data[o + 2] = B; img.data[o + 3] = 255;
   }
   octx.putImageData(img, 0, 0);
-  const { inner, ctx } = p;
-  ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(off, inner.l, inner.t, inner.r - inner.l, inner.b - inner.t);
+  p.ctx.imageSmoothingEnabled = true;
+  p.ctx.drawImage(off, p.inner.l, p.inner.t, p.inner.r - p.inner.l, p.inner.b - p.inner.t);
   after?.(p);
   p.axes();
 }
-
-function drawMaps() {
-  const g = rng(state.seed + 7), sig = noiseSigma(state.noise);
-  const noise = Array.from({ length: M + 1 }, () => XS.map(() => sig * g()));
-  const base = j => state.offset + state.drift * (ts[j] / T - 0.5);
-  const val = (j, x) => GA[x] + S.y[j] * GB[x] + base(j) + noise[j][x];
-  const xt = [0, 10, 20, 30, 40, 50, 60].map(v => [v, String(v)]);
-  heatmap($('cMapT'), { x: [0, 60], y: [0, T], xlabel: 'spectral position / –', ylabel: 'time in the period / T', xticks: xt, yticks: T_TICKS }, M + 1, XS.length, val, MAP_T,
-    p => { if (state.cursor < 1) p.hline(state.cursor * T, C['ink-700'], 1); });
-  // PSD at every spectral position, for φ = 0 … 360
-  const w = 2 * Math.PI * state.k / T;
-  const IQ = XS.map((_, x) => {
-    const I = 2 / T * trap(j => val(j, x) * Math.sin(w * ts[j])), Q = 2 / T * trap(j => val(j, x) * Math.cos(w * ts[j]));
-    return { I, Q };
+function drawHarm() {
+  const st = state.s, sc = SC();
+  if (st.view4 !== 'bars') { drawMap(); return; }
+  const p = plot($('cHarm'), { scale: sc, x: [0.3, NH + 0.7], y: Y_HARM, xlabel: 'harmonic *h* / –', ylabel: '|*A*_*h*_| / –', xticks: Array.from({ length: NH }, (_, i) => [i + 1, String(i + 1)]), yticks: ticks(Y_HARM[0], Y_HARM[1], 3) });
+  const { ctx, X, Y } = p, bw = (X(1) - X(0)) * 0.56;
+  S.harm.forEach((h, i) => {
+    const kk = i + 1, a = Math.min(h.amp, Y_HARM[1]);
+    ctx.fillStyle = kk === st.k ? C['data-highlight'] : st.rebuild && kk <= st.nh ? C['data-a'] : C['data-faint'];
+    ctx.fillRect(X(kk) - bw / 2, Y(a), bw, Y(0) - Y(a));
+    // the stimulus' own harmonic, as an outline
+    const s_ = Math.min(S.harmStim[i].amp, Y_HARM[1]);
+    ctx.strokeStyle = C['data-stimulus']; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
+    ctx.strokeRect(X(kk) - bw / 2 - 2.5, Y(s_), bw + 5, Y(0) - Y(s_)); ctx.setLineDash([]);
   });
-  heatmap($('cMapP'), { x: [0, 60], y: [0, 360], xlabel: 'spectral position / –', ylabel: 'phase angle φ / °', xticks: xt, yticks: PHI_TICKS }, 73, XS.length, (r, x) => at(IQ[x], r * 5), MAP_P,
-    p => p.hline(state.phi, C['data-highlight'], 2));
+  p.axes();
+  const even = S.harm.filter((_, i) => (i + 1) % 2 === 0).reduce((m, h) => Math.max(m, h.amp), 0);
+  $('subHarm').innerHTML = `Bars: the signal, outline: the stimulus, green: <i>k</i>${st.rebuild ? ', orange: rebuilt from' : ''}. Largest even: ${even.toFixed(3)}.`;
+}
+function drawMap() {
+  const st = state.s, sc = SC(), g = rng(state.seed + 7), sig = noiseSigma(st.noise);
+  const noise = Array.from({ length: M + 1 }, () => XS.map(() => sig * g()));
+  const val = (j, x) => GA[x] + S.A[j] * GB[x] + noise[j][x];   // a static band at 20, the signal as a band at 40
+  const xt = [0, 10, 20, 30, 40, 50, 60].map(v => [v, String(v)]);
+  if (st.view4 === 'mapT') {
+    heatmap($('cHarm'), { scale: sc, x: [0, 60], y: [0, T], xlabel: 'spectral position / –', ylabel: 'time in the period / *T*', xticks: xt, yticks: T_TICKS }, M + 1, XS.length, val, 1.9,
+      p => { if (state.cursor < 1) p.hline(state.cursor * T, C['ink-700'], 1); });
+    $('subHarm').innerHTML = 'The spectra through the period: a static band at 20, the signal at 40.';
+    return;
+  }
+  const w = 2 * Math.PI * st.k / T;
+  const IQ = XS.map((_, x) => ({ I: 2 / T * trap(j => val(j, x) * Math.sin(w * ts[j])), Q: 2 / T * trap(j => val(j, x) * Math.cos(w * ts[j])) }));
+  heatmap($('cHarm'), { scale: sc, x: [0, 60], y: [0, 360], xlabel: 'spectral position / –', ylabel: 'phase angle *φ* / °', xticks: xt, yticks: PHI_TICKS }, 73, XS.length, (r, x) => at(IQ[x], r * 5), phaseLim(),
+    p => p.hline(shownPhi(), C['data-highlight'], 2));
+  $('subHarm').innerHTML = `PSD at every position: the static band is gone, the signal a cosine in <i>φ</i>.`;
 }
 
+/* the values: signal, clean, stimulus, formula */
 function drawTable() {
-  const k = state.k, th = S.th, pc = S.pc, p = S.p;
-  const fmt = (v, d = 3) => (v == null ? '–' : v.toFixed(d));
-  const flat = q => q.amp < 1e-3;
-  const row = (label, q, color) => `<tr><td${color ? ` style="color:${color}"` : ''}>${label}</td><td>${fmt(q.I)}</td><td>${fmt(q.Q)}</td><td>${fmt(q.amp)}</td><td>${flat(q) ? '–' : q.phiMax.toFixed(0) + '°'}</td><td>${flat(q) || q.tcon == null ? '–' : fmt(q.tcon) + ' T'}</td></tr>`;
-  $('readout').innerHTML = `<tr><th>at <i>k</i> = ${k}</th><th><i>I<sub>k</sub></i></th><th><i>Q<sub>k</sub></i></th><th>|<i>A<sub>k</sub></i>|</th><th><i>φ</i><sub>max</sub></th><th><i>t</i><sub>con</sub></th></tr>`
-    + row('response alone', pc, C['ink-500'])
-    + row('with offset, drift, noise', p, C['data-a'])
-    + (th ? `<tr><td>first-order formula</td><td>–</td><td>–</td><td>${fmt(th.amp)}</td><td>–</td><td>${th.amp < 1e-3 || th.tcon == null ? '–' : fmt(th.tcon) + ' T'}</td></tr>` : '');
+  const st = state.s, k = st.k, dis = disturbed();
+  const fmt = (v, d = 3) => (v == null || !Number.isFinite(v) ? '–' : v.toFixed(d));
+  const flat = q => !q || q.amp == null || q.amp < 5e-3;
+  const deg = v => `${Math.round(v) % 360}°`;
+  const cols = [['signal', S.p, C['data-a']], ...(dis ? [['clean', S.pc, C['ink-500']]] : []), ['stimulus', S.ps, C['data-stimulus']], ['1st order', S.th, C['ink-500']]];
+  const row = (label, f) => `<tr><td>${label}</td>${cols.map(([, q]) => `<td>${f(q)}</td>`).join('')}</tr>`;
+  $('vK').textContent = k;
+  $('readout').innerHTML = `<tr><th></th>${cols.map(([n, , c]) => `<th style="color:${c}">${n}</th>`).join('')}</tr>`
+    + row('<i>I<sub>k</sub></i>', q => (q && q.I != null ? fmt(q.I) : '–'))
+    + row('<i>Q<sub>k</sub></i>', q => (q && q.Q != null ? fmt(q.Q) : '–'))
+    + row(`|<i>A</i><sub>${k}</sub>|`, q => (q ? fmt(q.amp) : '–'))
+    + row('<i>φ</i><sub>max</sub>', q => (flat(q) || q.phiMax == null ? '–' : deg(q.phiMax)))
+    + row('<i>δ</i>', q => (flat(q) || q.delta == null ? '–' : deg(q.delta)))
+    + row('<i>t</i><sub>con</sub> / <i>T</i>', q => (flat(q) || q.tcon == null ? '–' : fmt(q.tcon)))
+    + `<tr><td>mean <i>a</i>₀</td><td>${fmt(S.mean)}</td>${dis ? `<td>${fmt(trap(j => S.y[j]) / T)}</td>` : ''}<td>${fmt(trap(j => S.stim[j]) / T)}</td><td>–</td></tr>`;
 }
 
 function draw() {
   if (!S) return;
-  $('vPhi').textContent = `${state.phi}°`;
-  drawRef(); drawProd(); drawInt(); drawPhasor(); drawPhase(); drawHarm(); drawRebuild(); drawDist(); drawLeak(); drawMaps(); drawTable();
+  drawSig(); drawInt(); drawPhase(); drawHarm(); drawTable(); controls.refresh();
 }
-function update() { compute(); draw(); }
+function update() { compute(); draw(); markChanged(); }
 
 /* ---------------------------------------------------------------------------
-   Controls
+   Inputs as cases: changed or not, ignoring what is only for looking
    --------------------------------------------------------------------------- */
-function setSeg(id, v) { $(id).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v)))); }
-const fmtTau = v => `${v.toFixed(3)} T`;
+const snap = s => JSON.stringify(Object.fromEntries(Object.entries(s).filter(([k]) => !DISPLAY_ONLY.includes(k))));
+const caseS = () => INPUTS[state.idx].s;
+function markChanged() { selector.changed(snap(state.s) !== snap(caseS())); renderRail(); }
 
-function tauControls() {
-  const inp = INPUTS[state.inputIdx], taus = state.taus[inp.id];
-  const labels = inp.id === 'chain' ? { ...TAU_LABEL, ...TAU_LABEL_CHAIN } : TAU_LABEL;
-  $('tauSlot').innerHTML = Object.keys(taus).map(key => `<label class="ctl"><span>${labels[key]}: <b data-v="${key}">${fmtTau(taus[key])}</b></span>
-      <input type="range" min="0" max="100" data-tau="${key}" value="${sliderFromTau(taus[key])}"></label>`).join('');
-  $('tauSlot').hidden = !Object.keys(taus).length;
+/* ---------------------------------------------------------------------------
+   Value controls
+   --------------------------------------------------------------------------- */
+const lagOf = tau => Math.atan(2 * Math.PI * tau / T) * 180 / Math.PI;
+const tauOfLag = d => Math.tan(clamp(d, 0, 89.5) * Math.PI / 180) * T / (2 * Math.PI);
+const tauBind = (key, label, off, caseVal, def) => ({
+  label, unit: 'T', min: 0, max: 100, step: 1, redraw: 'update',
+  get: () => state.s[key] ?? state.s.tau, set: v => { state.s[key] = clamp(v, 0, 2); },
+  toR: sliderFromTau, fromR: tauFromSlider, fmt: v => v.toFixed(3), caseV: caseVal, def, off,
+});
+function bindOf(key) {
+  const st = state.s;
+  switch (key) {
+    case 'duty': return {
+      label: st.shape === 'triangle' ? 'rising fraction of the period' : 'on fraction of the period', unit: '', min: 0.05, max: 0.95, step: 0.05, redraw: 'update',
+      get: () => st.duty, set: v => { st.duty = Math.round(clamp(v, 0.05, 0.95) * 20) / 20; },
+      toR: v => v, fromR: r => +r, fmt: v => v.toFixed(2), caseV: () => caseS().duty, def: 0.5,
+      off: () => st.shape === 'saw' || st.shape === 'sine',
+    };
+    case 'tau': return tauBind('tau', st.tauOff != null ? '<i>τ</i>, building up' : '<i>τ</i>', () => false, () => caseS().tau, 0.08);
+    case 'tauOff': return tauBind('tauOff', '<i>τ</i>, decaying', () => st.tauOff == null, () => caseS().tauOff ?? caseS().tau, st.tau);
+    case 'tau2': return tauBind('tau2', '<i>τ</i>₂, second step', () => st.tau2 == null, () => caseS().tau2 ?? 0.1, 0.1);
+    case 'lag': return {
+      label: 'or its lag <i>δ</i> at <i>k</i> = 1', unit: '°', min: 0, max: 89, step: 1, redraw: 'update',
+      get: () => lagOf(st.tau), set: v => { st.tau = tauOfLag(v); }, toR: v => Math.round(v), fromR: r => +r, fmt: v => v.toFixed(1),
+      caseV: () => lagOf(caseS().tau), def: lagOf(0.08),
+    };
+    case 'offset': return {
+      label: 'offset', unit: '', min: 0, max: 0.5, step: 0.01, redraw: 'update',
+      get: () => st.offset, set: v => { st.offset = clamp(v, 0, 0.5); }, toR: v => v, fromR: r => +r, fmt: v => v.toFixed(2), caseV: () => caseS().offset, def: 0,
+    };
+    case 'drift': return {
+      label: 'drift per period', unit: '', min: -0.4, max: 0.4, step: 0.01, redraw: 'update',
+      get: () => st.drift, set: v => { st.drift = clamp(v, -0.4, 0.4); }, toR: v => v, fromR: r => +r, fmt: v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2), caseV: () => caseS().drift, def: 0,
+    };
+    case 'noise': return {
+      label: 'noise <i>σ</i>', unit: '', min: 0, max: 100, step: 1, redraw: 'update',
+      get: () => noiseSigma(st.noise), set: v => { st.noise = 100 * Math.pow(clamp(v, 0, NOISE_MAX) / NOISE_MAX, 2 / 3); },
+      toR: v => 100 * Math.pow(v / NOISE_MAX, 2 / 3), fromR: r => noiseSigma(r), fmt: v => v.toFixed(3), caseV: () => noiseSigma(caseS().noise), def: 0,
+    };
+    case 'phi': return {
+      label: 'phase angle <i>φ</i>', unit: '°', min: 0, max: 359, step: 1, redraw: 'draw',
+      get: () => st.phi, set: v => { st.phi = ((Math.round(v) % 360) + 360) % 360; }, toR: v => v, fromR: r => +r, fmt: v => String(v), caseV: () => caseS().phi, def: 0,
+    };
+    case 'speed': return {
+      label: 'sweep speed', unit: '° s⁻¹', min: 10, max: 240, step: 10, redraw: 'none',
+      get: () => state.speed, set: v => { state.speed = Math.round(clamp(v, 1, 720)); }, toR: v => v, fromR: r => +r, fmt: v => String(v), caseV: () => 80, def: 80,
+    };
+    case 'nh': return {
+      label: 'harmonics used, <i>n</i>', unit: '', min: 0, max: NH, step: 1, redraw: 'draw',
+      get: () => st.nh, set: v => { st.nh = Math.round(clamp(v, 0, NH)); }, toR: v => v, fromR: r => +r, fmt: v => String(v), caseV: () => caseS().nh, def: 3,
+      off: () => !st.rebuild,
+    };
+    default: throw new Error(`no binding ${key}`);
+  }
 }
-$('tauSlot').addEventListener('input', e => {
-  const key = e.target.dataset.tau;
-  if (!key) return;
-  const taus = state.taus[INPUTS[state.inputIdx].id];
-  taus[key] = tauFromSlider(+e.target.value);
-  $('tauSlot').querySelector(`b[data-v="${key}"]`).textContent = fmtTau(taus[key]);
-  update();
+
+const groupSums = () => {
+  const st = state.s, dis = [st.offset && `offset ${st.offset.toFixed(2)}`, st.drift && 'drift', st.noise && `<i>σ</i> ${noiseSigma(st.noise).toFixed(3)}`].filter(Boolean);
+  return {
+    case: `${state.idx + 1} · ${INPUTS[state.idx].title}`,
+    stimulus: `${SHAPE_NAME[st.shape]}${(st.shape === 'square' || st.shape === 'triangle') && st.duty !== 0.5 ? ` ${st.duty.toFixed(2)}` : ''}`,
+    response: `<i>τ</i> ${st.tau.toFixed(3)}${st.tauOff != null ? ` / ${st.tauOff.toFixed(3)}` : ''}${st.tau2 != null ? ` + ${st.tau2.toFixed(3)}` : ''}${st.invert ? ' · antiphase' : ''}`,
+    disturbances: dis.length ? dis.join(' · ') : 'none',
+    demodulation: `<i>k</i> = ${st.k} · <i>φ</i> = ${st.phi}°`,
+  };
+};
+const sums = foldingGroups(groupSums);
+
+const controls = valueControls({
+  bindOf, update, draw,
+  after: () => {
+    if (!state.s) return;
+    const st = state.s;
+    sums();
+    setSeg($('shape'), st.shape); setSeg($('invert'), st.invert ? 1 : 0); setSeg($('harm'), st.k);
+    setSeg($('view3'), st.view3); setSeg($('view4'), st.view4);
+    $('asym').checked = st.tauOff != null; $('chain').checked = st.tau2 != null;
+    $('clean').checked = st.clean; $('rebuild').checked = st.rebuild;
+    const pf = $('phiField');
+    if (document.activeElement !== pf) pf.value = Math.round(shownPhi());
+    pf.classList.toggle('preview', !!state.preview);
+    $('kField').innerHTML = `<i>k</i> = ${st.k}, `;
+  },
 });
 
-function selectInput(idx, push = true) {
-  state.inputIdx = idx;
-  const inp = INPUTS[idx];
-  $('caseBtn').innerHTML = `<span class="n">${idx + 1}</span>${inp.title}<span class="caret" aria-hidden="true">▾</span>`;
-  document.querySelectorAll('#caseMenu li').forEach((li, i) => li.setAttribute('aria-selected', String(i === idx)));
-  $('caseText').innerHTML = `<h2>${inp.title}</h2>${inp.text}${VIEWS_TEXT}`;
-  $('equations').innerHTML = `<h2>Equations</h2>${EQUATIONS.join('')}`;
-  // static text with markers: rendered once per input, never on a redraw
-  $('subPhase').innerHTML = `|<i>A<sub>k</sub></i>| cos(<i>φ</i> − <i>φ</i><sub>max</sub>): the arrow's shadow for every <i>φ</i>. The orange dot is <i>φ</i><sub>max</sub>, read as <i>t</i><sub>con</sub> in the table [@weyel, Eq. 2].`;
-  renderCitations([$('subPhase'), $('caseText'), $('equations')], $('refs'), SOURCES);
-  tauControls();
-  if (push) { try { const u = new URL(location.href); u.searchParams.set('input', inp.id); history.replaceState(null, '', u); } catch { /* not essential */ } }
-  update();
-}
-
-$('caseMenu').innerHTML = INPUTS.map((c, i) => `<li role="option" tabindex="-1" data-i="${i}"><span class="n">${i + 1}</span>${c.title}</li>`).join('');
-const menuOpen = () => !$('caseMenu').hidden;
-function openMenu(on) {
-  $('caseMenu').hidden = !on;
-  $('caseBtn').setAttribute('aria-expanded', String(on));
-  if (on) (document.querySelector('#caseMenu li[aria-selected="true"]') ?? document.querySelector('#caseMenu li')).focus();
-}
-$('caseBtn').addEventListener('click', () => openMenu(!menuOpen()));
-$('caseMenu').addEventListener('click', e => { const li = e.target.closest('li'); if (!li) return; openMenu(false); $('caseBtn').focus(); selectInput(+li.dataset.i); });
-$('caseMenu').addEventListener('keydown', e => {
-  const items = [...document.querySelectorAll('#caseMenu li')], i = items.indexOf(document.activeElement);
-  if (e.key === 'ArrowDown') { e.preventDefault(); items[Math.min(items.length - 1, i + 1)].focus(); }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); items[Math.max(0, i - 1)].focus(); }
-  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.activeElement.click(); }
-  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); openMenu(false); $('caseBtn').focus(); }
-});
-document.addEventListener('click', e => { if (menuOpen() && !e.target.closest('#caseSelect')) openMenu(false); });
-
-$('harm').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.k = +b.dataset.v; setSeg('harm', state.k); update(); });
-$('phi').addEventListener('input', e => { state.phi = +e.target.value; draw(); });
-$('offset').addEventListener('input', e => { state.offset = +e.target.value / 100; $('vOff').textContent = state.offset.toFixed(2); update(); });
-$('drift').addEventListener('input', e => { state.drift = +e.target.value / 100; $('vDrift').textContent = (state.drift >= 0 ? '+' : '−') + Math.abs(state.drift).toFixed(2); update(); });
-$('noise').addEventListener('input', e => { state.noise = +e.target.value; $('vNoise').textContent = noiseSigma(state.noise).toFixed(3); update(); });
-$('nh').addEventListener('input', e => { state.nh = +e.target.value; draw(); });
+/* ---------------------------------------------------------------------------
+   The other controls
+   --------------------------------------------------------------------------- */
+const segClick = (id, fn) => $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (b) { fn(b.dataset.v); update(); } });
+segClick('shape', v => { state.s.shape = v; });
+segClick('invert', v => { state.s.invert = v === '1'; });
+segClick('harm', v => { state.s.k = +v; });
+segClick('view3', v => { state.s.view3 = v; });
+segClick('view4', v => { state.s.view4 = v; });
+$('asym').addEventListener('change', e => { state.s.tauOff = e.target.checked ? state.s.tau : null; update(); });
+$('chain').addEventListener('change', e => { state.s.tau2 = e.target.checked ? 0.1 : null; update(); });
+$('clean').addEventListener('change', e => { state.s.clean = e.target.checked; draw(); });
+$('rebuild').addEventListener('change', e => { state.s.rebuild = e.target.checked; draw(); });
 $('reseed').addEventListener('click', () => { state.seed += 1; update(); });
+$('resetCase').addEventListener('click', () => selectInput(state.idx, false));
+$('phiField').addEventListener('change', e => {
+  const v = parseFloat(String(e.target.value).replace(',', '.'));
+  if (Number.isFinite(v)) controls.apply('phi', v);
+  e.target.blur(); controls.refresh();
+});
+$('phiField').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.dispatchEvent(new Event('change')); });
+const setPhi = v => { state.s.phi = ((Math.round(v) % 360) + 360) % 360; draw(); };
 
-/* φ sweep and the integration cursor share one animation loop */
-let sweeping = false, integrating = false, raf = 0, last = 0;
-function loop(ts_) {
-  if (!sweeping && !integrating) return;
-  if (ts_ - last > 50) {
-    last = ts_;
-    if (sweeping) { state.phi = (state.phi + 5) % 360; $('phi').value = state.phi; }
-    if (integrating) {
-      state.cursor = Math.min(1, state.cursor + 1 / 60);
-      if (state.cursor >= 1) { integrating = false; $('run').textContent = '▶ integrate'; }
-    }
+/* panel 1: drag the reference by a peak; the peak at t means φ = 90° − 360°·k·t/T */
+const cSig = $('cSig');
+dragRuler(cSig, {
+  rulerXs: () => P1?.xs ?? [], plotOf: () => P1?.p,
+  onDrag: x => { const { inner } = P1.p, t = clamp((x - inner.l) / (inner.r - inner.l), 0, 1) * T; setPhi(90 - 360 * state.s.k * t / T); },
+});
+
+/* panel 3: hover a point, click to keep it, drag the ruler */
+const cPhase = $('cPhase');
+const hitPoi = e => {
+  if (!P3) return null;
+  const { x, y } = localIn(cPhase, e);
+  let best = null, bd = 11;
+  for (const q of P3.pois) { const d = Math.hypot(q.px - x, q.py - y); if (d < bd) { bd = d; best = q; } }
+  return best;
+};
+function poiText(q) {
+  const k = state.s.k, p = S.p;
+  if (q.kind === 'max') return `<div class="tip-title">The signal at its maximum, <i>φ</i> = ${q.phi.toFixed(0)}°</div>
+    <p>The reference is in step with the signal: in panel 1 almost all of the product is amber, and the integral in panel 2 ends at its largest value, |<i>A</i><sub>${k}</sub>| = ${p.amp.toFixed(3)}. The lag <i>δ</i> = 360° − <i>φ</i><sub>max</sub> = ${p.delta.toFixed(0)}° reads as the time value <i>t</i><sub>con</sub> = ${p.tcon.toFixed(3)} <i>T</i>.</p><p class="tip-hint">click to keep this <i>φ</i></p>`;
+  return `<div class="tip-title">The signal is gone, <i>φ</i> = ${q.phi.toFixed(0)}°</div>
+    <p>90° from the maximum the reference is a quarter period out of step: in panel 1 the amber and purple areas are equal, and the integral in panel 2 comes back to zero.</p><p class="tip-hint">click to keep this <i>φ</i></p>`;
+}
+dragRuler(cPhase, {
+  rulerXs: () => (P3 ? [P3.rx] : []), plotOf: () => P3?.p,
+  onDrag: x => { const { inner } = P3.p; setPhi(clamp((x - inner.l) / (inner.r - inner.l), 0, 0.9999) * 360); },
+  hover: e => {
+    const q = hitPoi(e), prev = state.preview?.poi;
+    if (q !== prev) { state.preview = q ? { phi: q.phi, poi: q } : null; draw(); }
+    if (q) tooltip.show(poiText(q), e.clientX, e.clientY); else tooltip.hide();
+    return !!q;
+  },
+  down: e => { const q = hitPoi(e); if (!q) return false; state.preview = null; tooltip.hide(); setPhi(q.phi); return true; },
+  leave: () => { if (state.preview) { state.preview = null; draw(); } tooltip.hide(); },
+});
+
+/* sweep φ and run the integration cursor: one animation loop */
+let playing = false, integrating = false, raf = 0, last = 0, acc = 0;
+function loop(t) {
+  if (!playing && !integrating) return;
+  if (last) {
+    const dts = (t - last) / 1000;
+    if (playing) { acc = (acc + state.speed * dts) % 360; state.s.phi = Math.round(acc) % 360; }
+    if (integrating) { state.cursor = Math.min(1, state.cursor + dts / 2.5); if (state.cursor >= 1) { integrating = false; $('run').textContent = '▶ integrate'; renderRail(); } }
     draw();
   }
+  last = t;
   raf = requestAnimationFrame(loop);
 }
-const kick = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); };
-$('play').addEventListener('click', () => { sweeping = !sweeping; $('play').textContent = sweeping ? '❚❚ pause' : '▶ sweep φ'; kick(); });
-$('run').addEventListener('click', () => {
+const kick = () => { cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(loop); };
+function togglePlay() { playing = !playing; acc = state.s.phi; $('play').textContent = playing ? '❚❚ pause' : '▶ sweep φ'; renderRail(); kick(); }
+function toggleRun() {
   integrating = !integrating;
   if (integrating && state.cursor >= 1) state.cursor = 0;
-  $('run').textContent = integrating ? '❚❚ pause' : '▶ integrate';
   if (!integrating) { state.cursor = 1; draw(); }
-  kick();
-});
-window.addEventListener('shell:resize', draw);
+  $('run').textContent = integrating ? '❚❚ pause' : '▶ integrate';
+  renderRail(); kick();
+}
+$('play').addEventListener('click', togglePlay);
+$('run').addEventListener('click', toggleRun);
 
-$('vOff').textContent = '0.00'; $('vDrift').textContent = '+0.00'; $('vNoise').textContent = noiseSigma(0).toFixed(3);
-setSeg('harm', state.k);
+/* ---------------------------------------------------------------------------
+   Panels and the rail
+   --------------------------------------------------------------------------- */
+function renderRail() {
+  if (panels.left || !state.s) { $('rail').innerHTML = ''; return; }
+  const st = state.s, changed = $('caseSelect').classList.contains('changed');
+  $('rail').innerHTML = [
+    rail.btn('open', '▶', 'Open the settings', { text: true }), rail.rule,
+    rail.fly('input', rail.btn('inFly', String(state.idx + 1), 'Input', { text: true, on: true }),
+      `<div class="fly-title">Input</div>${INPUTS.map((c, i) => rail.item('input', i, `${i + 1} · ${c.title}`, i === state.idx)).join('')}`),
+    rail.btn('reset', '↺', changed ? 'Reset to the input' : 'Nothing changed from the input', { disabled: !changed }), rail.rule,
+    rail.fly('shape', rail.btn('shFly', { square: '⊓', triangle: '⋀', saw: '◿', sine: '∿' }[st.shape], 'Stimulus shape', { text: true }),
+      `<div class="fly-title">Stimulus</div>${Object.entries(SHAPE_NAME).map(([v, n]) => rail.item('shape', v, n, v === st.shape)).join('')}`),
+    rail.fly('k', rail.btn('kFly', `k${st.k}`, 'Harmonic k', { text: true }),
+      `<div class="fly-title">Harmonic <i>k</i></div>${[1, 2, 3, 4, 5].map(k => rail.item('k', k, `k = ${k}`, k === st.k)).join('')}`),
+    rail.btn('play', playing ? '❚❚' : '▶', playing ? 'Pause the sweep' : 'Sweep φ', { on: playing, text: true }),
+    rail.btn('run', '∫', integrating ? 'Pause the integration' : 'Run the integral', { on: integrating, text: true }),
+    rail.btn('rebuild', 'Σ', st.rebuild ? 'Rebuilt period shown. Click to hide' : 'Rebuild the period from its harmonics', { on: st.rebuild, text: true }),
+    rail.btn('clean', '≈', st.clean ? 'Clean signal shown. Click to hide' : 'Show the clean signal', { on: st.clean, text: true }),
+    rail.btn('view3', st.view3 === 'cos' ? '∿' : '↗', st.view3 === 'cos' ? 'Phase domain as a cosine. Click for the phasor' : 'Phase domain as a phasor. Click for the cosine', { text: true }),
+  ].join('');
+}
+$('rail').addEventListener('click', e => {
+  const b = e.target.closest('[data-r]');
+  if (!b) return;
+  const r = b.dataset.r, st = state.s;
+  rail.open = null;
+  if (r === 'open') { panels.left = true; panels.set(); return; }
+  if (r === 'input') { selectInput(+b.dataset.v); return; }
+  if (r === 'reset') { selectInput(state.idx, false); return; }
+  if (r === 'play') { togglePlay(); return; }
+  if (r === 'run') { toggleRun(); return; }
+  if (r === 'shape') st.shape = b.dataset.v;
+  else if (r === 'k') st.k = +b.dataset.v;
+  else if (r === 'rebuild') st.rebuild = !st.rebuild;
+  else if (r === 'clean') st.clean = !st.clean;
+  else if (r === 'view3') st.view3 = st.view3 === 'cos' ? 'phasor' : 'cos';
+  else return;
+  update();
+});
+
+const panels = initWorkbench({ redraw: draw, renderRail });
+const selector = caseSelector({ list: INPUTS, onSelect: i => selectInput(i) });
+
+function selectInput(idx, push = true) {
+  state.idx = idx;
+  state.s = clone(INPUTS[idx].s);
+  state.preview = null;
+  selector.mark(idx);
+  if (push) { try { const u = new URL(location.href); u.searchParams.set('input', INPUTS[idx].id); history.replaceState(null, '', u); } catch { /* not essential */ } }
+  update();
+}
+
+/* ---------------------------------------------------------------------------
+   Start: texts once (their markers are numbered once), then an input
+   --------------------------------------------------------------------------- */
+$('general').innerHTML = GENERAL;
+$('equations').innerHTML = `<h2>Equations</h2>${EQUATIONS.join('')}`;
+$('caseTexts').innerHTML = INPUTS.map(c => `<div>${c.text}</div>`).join('');
+state.s = clone(INPUTS[state.idx].s);
+controls.fill(document);
 const wanted = new URLSearchParams(location.search).get('input');
 const start = INPUTS.findIndex(c => c.id === wanted);
-(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => selectInput(start < 0 ? state.inputIdx : start, false));
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {
+  fitWorkbench();
+  selectInput(start < 0 ? state.idx : start, false);
+  renderCitations([$('general'), $('equations'), $('caseTexts')], $('refs'), SOURCES);
+});

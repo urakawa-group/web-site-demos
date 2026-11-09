@@ -12,7 +12,7 @@ happens. Nothing to install, no account, no build step.
 
 | demo | field | what it shows |
 |---|---|---|
-| [MES-PSD](demos/spectroscopy/mes-psd/index.html) | spectroscopy | modulation excitation and phase-sensitive detection. [Transformation](demos/spectroscopy/mes-psd/transformation/index.html): one period turned into the phase domain five ways (multiply and integrate, phasor, harmonics, disturbances, the whole spectrum), six inputs. [Cases](demos/spectroscopy/mes-psd/cases/index.html): every setting on a control, nine stored cases from one band without delay to a sequence of species with a spectator |
+| [MES-PSD](demos/spectroscopy/mes-psd/index.html) | spectroscopy | modulation excitation and phase-sensitive detection. [Transformation](demos/spectroscopy/mes-psd/transformation/index.html): one period turned into the phase domain (signal × reference, running integral, phase domain as cosine or phasor, harmonics or the whole spectrum as a map), seven inputs, four stimulus shapes, disturbances. [Cases](demos/spectroscopy/mes-psd/cases/index.html): every setting on a control, nine stored cases from one band without delay to a sequence of species with a spectator |
 
 ## Layout
 
@@ -26,6 +26,7 @@ assets/site.css                     the styles, built only from tokens
 assets/shell.js                     header, footer, width steps, the two views
 assets/plot.js                      canvas plots with the chart conventions built in
 assets/cite.js                      [@alias, locator] markers → numbered citations from references.bib
+assets/workbench.js                 the workbench of a page with cases: panels, rail, value controls, groups, tooltips
 assets/fonts/                       Source Sans 3 (OFL), served from here
 demos/<field>/<demo>/index.html     one demo: its page,
 demos/<field>/<demo>/<demo>.js      and its engine

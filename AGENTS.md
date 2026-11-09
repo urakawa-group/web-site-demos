@@ -17,9 +17,12 @@ should understand the idea by changing something and watching the response.
 - **A topic gets a hub, then the transformation, then the cases.** A method
   is a folder with a short hub page (one card per sub-page) and two
   sub-pages, in this order:
-  - *Transformation*: the core operation on one signal, shown several ways,
-    with an input selector (the simplest input first). It answers "what does
-    the method do to a signal".
+  - *Transformation*: the core operation on one signal, on the same
+    workbench as the cases, with an input selector (the simplest input
+    first); an input is a stored set of values, like a case. It answers
+    "what does the method do to a signal". Views of one result share a panel
+    behind a view switch (cosine or phasor; bars or a map) rather than each
+    taking a panel of its own.
   - *Cases*: the method on realistic spectra, with every setting on screen
     (see below). Cases are ordered from the simplest (one signal, no delay,
     no noise) to the realistic one.
@@ -109,7 +112,10 @@ should understand the idea by changing something and watching the response.
   CDN link.
 - Every page uses the shared layer in `assets/`: `shell.js` (tokens, header,
   footer, width steps, the two views), `site.css`, `plot.js` for canvases and
-  `cite.js` for references. A demo calls `initShell({ page: 'demo', views: true })`.
+  `cite.js` for references. A workbench page also uses `workbench.js` (panels,
+  rail, value controls, folding groups, case selector, tooltip, maxima in a
+  phase-domain plot, draggable rulers). The cases page still carries its own
+  copy of these and is to move onto `workbench.js`. A demo calls `initShell({ page: 'demo', views: true })`.
 - No analytics, no cookies, no tracking, no requests to another server. The
   font is Source Sans 3 from `assets/fonts/`, never Google Fonts.
 - It is served over http (GitHub Pages, or `python -m http.server` locally):
