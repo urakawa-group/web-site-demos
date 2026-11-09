@@ -12,10 +12,11 @@
   page ../transformation/.
 
   Layout on a wide screen: an app layout under the site header, as tall as
-  the window. Settings in a full-height left side panel, the title and the
-  four plots in the centre sized so none needs scrolling, the values in a
-  full-height right side panel; text, equations and references below.
-  Narrower, the three stack.
+  the window. Settings in a full-height left panel (collapsible to a rail of
+  quick switches), values in a full-height right panel (collapsible), and the
+  centre, which scrolls on its own: first the title and the four plots sized
+  to the window, then text, equations and references. Narrower, the three
+  stack and the page scrolls as usual.
 
   Model: a square-wave (on in the first half-period) or sine stimulus drives
   first-order steps, dy/dt = (u - y) / tau, integrated exactly for an input
@@ -45,96 +46,108 @@
 <body>
 <main class="page-wb">
   <div class="workbench" id="workbench">
-    <!-- left: every setting, always there -->
-    <aside class="wb-side wb-left" aria-label="Settings">
-      <div class="case-select" id="caseSelect">
-        <span class="case-select-label">case</span>
-        <button type="button" id="caseBtn" aria-haspopup="listbox" aria-expanded="false"></button>
-        <ul id="caseMenu" role="listbox" aria-label="Case" hidden></ul>
-        <button class="btn" id="resetCase" type="button" disabled>reset to the case</button>
-      </div>
+    <!-- left: every setting, always there; collapsed, a rail of quick switches -->
+    <aside class="wb-side wb-left" id="left" aria-label="Settings">
+      <button type="button" class="side-toggle" id="leftToggle" title="Collapse the settings to quick switches">◀</button>
+      <div class="side-open">
+        <div class="case-select" id="caseSelect">
+          <span class="case-select-label">case</span>
+          <button type="button" id="caseBtn" aria-haspopup="listbox" aria-expanded="false"></button>
+          <ul id="caseMenu" role="listbox" aria-label="Case" hidden></ul>
+          <button class="btn" id="resetCase" type="button" disabled>reset to the case</button>
+        </div>
 
-      <div class="side-group">
-        <div class="side-title">measurement</div>
-        <div class="ctl"><span>time unit</span>
-          <span class="seg" id="unit"><button type="button" data-v="T">periods</button><button type="button" data-v="min">minutes</button></span></div>
-        <label class="ctl num"><span>period <i>T</i> / min</span><input id="period" type="number" min="1" max="600" step="1"></label>
-        <label class="ctl"><span>spectral axis</span><select id="axis"></select></label>
-        <div class="ctl"><span>stimulus</span>
-          <span class="seg" id="shape"><button type="button" data-v="square">on / off</button><button type="button" data-v="sine">sine</button></span></div>
-        <div class="ctl vctl" data-k="noise"></div>
-        <div class="ctl vctl" data-k="cycles"></div>
-        <button class="btn" id="reseed" type="button">new noise</button>
-      </div>
+        <div class="side-group">
+          <div class="side-title">measurement</div>
+          <div class="ctl"><span>time unit</span>
+            <span class="seg" id="unit"><button type="button" data-v="T">periods</button><button type="button" data-v="min">minutes</button></span></div>
+          <label class="ctl num"><span>period <i>T</i> / min</span><input id="period" type="number" min="1" max="600" step="1"></label>
+          <label class="ctl"><span>spectral axis</span><select id="axis"></select></label>
+          <div class="ctl"><span>stimulus</span>
+            <span class="seg" id="shape"><button type="button" data-v="square">on / off</button><button type="button" data-v="sine">sine</button></span></div>
+          <div class="ctl vctl" data-k="noise"></div>
+          <div class="ctl vctl" data-k="cycles"></div>
+          <button class="btn" id="reseed" type="button">new noise</button>
+        </div>
 
-      <div class="side-group">
-        <div class="side-title">demodulation</div>
-        <div class="ctl"><span>harmonic <i>k</i></span>
-          <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="5">5</button></span></div>
-        <div class="ctl vctl" data-k="phi"></div>
-        <label class="ctl check"><input id="allPhi" type="checkbox"><span>all <i>φ</i> from 0 to 170°</span></label>
-        <div class="ctl vctl" data-k="speed"></div>
-        <button class="btn primary" id="play" type="button">▶ sweep φ</button>
-      </div>
+        <div class="side-group">
+          <div class="side-title">demodulation</div>
+          <div class="ctl"><span>harmonic <i>k</i></span>
+            <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="5">5</button></span></div>
+          <div class="ctl vctl" data-k="phi"></div>
+          <label class="ctl check"><input id="allPhi" type="checkbox"><span>all <i>φ</i> from 0 to 170°</span></label>
+          <div class="ctl vctl" data-k="speed"></div>
+          <button class="btn primary" id="play" type="button">▶ sweep φ</button>
+        </div>
 
-      <div class="side-group">
-        <div class="side-title">species, in drive order</div>
-        <div id="species"></div>
+        <div class="side-group">
+          <div class="side-title">species, in drive order</div>
+          <div id="species"></div>
+        </div>
       </div>
+      <div class="rail" id="rail" aria-label="Quick switches"></div>
     </aside>
 
-    <!-- centre: the head, then the four plots, sized to the window -->
-    <div class="wb-main">
-      <div class="wb-head">
-        <p class="crumbs"><a href="../index.html">MES-PSD</a> · Cases</p>
-        <h1>Modulation Excitation and Phase-Sensitive Detection: Cases</h1>
-        <p class="lead">Switch a stimulus on and off, fold the cycles, demodulate. Every setting is on the left; a case only sets them. Hover a point in the phase domain to see the spectrum there.</p>
+    <!-- centre: scrolls on its own. First the head and the plots, sized to the window, then the text -->
+    <div class="wb-main" id="wbMain">
+      <div class="wb-stage" id="stage">
+        <div class="wb-head">
+          <p class="crumbs"><a href="../index.html">MES-PSD</a> · Cases</p>
+          <h1>Modulation Excitation and Phase-Sensitive Detection: Cases</h1>
+          <p class="lead">Switch a stimulus on and off, fold the cycles, demodulate. Every setting is on the left; a case only sets them. Hover a point in the phase domain to see the spectrum there.</p>
+        </div>
+        <div class="wb-center">
+          <section class="panel">
+            <h3>1 · Time Domain</h3>
+            <p class="sub">The signal at each band maximum. Red: stimulus on, blue: off. Dashed: the stimulus.</p>
+            <canvas id="cTime"></canvas>
+            <div class="legend" id="legTime"></div>
+          </section>
+          <section class="panel">
+            <h3>2 · Fold and Average</h3>
+            <p class="sub" id="subFold"></p>
+            <canvas id="cFold"></canvas>
+            <div class="legend" id="legFold"></div>
+          </section>
+          <section class="panel">
+            <h3>3 · Spectra</h3>
+            <p class="sub"><span id="subSpecFold">Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].</span><span id="subSpecAll" hidden><i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].</span></p>
+            <canvas id="cSpec"></canvas>
+            <div class="legend" aria-hidden="true"></div>
+          </section>
+          <section class="panel">
+            <h3>4 · Phase Domain</h3>
+            <p class="sub" id="subPhase"><i>A<sub>k</sub></i>(<i>φ</i>) at each band maximum. Dot: <i>φ</i><sub>max</sub>, ring: where a band is gone. Hover a point, click to keep it; drag the dashed green ruler [@weyel, Eq. 2].</p>
+            <canvas id="cPhase" class="interactive"></canvas>
+            <div class="legend" id="legPhase"></div>
+          </section>
+        </div>
       </div>
-    <div class="wb-center">
-      <section class="panel">
-        <h3>1 · Time Domain</h3>
-        <p class="sub">Band heights at their maxima. Red: stimulus on, blue: off. Dashed: the stimulus.</p>
-        <canvas id="cTime"></canvas>
-        <div class="legend" id="legTime"></div>
-      </section>
-      <section class="panel">
-        <h3>2 · Fold and Average</h3>
-        <p class="sub" id="subFold"></p>
-        <canvas id="cFold"></canvas>
-        <div class="legend" id="legFold"></div>
-      </section>
-      <section class="panel">
-        <h3>3 · Spectra, Averaged and Phase-Resolved</h3>
-        <p class="sub"><span id="subSpecFold">Grey: the averaged spectra through one period. Green: <i>A<sub>k</sub></i>(<i>φ</i>) at the chosen <i>φ</i> [@handbook, Fig. 42.1, p. 969].</span><span id="subSpecAll" hidden><i>A<sub>k</sub></i>(<i>φ</i>) for <i>φ</i> = 0, 10, …, 170° (grey) and at the chosen <i>φ</i> (green) [@handbook, Fig. 42.2, pp. 971–972].</span></p>
-        <canvas id="cSpec"></canvas>
-      </section>
-      <section class="panel">
-        <h3>4 · Phase Domain</h3>
-        <p class="sub" id="subPhase"><i>A<sub>k</sub></i>(<i>φ</i>) at each band maximum. Dot: <i>φ</i><sub>max</sub>, with the lag <i>δ</i>; ring: where the band is gone. Hover a point, click to keep it, drag the green line [@weyel, Eq. 2].</p>
-        <canvas id="cPhase" class="interactive"></canvas>
-        <div class="legend" id="legPhase"></div>
-      </section>
+
+      <div class="wb-below" id="below">
+        <section class="explain">
+          <article id="general"></article>
+          <article id="equations"></article>
+        </section>
+
+        <section class="refs-section">
+          <h2>References</h2>
+          <ol class="refs" id="refs"></ol>
+          <p class="note">All numbers on this page are illustrative: simulated first-order kinetics, not fitted to a measurement.</p>
+        </section>
       </div>
     </div>
 
-    <!-- right: the values -->
-    <aside class="wb-side wb-right" aria-label="Values">
-      <div class="side-title">values at <i>k</i> = <span id="vK"></span></div>
-      <div id="values"></div>
+    <!-- right: the values; collapsed, gone, with a tab to bring it back -->
+    <aside class="wb-side wb-right" id="right" aria-label="Values">
+      <div class="side-head">
+        <span class="side-title">values at <i>k</i> = <span id="vK"></span></span>
+        <button type="button" class="side-toggle" id="rightToggle" title="Hide the values">▶</button>
+      </div>
+      <div class="readout-wrap"><table class="readout side" id="readout"></table></div>
+      <p class="side-note">Each band at its maximum. <i>δ</i> = 360° − <i>φ</i><sub>max</sub> is the lag at harmonic <i>k</i>; “first-order” is the same read from the formula for the steps the band follows through.</p>
     </aside>
-  </div>
-
-  <div class="page-demo">
-    <section class="explain">
-      <article id="general"></article>
-      <article id="equations"></article>
-    </section>
-
-    <section class="refs-section">
-      <h2>References</h2>
-      <ol class="refs" id="refs"></ol>
-      <p class="note">All numbers on this page are illustrative: simulated first-order kinetics, not fitted to a measurement.</p>
-    </section>
+    <button type="button" class="right-tab" id="rightOpen" title="Show the values" hidden>◀ values</button>
   </div>
 
   <div id="caseTexts" hidden></div>

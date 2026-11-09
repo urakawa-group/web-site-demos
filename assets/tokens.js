@@ -238,6 +238,7 @@ export const PAGE_LAYOUT = {
   'Demo head':      { value: '2 : 1', usage: 'Title and lead on the left two thirds, the case selector on the right third, top-aligned' },
   'Panel grid':     { value: '2 × 2 from mid', usage: 'Four panels, one column on a compact shell' },
   'Header':         { value: '56px band', usage: 'Accent-strong band, wordmark left, links right' },
+  'Workbench':      { value: '360px · rest · 340px', usage: 'A page with cases on a wide screen: settings panel left, plots in the centre sized to the window, values panel right; both panels full height and collapsible, the left one to a rail of quick switches' },
 };
 
 /* ---------------------------------------------------------------------------
@@ -298,6 +299,7 @@ export const CHART = {
   lineFrame: 1,           // px, the plot frame
   dash: [5, 4],           // the stimulus and anything that is not a measured signal
   marker: 5,              // px radius, a maximum or a chosen point
+  workbenchScale: 1.5,    // text in the centre of a workbench page, plots and panel titles
 };
 
 export const CHART_DOCS = [
@@ -308,6 +310,7 @@ export const CHART_DOCS = [
   { name: 'Highlight', value: `${CHART.lineHighlight}px`, usage: 'The single trace that answers the panel\'s question' },
   { name: 'Dash', value: CHART.dash.join(' / ') + ' px', usage: 'The stimulus, and only things that are not measured signals' },
   { name: 'Frame', value: `${CHART.lineFrame}px ink-700`, usage: 'A closed box round every plot, ticks outside' },
+  { name: 'Workbench text', value: `${CHART.workbenchScale}×`, usage: 'Every text in the centre of a workbench page (panel titles, subtitles, legends, ticks, axis labels) at this multiple of its role, on a wide screen. The plots fill the window there, so normal sizes read small' },
 ];
 
 /* ---------------------------------------------------------------------------
@@ -357,7 +360,7 @@ export function tokenCss() {
   for (const g of COLOR_GROUPS) for (const [n, t] of Object.entries(g.tokens)) lines.push(`  --${n}: ${t.value};`);
   for (const r of TYPE_ROLES) lines.push(...typeVars(r));
   for (const map of [RADII, SPACING, SHADOWS]) for (const [n, t] of Object.entries(map)) lines.push(`  --${n}: ${t.value};`);
-  lines.push(`  --chart-h: ${CHART.height}px;`, `  --chart-h-compact: ${CHART.heightCompact}px;`, '}');
+  lines.push(`  --chart-h: ${CHART.height}px;`, `  --chart-h-compact: ${CHART.heightCompact}px;`, `  --wb-text-scale: ${CHART.workbenchScale};`, '}');
   return lines.join('\n');
 }
 

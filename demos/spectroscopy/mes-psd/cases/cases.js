@@ -86,13 +86,13 @@ const settings = (extra, list) => ({ ...base, ...extra, species: slots(list, ext
 const CASES = [
   {
     id: 'instant', title: 'One Band, No Delay',
-    s: settings({}, [sp('B', 'data-b', [30, 10, 1], 'stim', 0)]),
+    s: settings({}, [sp('A', 'data-a', [30, 10, 1], 'stim', 0)]),
     text: `<p>The simplest response there is: one band that follows the stimulus at once. Phase-sensitive detection multiplies the averaged period by a sine of harmonic <i>k</i>, shifted by the phase angle <i>φ</i>, and integrates over one period [@handbook, Fig. 42.1, p. 969]. Anything constant over the period meets the sine with zero area and drops out, so the mean height of the band is gone and only its swing is left.</p>
       <p>An on/off square wave of height 1 is ½ plus odd sines, so at <i>k</i> = 1 the band comes out with amplitude 2/π ≈ 0.64, largest at <i>φ</i> = 0: no delay, <i>t</i><sub>con</sub> = 0. Try <i>k</i> = 3: amplitude 2/(3π) ≈ 0.21, still at <i>φ</i> = 0. Try <i>k</i> = 2: nothing, a square wave has no even harmonics [@handbook, Eq. 42.1, p. 970].</p>`,
   },
   {
     id: 'lag', title: 'One Band, First-Order Delay',
-    s: settings({}, [sp('B', 'data-b', [30, 10, 1], 'stim', 0.08)]),
+    s: settings({}, [sp('A', 'data-a', [30, 10, 1], 'stim', 0.08)]),
     text: `<p>Now the band follows through one first-order step, d<i>y</i>/d<i>t</i> = (<i>u</i> − <i>y</i>)/<i>τ</i>. For a linear step like this the fundamental lags the stimulus by <i>δ</i> = arctan(<i>ωτ</i>) and shrinks by 1/√(1 + (<i>ωτ</i>)²), with <i>ω</i> = 2π/<i>T</i>. In the phase domain the maximum moves from 0 to <i>φ</i><sub>max</sub> = 360° − <i>δ</i>, and the time value reads that delay back as a time [@weyel, Eq. 2].</p>
       <p>Move <i>τ</i>. The time value is close to <i>τ</i> only while <i>ωτ</i> ≪ 1, and for one step it never passes <i>T</i>/4, however slow the species, while the amplitude keeps falling. So a period near 2π<i>τ</i> to 10<i>τ</i> suits the steps of interest.</p>`,
   },
@@ -144,12 +144,12 @@ const CASES = [
   {
     id: 'sequence', title: 'A Sequence with a Spectator',
     s: settings({ unit: 'min', T: 60, axis: 'ir', noise: 35 }, [
-      sp('gas in the cell', 'data-a', null, 'stim', 3.5),
-      sp('fast species', 'data-b', [1600, 70, 1.0], 's1', 1.1),
-      sp('slow species', 'data-c', [1060, 60, 0.7], 's2', 17.6, { base: 0.35 }),
-      sp('spectator', 'data-a', [1430, 90, 0.9], 'static', 0),
+      sp('A, gas in the cell', 'data-a', null, 'stim', 3.5),
+      sp('B, fast species', 'data-b', [1600, 70, 1.0], 's1', 1.1),
+      sp('C, slow species', 'data-c', [1060, 60, 0.7], 's2', 17.6, { base: 0.35 }),
+      sp('D, spectator', 'data-a', [1430, 90, 0.9], 'static', 0),
     ]),
-    text: `<p>A catalyst bed switched between CO₂ + H₂ and H₂ every 30 min (<i>T</i> = 60 min). The gas in the cell follows the valve with its own lag, a fast surface species follows the gas, a slow one is fed by the fast one and keeps a part that never leaves, and a spectator sits there. The band positions and every number are illustrative.</p>
+    text: `<p>A catalyst bed switched between CO₂ + H₂ and H₂ every 30 min (<i>T</i> = 60 min). The gas in the cell (A) follows the valve with its own lag, a fast surface species (B) follows the gas, a slow one (C) is fed by the fast one and keeps a part that never leaves, and a spectator (D) sits there. The band positions and every number are illustrative.</p>
       <p>Delays in series add, so the slow species can come out later than <i>T</i>/4 although no single step can. The spectator is the largest band in the spectrum and vanishes after PSD. Time values read as an order: an intermediate responds after the reactant and before the product, and a signal later than the product is suspect [@weyel].</p>`,
   },
 ];
@@ -157,9 +157,9 @@ const CASES = [
 /** The text under the plots: the same for every case; a case's own text is its tooltip. */
 const GENERAL = `<h2>What This Page Shows</h2>
   <p>A modulation excitation experiment in four steps, from left to right and top to bottom: the spectra over time while a stimulus is switched on and off, the cycles folded into one averaged period, the spectra after phase-sensitive detection, and the phase domain, where each band becomes one cosine in <i>φ</i> [@handbook, Fig. 42.1, p. 969]. The values on the right read the phase domain back as the lag <i>δ</i> and the time value <i>t</i><sub>con</sub> [@weyel, Eq. 2], and compare them with the first-order formula.</p>
-  <p>Every setting is on the left and stays there. A case only sets their values, from one band without delay to a sequence of species with a spectator; hover a case for what it shows. Each species slot is on or off, follows the stimulus or an earlier species through one first-order step, in phase (rises while the stimulus is on) or in antiphase (falls).</p>
+  <p>Every setting is on the left and stays there. A case only sets their values, from one band without delay to a sequence of species with a spectator; hover a case for what it shows. Each species slot is on or off, follows the stimulus or an earlier species through one first-order step, set by its time constant <i>τ</i> or by the lag <i>δ</i> = arctan(<i>ωτ</i>) that step gives at the fundamental, in phase (rises while the stimulus is on) or in antiphase (falls). Every value can be typed; ↺ puts the case's value back, a double-click on a slider the default. Both side panels collapse: the left one to a rail of quick switches.</p>
   <h2>Using the Phase Domain</h2>
-  <p>Each dot marks <i>φ</i><sub>max</sub> of a band, labelled with its lag <i>δ</i> = 360° − <i>φ</i><sub>max</sub>. Each ring marks a <i>φ</i> where that band is gone, 90° from its maximum. Hover a dot or a ring and panel 3 shows the phase-resolved spectrum there, with a note on what each band does at that angle; click to keep it. Drag the green line, or anywhere in the plot, to set <i>φ</i> by hand.</p>`;
+  <p>Each dot marks <i>φ</i><sub>max</sub> of a band, labelled with its lag <i>δ</i> = 360° − <i>φ</i><sub>max</sub>. Each ring marks a <i>φ</i> where that band is gone, 90° from its maximum. Hover a dot or a ring and panel 3 shows the phase-resolved spectrum there, with a note on what each band does at that angle; click to keep it. Grab the dashed green ruler by its triangle or line to set <i>φ</i> by hand.</p>`;
 /* Formula boxes: fractions stacked, an integral with its limits stacked.
    Running prose keeps the one-line form (2/π), as in IR-bands. */
 const frac = (num, den) => `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
@@ -406,8 +406,8 @@ function drawTime() {
   const { st, T, dt, n, held, raw, conc } = S;
   const shown = Math.min(n, (WARM + 3) * M), ts = Array.from({ length: shown }, (_, i) => i * dt);
   const yr = limits().time;
-  const p = plot($('cTime'), {
-    x: [0, shown * dt], y: yr, xlabel: timeLabel(), ylabel: 'band height / –',
+  const p = plot($('cTime'), { scale: SC(),
+    x: [0, shown * dt], y: yr, xlabel: timeLabel(), ylabel: 'signal / –',
     xticks: ticks(0, shown * dt, 5, v => String(+v.toFixed(2))), yticks: ticks(yr[0], yr[1], 4),
   });
   for (let c = 0; c < shown / M; c++) { p.shadeX(c * T, c * T + T / 2, C['shade-on']); p.shadeX(c * T + T / 2, (c + 1) * T, C['shade-off']); }
@@ -424,7 +424,7 @@ function drawFold() {
   const tp = Array.from({ length: M }, (_, j) => j * dt);
   const yr = limits().time;
   const tk = st.unit === 'T' ? [[0, '0'], [0.25, 'T/4'], [0.5, 'T/2'], [0.75, '3T/4'], [1, 'T']] : ticks(0, T, 4);
-  const p = plot($('cFold'), { x: [0, T], y: yr, xlabel: st.unit === 'T' ? 'time in the period / T' : 'time in the period / min', ylabel: 'band height / –', xticks: tk, yticks: ticks(yr[0], yr[1], 4) });
+  const p = plot($('cFold'), { scale: SC(), x: [0, T], y: yr, xlabel: st.unit === 'T' ? 'time in the period / T' : 'time in the period / min', ylabel: 'signal / –', xticks: tk, yticks: ticks(yr[0], yr[1], 4) });
   p.shadeX(0, T / 2, C['shade-on']); p.shadeX(T / 2, T, C['shade-off']);
   p.steps(tp, Array.from(held.subarray(0, M)), C['data-stimulus']);
   for (const s of live().filter(s => !s.band)) {
@@ -441,7 +441,8 @@ const psdAt = phi => {
   return Array.from(S.I, (v, x) => v * Math.cos(r) + S.Q[x] * Math.sin(r));
 };
 const shownPhi = () => (state.preview ? state.preview.phi : state.s.phi);
-const bold = role => { const f = typeFont(role); return { ...f, font: f.font.replace(/^(italic )?\d+/, '$1700') }; };
+/** Text scale of the centre: CHART.workbenchScale on a wide screen, where the plots fill the window. */
+const SC = () => (document.documentElement.dataset.w === 'wide' ? CHART.workbenchScale : 1);
 
 function drawSpec() {
   const { st, xs } = S, ax = AXES[st.axis], phi = shownPhi();
@@ -449,16 +450,16 @@ function drawSpec() {
   const set = st.allPhi ? Array.from({ length: 18 }, (_, i) => psdAt(i * 10)) : [];
   const avg = st.allPhi ? [] : Array.from({ length: 12 }, (_, i) => Array.from(S.fold[i * (M / 12)]));
   const yr = limits().spec;
-  const p = plot($('cSpec'), { x: [ax.from, ax.to], y: yr, xlabel: ax.label, ylabel: 'absorbance / –', xticks: ax.ticks, yticks: ticks(yr[0], yr[1], 4) });
+  const p = plot($('cSpec'), { scale: SC(), x: [ax.from, ax.to], y: yr, xlabel: ax.label, ylabel: 'absorbance / –', xticks: ax.ticks, yticks: ticks(yr[0], yr[1], 4) });
   p.hline(0);
   for (const s of avg) p.line(xs, s, C['data-faint'], CHART.lineFaint);
   for (const s of set) p.line(xs, s, C['data-faint'], CHART.lineFaint);
   p.line(xs, cur, C['data-highlight'], CHART.lineHighlight);
   for (const s of S.banded) p.text(s.label.split(',')[0], s.band[0], yr[1] - (yr[1] - yr[0]) * 0.07, colorOf(s));
   // the angle on show, bold green, top left
-  const f = bold('axis'), { ctx, inner } = p;
-  ctx.font = f.font; ctx.fillStyle = C['data-highlight']; ctx.textAlign = 'left';
-  ctx.fillText(`φ = ${Math.round(phi)}°${st.k > 1 ? `, k = ${st.k}` : ''}`, inner.l + 8, inner.t + 18);
+  const { ctx, inner } = p;
+  ctx.font = p.font('axis', 700); ctx.fillStyle = C['data-highlight']; ctx.textAlign = 'left';
+  ctx.fillText(`φ = ${Math.round(phi)}°${st.k > 1 ? `, k = ${st.k}` : ''}`, inner.l + 8, inner.t + 18 * p.scale);
   p.axes();
 }
 
@@ -469,13 +470,13 @@ function drawPhase() {
   const ph = Array.from({ length: 73 }, (_, i) => i * 5);
   const rows = S.rows.filter(r => r.sp && r.sp.band);
   const yr = limits().phase, amp = yr[1];
-  const p = plot($('cPhase'), {
-    x: [0, 360], y: yr, xlabel: 'phase angle φ / °', ylabel: 'phase-resolved absorbance / –',
+  const p = plot($('cPhase'), { scale: SC(),
+    x: [0, 360], y: yr, xlabel: 'phase angle φ / °', ylabel: 'Aₖ(φ) / –',
     xticks: [0, 90, 180, 270, 360].map(v => [v, String(v)]), yticks: ticks(yr[0], yr[1], 4),
   });
   p.hline(0);
-  if (state.preview) p.vline(state.preview.phi, C['data-highlight'], 1, [2, 3]);
-  p.vline(state.s.phi, C['data-highlight'], 2, []);
+  if (state.preview) p.vline(state.preview.phi, C['data-highlight'], 1, [1, 3]);
+  p.vline(state.s.phi, C['data-highlight'], 1.5, [4, 3]);
   const pois = [];
   for (const r of rows) {
     p.line(ph, ph.map(f => r.I * Math.cos(f * Math.PI / 180) + r.Q * Math.sin(f * Math.PI / 180)), r.color);
@@ -494,48 +495,49 @@ function drawPhase() {
   }
   // φmax and δ of each band, as a key in the top-right corner (labels on the
   // dots collide as soon as two maxima are close)
-  const note = typeFont('annotation'), maxima = pois.filter(q => q.kind === 'max');
+  const maxima = pois.filter(q => q.kind === 'max');
   if (maxima.length) {
-    ctx.font = note.font;
+    ctx.font = p.font('annotation');
     const lines = maxima.map(q => [`${q.row.label.split(',')[0]}: φmax ${q.phi.toFixed(0)}°, δ ${q.row.delta.toFixed(0)}°`, q.row.color]);
-    const w = Math.max(...lines.map(([t]) => ctx.measureText(t).width)) + 12, lh = 15;
+    const w = Math.max(...lines.map(([t]) => ctx.measureText(t).width)) + 12, lh = 15 * p.scale;
     const x = p.inner.r - w - 6, y = p.inner.t + 6;
     ctx.fillStyle = C.surface; ctx.globalAlpha = 0.9; ctx.fillRect(x, y, w, lh * lines.length + 6); ctx.globalAlpha = 1;
     ctx.textAlign = 'left';
-    lines.forEach(([t, c], i) => { ctx.fillStyle = c; ctx.fillText(t, x + 6, y + 14 + i * lh); });
+    lines.forEach(([t, c], i) => { ctx.fillStyle = c; ctx.fillText(t, x + 6, y + lh - 1 + i * lh); });
   }
-  // the handle: a grip on the green line
+  // the ruler's grip: a small triangle on top of the dashed line, to grab it by
+  const rx = X(state.s.phi), g = 6;
   ctx.fillStyle = C['data-highlight'];
-  ctx.fillRect(X(state.s.phi) - 4, p.inner.t, 8, 10);
+  ctx.beginPath(); ctx.moveTo(rx - g, p.inner.t); ctx.lineTo(rx + g, p.inner.t); ctx.lineTo(rx, p.inner.t + g * 1.4); ctx.closePath(); ctx.fill();
   p.axes();
-  PH = { p, pois, x0: 0, x1: 360 };
+  PH = { p, pois, rx };
 }
 
 function legend(el, items) {
   el.innerHTML = items.map(([label, color, dashed]) => `<span class="${dashed ? 'dashed' : ''}" style="--c:${color}">${label}</span>`).join('');
 }
 
-/** Right sidebar: one card per signal. */
+/**
+ * Right panel: the table of values, one row per signal. τ is not repeated
+ * here, it is on its slot; the k-scaled amplitude appears for a square wave
+ * above k = 1, where the handbook reads it.
+ */
 function drawValues() {
   const { k, rows, st } = S;
-  const square = st.shape === 'square';
+  const scaled = st.shape === 'square' && k > 1;
   const strong = Math.max(...rows.filter(r => r.key !== 'stim').map(r => r.amp), 1e-9);
   $('vK').textContent = k;
-  $('values').innerHTML = rows.map(r => {
+  const unit = st.unit === 'T' ? 'T' : 'min';
+  const t = v => (st.unit === 'T' ? v.toFixed(3) : v.toFixed(1));
+  const head = `<tr><th></th><th><i>φ</i><sub>max</sub></th><th><i>δ</i></th><th><i>t</i><sub>con</sub><br><span class="th-sub">sim. / ${unit}</span></th><th><i>t</i><sub>con</sub><br><span class="th-sub">1st ord.</span></th><th>|<i>A</i><sub>${k}</sub>|</th>${scaled ? `<th>${k}|<i>A</i><sub>${k}</sub>|</th>` : ''}</tr>`;
+  const body = rows.map(r => {
     const flat = r.static || r.amp < 1e-4 || r.amp < 0.01 * Math.max(strong, rows[0].amp);
-    const tau = r.sp ? (isStatic(r.sp) ? '–' : fmtT(r.sp.tau)) : '–';
-    const items = [
-      ['<i>τ</i>', tau],
-      ['<i>φ</i><sub>max</sub>', flat ? '–' : r.phiMax.toFixed(0) + '°'],
-      ['<i>δ</i>', flat ? '–' : r.delta.toFixed(0) + '°'],
-      ['<i>t</i><sub>con</sub>, simulated', flat ? '–' : fmtT(r.tcon)],
-      ['<i>t</i><sub>con</sub>, first-order', r.theory == null || flat ? '–' : fmtT(r.theory)],
-      [`|<i>A</i><sub>${k}</sub>|`, r.amp.toFixed(3)],
-      ...(square && k > 1 ? [[`${k} · |<i>A</i><sub>${k}</sub>|`, (k * r.amp).toFixed(3)]] : []),
-    ];
-    return `<div class="val-card" style="--c:${r.color}"><div class="val-name">${r.label}</div>
-      <dl>${items.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl></div>`;
+    return `<tr><td style="color:${r.color}" title="${r.label}">${r.key === 'stim' ? 'stim.' : r.label.split(',')[0]}</td>
+      <td>${flat ? '–' : r.phiMax.toFixed(0) + '°'}</td><td>${flat ? '–' : r.delta.toFixed(0) + '°'}</td>
+      <td>${flat ? '–' : t(r.tcon)}</td><td>${r.theory == null || flat ? '–' : t(r.theory)}</td>
+      <td>${r.amp.toFixed(3)}</td>${scaled ? `<td>${(k * r.amp).toFixed(3)}</td>` : ''}</tr>`;
   }).join('');
+  $('readout').innerHTML = head + body;
 }
 
 function draw() {
@@ -555,6 +557,7 @@ function markChanged() {
   const changed = snap(state.s) !== snap(CASES[state.caseIdx].s);
   $('caseSelect').classList.toggle('changed', changed);
   $('resetCase').disabled = !changed;
+  renderRail();
 }
 
 /* ---------------------------------------------------------------------------
@@ -562,12 +565,92 @@ function markChanged() {
    the four plots never need scrolling.
    --------------------------------------------------------------------------- */
 function fitWorkbench() {
-  const wb = $('workbench');
-  if (document.documentElement.dataset.w !== 'wide') { wb.style.height = ''; return; }
+  const wb = $('workbench'), stage = $('stage'), wide = document.documentElement.dataset.w === 'wide';
+  document.body.classList.toggle('wb-locked', wide);
+  if (!wide) { wb.style.height = ''; stage.style.height = ''; return; }
   const zoom = parseFloat(document.body.style.zoom) || 1;
-  // from under the site header to the bottom of the window
+  // from under the site header to the bottom of the window; only the centre scrolls
   wb.style.height = `${Math.max(560, window.innerHeight / zoom - wb.offsetTop)}px`;
+  stage.style.height = `${$('wbMain').clientHeight}px`;
 }
+
+/* ---------------------------------------------------------------------------
+   Collapsing the panels. Right: gone, a tab brings it back. Left: a rail of
+   quick switches, the way IR-bands collapses its sidebar.
+   --------------------------------------------------------------------------- */
+const panels = { left: true, right: true };
+function setPanels() {
+  const wb = $('workbench');
+  wb.classList.toggle('left-closed', !panels.left);
+  wb.classList.toggle('right-closed', !panels.right);
+  $('leftToggle').textContent = panels.left ? '◀' : '▶';
+  $('leftToggle').title = panels.left ? 'Collapse the settings to quick switches' : 'Open the settings';
+  $('rightOpen').hidden = panels.right;
+  renderRail();
+  fitWorkbench(); draw();
+}
+$('leftToggle').addEventListener('click', () => { panels.left = !panels.left; setPanels(); });
+$('rightToggle').addEventListener('click', () => { panels.right = false; setPanels(); });
+$('rightOpen').addEventListener('click', () => { panels.right = true; setPanels(); });
+
+/* The rail: the case, its reset, the stimulus, k, all φ, the sweep, the
+   noise, and one switch per species slot. A button says what it is on hover;
+   the case, k and noise open a small menu. */
+let flyOpen = null, flyTimer = null;
+const railBtn = (id, text, title, opts = {}) => `<button type="button" class="rail-btn${opts.on ? ' on' : ''}${opts.text ? ' is-text' : ''}" data-r="${id}" title="${title}"${opts.style ? ` style="${opts.style}"` : ''}${opts.disabled ? ' disabled' : ''}>${text}</button>`;
+const flyWrap = (id, btn, items) => `<div class="rail-wrap" data-fly="${id}">${btn}<div class="fly"${flyOpen === id ? '' : ' hidden'}>${items}</div></div>`;
+const flyItem = (r, v, text, on) => `<button type="button" class="fly-item${on ? ' fly-on' : ''}" data-r="${r}" data-v="${v}">${text}</button>`;
+function renderRail() {
+  if (panels.left || !state.s) { $('rail').innerHTML = ''; return; }
+  const st = state.s, ci = state.caseIdx, changed = $('caseSelect').classList.contains('changed');
+  $('rail').innerHTML = [
+    flyWrap('case', railBtn('caseFly', String(ci + 1), 'Case', { text: true, on: true }),
+      `<div class="fly-title">Case</div>${CASES.map((c, i) => flyItem('case', i, `${i + 1} · ${c.title}`, i === ci)).join('')}`),
+    railBtn('reset', '↺', changed ? 'Reset to the case' : 'Nothing changed from the case', { disabled: !changed }),
+    '<hr class="rail-rule">',
+    railBtn('shape', st.shape === 'square' ? '⊓' : '∿', st.shape === 'square' ? 'Stimulus on / off. Click for sine' : 'Stimulus sine. Click for on / off', { text: true }),
+    flyWrap('k', railBtn('kFly', `k${st.k}`, 'Harmonic k', { text: true }),
+      `<div class="fly-title">Harmonic <i>k</i></div>${[1, 2, 3, 5].map(k => flyItem('k', k, `k = ${k}`, k === st.k)).join('')}`),
+    railBtn('allPhi', '∥', st.allPhi ? 'All φ from 0 to 170° shown. Click for the period' : 'The averaged period shown. Click for all φ', { on: st.allPhi, text: true }),
+    railBtn('play', playing ? '❚❚' : '▶', playing ? 'Pause the sweep' : 'Sweep φ', { on: playing, text: true }),
+    flyWrap('noise', railBtn('noiseFly', 'σ', 'Noise', { text: true, on: st.noise > 0 }),
+      `<div class="fly-title">Noise, <i>σ</i> = ${sigmaFromSlider(st.noise).toFixed(3)}</div>${flyItem('noise', 'new', 'new noise')}${flyItem('noise', 'off', 'no noise', st.noise === 0)}${flyItem('noise', 'case', 'the case’s noise', st.noise === caseS().noise)}`),
+    '<hr class="rail-rule">',
+    ...st.species.map((s, i) => railBtn(`sp:${i}`, s.label.split(',')[0].slice(0, 2), `${s.label}: ${s.on ? 'in the sample. Click to take it out' : 'not in the sample. Click to add it'}`, { text: true, on: s.on, style: `--c:${colorOf(s)}` })),
+  ].join('');
+}
+$('rail').addEventListener('mouseover', e => {
+  const w = e.target.closest('[data-fly]');
+  if (!w) return;
+  if (flyTimer) { clearTimeout(flyTimer); flyTimer = null; }
+  if (flyOpen !== w.dataset.fly) { flyOpen = w.dataset.fly; $('rail').querySelectorAll('.fly').forEach(f => { f.hidden = f.parentElement.dataset.fly !== flyOpen; }); }
+});
+$('rail').addEventListener('mouseout', e => {
+  if (e.relatedTarget && e.relatedTarget.closest?.('[data-fly]') === e.target.closest('[data-fly]')) return;
+  flyTimer = setTimeout(() => { flyOpen = null; $('rail').querySelectorAll('.fly').forEach(f => { f.hidden = true; }); }, 180);
+});
+$('rail').addEventListener('click', e => {
+  const b = e.target.closest('[data-r]');
+  if (!b) return;
+  const r = b.dataset.r, st = state.s;
+  if (r === 'case') { flyOpen = null; selectCase(+b.dataset.v); return; }
+  if (r === 'reset') { selectCase(state.caseIdx, false); return; }
+  if (r === 'shape') { st.shape = st.shape === 'square' ? 'sine' : 'square'; syncControls(); }
+  else if (r === 'k') { st.k = +b.dataset.v; flyOpen = null; syncControls(); }
+  else if (r === 'allPhi') { st.allPhi = !st.allPhi; syncControls(); }
+  else if (r === 'play') { $('play').click(); return; }
+  else if (r === 'noise') {
+    if (b.dataset.v === 'new') state.seed += 1;
+    else st.noise = b.dataset.v === 'off' ? 0 : caseS().noise;
+    flyOpen = null;
+  } else if (r.startsWith('sp:')) {
+    const s = st.species[+r.slice(3)], before = s.on;
+    s.on = !s.on;
+    if (!claimColor(s)) { s.on = before; b.classList.add('refused'); setTimeout(() => b.classList.remove('refused'), 900); return; }
+    renderSpecies();
+  } else return;
+  update();
+});
 
 /* ---------------------------------------------------------------------------
    Controls: measurement and demodulation
@@ -614,8 +697,9 @@ function slotCard(s, i) {
     <div class="sp-body">
       <label class="ctl wide"><span>follows</span><select data-f="drive">${opts}</select></label>
       <div class="ctl vctl wide" data-k="tau:${i}"></div>
+      <div class="ctl vctl wide" data-k="lag:${i}"></div>
       <div class="ctl wide"><span>response</span><span class="seg" data-f="invert"><button type="button" data-v="0"${dis(isStatic(s))} aria-pressed="${!s.invert}" title="rises while the stimulus is on">in phase</button><button type="button" data-v="1"${dis(isStatic(s))} aria-pressed="${!!s.invert}" title="falls while the stimulus is on">antiphase</button></span></div>
-      <label class="ctl check"><input type="checkbox" data-f="hasBand"${s.band ? ' checked' : ''}${dis(isStatic(s))}><span>band</span></label>
+      ${s.band ? '' : '<p class="sp-note wide">a signal without a band, e.g. the gas in the cell: it drives what follows it and is drawn dashed</p>'}
       <label class="ctl num"><span>centre</span><input type="number" data-f="c" min="${lo}" max="${hi}" step="${Math.abs(ax.step)}" value="${s.band ? num(s.band[0], 1) : ''}"${dis(!s.band)}></label>
       <label class="ctl num"><span>width</span><input type="number" data-f="w" min="${Math.abs(ax.step)}" max="${(hi - lo) / 2}" step="${Math.abs(ax.step)}" value="${s.band ? num(s.band[1], 1) : ''}"${dis(!s.band)}></label>
       <label class="ctl num"><span>height</span><input type="number" data-f="h" min="0.01" step="0.01" value="${s.band ? num(s.band[2], 3) : ''}"${dis(!s.band)}></label>
@@ -809,11 +893,17 @@ function phiAt(e) {
   const { x } = local(e), { inner } = PH.p;
   return Math.max(0, Math.min(359, (x - inner.l) / (inner.r - inner.l) * 360));
 }
+/** Near the ruler: within a few px of the dashed line, inside the plot. */
+function onRuler(e) {
+  if (!PH) return false;
+  const { x, y } = local(e), { inner } = PH.p;
+  return Math.abs(x - PH.rx) <= 7 && y >= inner.t - 4 && y <= inner.b;
+}
 let dragging = false;
 cPhase.addEventListener('pointermove', e => {
   if (dragging) { setPhi(phiAt(e)); return; }
   const q = hit(e);
-  cPhase.style.cursor = q ? 'pointer' : 'ew-resize';
+  cPhase.style.cursor = q ? 'pointer' : onRuler(e) ? 'ew-resize' : 'default';
   const prev = state.preview?.poi;
   if (q !== prev) {
     state.preview = q ? { phi: q.phi, poi: q } : null;
@@ -822,10 +912,12 @@ cPhase.addEventListener('pointermove', e => {
   if (q) showTip(poiText(q), e.clientX, e.clientY, 'cursor'); else hideTip();
 });
 cPhase.addEventListener('pointerleave', () => { if (dragging) return; state.preview = null; hideTip(); draw(); });
+/* the ruler moves only when grabbed, or when a marked point is clicked; a click elsewhere does nothing */
 cPhase.addEventListener('pointerdown', e => {
   const q = hit(e);
   if (q) { state.preview = null; hideTip(); setPhi(q.phi); return; }
-  dragging = true; cPhase.setPointerCapture(e.pointerId); hideTip(); state.preview = null; setPhi(phiAt(e));
+  if (!onRuler(e)) return;
+  dragging = true; cPhase.setPointerCapture(e.pointerId); hideTip(); state.preview = null;
 });
 cPhase.addEventListener('pointerup', e => { dragging = false; try { cPhase.releasePointerCapture(e.pointerId); } catch { /* already released */ } });
 
@@ -871,9 +963,20 @@ const BIND = {
     toR: v => v, fromR: r => r, fmt: v => String(v), caseV: () => 80, def: 80,
   },
 };
+/** The lag of one first-order step at the fundamental, δ = arctan(ωτ), in degrees. */
+const lagOf = tau => Math.atan(2 * Math.PI * tau / state.s.T) * 180 / Math.PI;
+const tauOfLag = d => Math.tan(clamp(d, 0, 89.5) * Math.PI / 180) * state.s.T / (2 * Math.PI);
 function bindOf(key) {
   if (BIND[key]) return BIND[key];
   const i = +key.split(':')[1];
+  // the same step set by its lag: δ of this one step at k = 1, so τ = tan(δ) T / 2π
+  if (key.startsWith('lag:')) return {
+    label: 'or its lag <i>δ</i> at <i>k</i> = 1', unit: '°', min: 0, max: 89, step: 1, redraw: 'update',
+    get: () => lagOf(state.s.species[i].tau), set: v => { state.s.species[i].tau = tauOfLag(v); },
+    toR: v => Math.round(v), fromR: r => r, fmt: v => v.toFixed(1),
+    caseV: () => lagOf(caseTau(i)), def: lagOf((DEFAULT_SLOTS[i].tau ?? 0) * state.s.T),
+    off: () => isStatic(state.s.species[i]),
+  };
   return {
     label: '<i>τ</i>', unit: state.s.unit === 'T' ? 'T' : 'min', min: 0, max: 100, step: 1, redraw: 'update',
     get: () => state.s.species[i].tau, set: v => { state.s.species[i].tau = clamp(v, 0, 2 * state.s.T); },
@@ -975,6 +1078,7 @@ let playing = false, raf = 0, acc = 0, last = 0;
 $('play').addEventListener('click', () => {
   playing = !playing;
   $('play').textContent = playing ? '❚❚ pause' : '▶ sweep φ';
+  renderRail();
   last = 0; acc = state.s.phi;
   const stepFn = t => {
     if (!playing) return;
@@ -1000,4 +1104,6 @@ renderCitations([$('general'), $('subSpecFold'), $('subSpecAll'), $('subPhase'),
 fillVctls(document);
 const wanted = new URLSearchParams(location.search).get('case');
 const start = Math.max(0, CASES.findIndex(c => c.id === wanted));
+// the footer goes under the text in the centre, which is what scrolls on a wide screen
+$('below').append(document.querySelector('.site-footer'));
 (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { fitWorkbench(); selectCase(start, false); });

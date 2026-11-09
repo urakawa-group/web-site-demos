@@ -5,6 +5,11 @@
  *
  *   const p = plot(canvas, { x: [0, 1], y: [-0.2, 1.2], xlabel: 'time / T', ... });
  *   p.line(xs, ys, C['data-a']);
+ *
+ * `scale` (default 1) multiplies every text size and the margins that hold
+ * text, e.g. CHART.workbenchScale for the plots of a workbench page.
+ * p.font(role, weight) is a type role's font at that scale, for text a page
+ * draws itself.
  */
 import { C, CHART, typeFont } from './tokens.js';
 
@@ -19,16 +24,26 @@ export function plot(canvas, o) {
   ctx.setTransform(d, 0, 0, d, 0, 0);
   ctx.clearRect(0, 0, W, H);
 
-  const m = { ...CHART.margin, ...(o.margin ?? {}) };
+  const sc = o.scale ?? 1;
+  const base = { ...CHART.margin, ...(o.margin ?? {}) };
+  const m = { l: base.l * sc, r: base.r, t: base.t, b: base.b * sc };
   const [x0, x1] = o.x, [y0, y1] = o.y;
   const X = x => m.l + (x - x0) / (x1 - x0) * (W - m.l - m.r);
   const Y = y => H - m.b - (y - y0) / (y1 - y0) * (H - m.t - m.b);
   const inner = { l: m.l, r: W - m.r, t: m.t, b: H - m.b };
 
-  const tick = typeFont('tick'), axis = typeFont('axis'), note = typeFont('annotation');
+  const scaled = (role, weight) => {
+    const f = typeFont(role);
+    let font = f.font.replace(/(\d+(?:\.\d+)?)px/, (_, n) => `${+n * sc}px`);
+    if (weight) font = font.replace(/^(italic )?\d+/, `$1${weight}`);
+    return { ...f, font };
+  };
+  const tick = scaled('tick'), axis = scaled('axis'), note = scaled('annotation');
 
   const api = {
-    ctx, X, Y, W, H, inner,
+    ctx, X, Y, W, H, inner, scale: sc,
+    /** A type role's font at this plot's scale, optionally at another weight. */
+    font: (role, weight) => scaled(role, weight).font,
     /** Fill the background between two x values, e.g. a half-period. */
     shadeX(xa, xb, color) {
       const a = Math.max(X(xa), inner.l), b = Math.min(X(xb), inner.r);
@@ -72,7 +87,7 @@ export function plot(canvas, o) {
       const w = ctx.measureText(s).width, px = X(x), py = Y(y);
       const left = align === 'center' ? px - w / 2 : align === 'right' ? px - w : px;
       ctx.fillStyle = C.surface; ctx.globalAlpha = 0.85;
-      ctx.fillRect(left - 3, py - 12, w + 6, 16);
+      ctx.fillRect(left - 3, py - 12 * sc, w + 6, 16 * sc);
       ctx.globalAlpha = 1; ctx.fillStyle = color;
       ctx.fillText(s, px, py);
     },
@@ -86,18 +101,18 @@ export function plot(canvas, o) {
       for (const [v, s] of o.xticks ?? []) {
         const px = X(v);
         ctx.beginPath(); ctx.moveTo(px, inner.b); ctx.lineTo(px, inner.b + 4); ctx.stroke();
-        ctx.fillText(s, px, inner.b + 17);
+        ctx.fillText(s, px, inner.b + 17 * sc);
       }
       ctx.textAlign = 'right';
       for (const [v, s] of o.yticks ?? []) {
         const py = Y(v);
         ctx.beginPath(); ctx.moveTo(inner.l - 4, py); ctx.lineTo(inner.l, py); ctx.stroke();
-        ctx.fillText(s, inner.l - 7, py + 4);
+        ctx.fillText(s, inner.l - 7, py + 4 * sc);
       }
       ctx.font = axis.font; ctx.fillStyle = axis.color; ctx.textAlign = 'center';
       if (o.xlabel) ctx.fillText(o.xlabel, (inner.l + inner.r) / 2, H - 5);
       if (o.ylabel) {
-        ctx.save(); ctx.translate(13, (inner.t + inner.b) / 2); ctx.rotate(-Math.PI / 2);
+        ctx.save(); ctx.translate(13 * sc, (inner.t + inner.b) / 2); ctx.rotate(-Math.PI / 2);
         ctx.fillText(o.ylabel, 0, 0); ctx.restore();
       }
     },

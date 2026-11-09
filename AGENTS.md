@@ -37,21 +37,35 @@ should understand the idea by changing something and watching the response.
   double-click on the slider sets the page default (noise 0, φ 0°, …). A
   group of values (a species slot) gets one ↺ for the whole group.
 - **The workbench layout, on a wide screen.** An app layout under the site
-  header, as tall as the window: the settings in a full-height side panel
-  flush with the left edge (case selector first), the values in one flush
-  with the right edge, and between them the head (breadcrumb, title, a lead
-  of at most 50 words) over the plots. The plots are sized to what is left,
-  so every one is in view without scrolling; the side panels scroll on their
-  own. Narrower, head and plots come first, then the settings, then the
-  values. Under the workbench the explanation and the equations, last the
-  reference list.
+  header, as tall as the window: the settings in a full-height panel flush
+  with the left edge (case selector first), the values as a table in one
+  flush with the right edge, the centre between them. Each of the three
+  scrolls on its own; scrolling the centre never moves a side panel. The
+  centre holds first the head (breadcrumb, title, a lead of at most 50
+  words) and the plots, sized so every one is in view without scrolling,
+  then the explanation, the equations and the reference list. Text in the
+  centre is at `CHART.workbenchScale` (1.5×). Narrower, head and plots come
+  first, then the settings, then the values, and the page scrolls as usual.
+- **Both panels collapse.** The right one goes away entirely, a tab at the
+  edge brings it back. The left one shrinks to a rail of quick switches, as
+  IR-bands does: the case, its reset, the stimulus, k, all φ, the sweep, the
+  noise, and one switch per species slot; a button names itself on hover,
+  and a few open a small menu.
+- **Nothing moves when a setting changes.** Subtitles and legends keep a
+  fixed height, panel titles stay on one line, a mark that comes and goes
+  (changed, ↺) keeps its space. Only the panels' own content changes.
 - **Case texts are tooltips; the text below is general.** Hovering a case
   in the selector shows its text. The explanation under the plots is the
   same for every case: what the page shows and how to read and use it.
 - **Plots answer the pointer where a point means something.** A marked
   point (a maximum, a zero) shows what it means on hover, previews its
-  effect in the other plots, and is kept on click; a cursor line that sets a
-  value can be dragged.
+  effect in the other plots, and is kept on click. A ruler that sets a value
+  (the phase angle) is drawn dashed with a grip and moves only when grabbed;
+  a click anywhere else in the plot does nothing.
+- **Names in a case.** Species are lettered in drive order, A first
+  (`A, gas in the cell`, `B, fast species`). A quantity a reader may know
+  from another method is named generically: the signal, not the band
+  height.
 - **Plot limits are fixed per case.** They follow from the bands, never from
   a slider or the phase angle, so nothing rescales while the reader changes a
   setting or sweeps φ. The one exception is the harmonic: the axes of
