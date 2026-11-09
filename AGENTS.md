@@ -36,13 +36,15 @@ should understand the idea by changing something and watching the response.
   value differs from the case and puts the case's value back; a
   double-click on the slider sets the page default (noise 0, φ 0°, …). A
   group of values (a species slot) gets one ↺ for the whole group.
-- **The workbench layout, on a wide screen.** Under a short head (breadcrumb,
-  title, a lead of at most 50 words) three columns: the settings in a left
-  sidebar (case selector first), the plots in the centre, the values in a
-  right sidebar. The centre is sized to the window, so every plot is in
-  view without scrolling; the sidebars scroll on their own. Narrower, the
-  three stack. Under the workbench the explanation and the equations, last
-  the reference list, full width.
+- **The workbench layout, on a wide screen.** An app layout under the site
+  header, as tall as the window: the settings in a full-height side panel
+  flush with the left edge (case selector first), the values in one flush
+  with the right edge, and between them the head (breadcrumb, title, a lead
+  of at most 50 words) over the plots. The plots are sized to what is left,
+  so every one is in view without scrolling; the side panels scroll on their
+  own. Narrower, head and plots come first, then the settings, then the
+  values. Under the workbench the explanation and the equations, last the
+  reference list.
 - **Case texts are tooltips; the text below is general.** Hovering a case
   in the selector shows its text. The explanation under the plots is the
   same for every case: what the page shows and how to read and use it.
