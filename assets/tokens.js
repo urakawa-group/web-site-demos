@@ -109,6 +109,8 @@ export const COLOR_GROUPS = [
       'data-faint':     { value: 'rgba(94,101,112,0.28)', usage: 'Many traces at once (grey dark at 28 %): the spectra of one period, the other phase angles' },
       'shade-on':       { value: 'rgba(196,64,54,0.08)', usage: 'Background of the stimulus-on half in a time plot (red line at 8 %)' },
       'shade-off':      { value: 'rgba(1,134,174,0.08)', usage: 'Background of the stimulus-off half (blue line at 8 %)' },
+      'map-pos':        { value: SCHEME.amber.line, usage: 'Positive values in a colour map and positive area under a product curve (amber line, PuOr-style). Not red, so it is never read as stimulus on' },
+      'map-neg':        { value: SCHEME.purple.dark, usage: 'Negative values in a colour map and negative area under a product curve (purple dark). Not blue, so it is never read as stimulus off' },
     },
   },
 ];
@@ -276,6 +278,7 @@ export const PRESENTATION = {
   subtractions: [
     { what: 'The site header and footer', why: 'Navigation for a reader at a desk. On a wall it is a band of nothing that costs an eighth of the screen.' },
     { what: 'The lead under the title', why: 'The presenter says it. The title stays, so the room knows what it is looking at.' },
+    { what: 'The breadcrumb above the title of a sub-page', why: 'It is for finding the sibling page at a desk. The presenter switches pages with the address bar or a link, the room does not need the path.' },
     { what: 'The explanation and the reference list', why: 'Prose is read at a desk, not from the back of a room. The citation numbers in the panel subtitles stay, so a slide photographed by a student still says where the equation comes from.' },
   ],
 };

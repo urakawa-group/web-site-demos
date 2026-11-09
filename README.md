@@ -12,7 +12,7 @@ happens. Nothing to install, no account, no build step.
 
 | demo | field | what it shows |
 |---|---|---|
-| [MES-PSD](demos/spectroscopy/mes-psd/index.html) | spectroscopy | modulation excitation and phase-sensitive detection in eight cases, from one band without delay to a sequence of species with a spectator: folding, the phase domain, time values, square-wave harmonics |
+| [MES-PSD](demos/spectroscopy/mes-psd/index.html) | spectroscopy | modulation excitation and phase-sensitive detection. [Transformation](demos/spectroscopy/mes-psd/transformation/index.html): one period turned into the phase domain five ways (multiply and integrate, phasor, harmonics, disturbances, the whole spectrum), six inputs. [Cases](demos/spectroscopy/mes-psd/cases/index.html): every setting on a control, eight stored cases from one band without delay to a sequence of species with a spectator |
 
 ## Layout
 
@@ -29,6 +29,8 @@ assets/cite.js                      [@alias, locator] markers → numbered citat
 assets/fonts/                       Source Sans 3 (OFL), served from here
 demos/<field>/<demo>/index.html     one demo: its page,
 demos/<field>/<demo>/<demo>.js      and its engine
+demos/<field>/<topic>/index.html    or a topic with sub-pages: a hub with one card each,
+demos/<field>/<topic>/<page>/       and each sub-page laid out like a demo
 ```
 
 ## Running it locally
@@ -52,7 +54,7 @@ Every demo has a desktop view and a presentation view for a screen at the
 front of a room: a zoom of 1.25× to 2× plus a few subtractions (header, lead,
 explanation). Switch with the button in the header, with Shift+P, or open a
 link with `?present=1` (`?present=1.75` names the scale); + and − step the
-scale, Escape leaves. A demo with cases also takes `?case=<id>`.
+scale, Escape leaves. A page with cases also takes `?case=<id>`, the transformation page `?input=<id>`.
 
 ## Adding a demo
 

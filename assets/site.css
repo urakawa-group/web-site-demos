@@ -126,6 +126,37 @@ ol.refs .loc { font-size: var(--t-ref-loc-size); color: var(--t-ref-loc-color); 
 #caseMenu li:hover, #caseMenu li:focus { background: var(--surface-hover); outline: none; }
 #caseMenu li[aria-selected="true"] { color: var(--accent); background: var(--accent-tint); }
 
+/* breadcrumb above the title of a demo sub-page */
+.crumbs { font-size: var(--t-control-size); color: var(--t-control-color); margin: 0 0 var(--space-1); }
+.crumbs a { text-decoration: none; }
+.crumbs a:hover { text-decoration: underline; }
+
+/* a case is a snapshot of settings: mark it once a setting differs */
+.case-actions { display: flex; gap: var(--space-2); }
+.case-actions .btn { flex: 1; }
+.case-actions .btn:disabled { opacity: 0.45; cursor: default; }
+#caseBtn .changed-mark { display: none; font-size: var(--t-control-size); font-weight: var(--t-control-weight); color: var(--ink-500); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 6px; }
+.case-select.changed #caseBtn .changed-mark { display: inline; }
+
+/* species editor: one row per species */
+.species-panel { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: var(--space-2) var(--space-4) var(--space-3); margin-top: var(--space-3); }
+.species-head { display: flex; align-items: center; justify-content: space-between; font-size: var(--t-control-size); color: var(--t-control-color); margin-bottom: var(--space-1); }
+.sp-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2) var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--line-soft); }
+.sp-row .ctl { min-width: 0; }
+.sp-row .ctl input[type=range] { width: 150px; }
+.sp-name { display: flex; align-items: center; gap: var(--space-2); min-width: 170px; }
+.sp-swatch { display: inline-block; width: 18px; height: 0; border-top: 3px solid var(--c); }
+.sp-swatch.dashed { border-top-style: dashed; }
+.sp-name input, .ctl.num input {
+  font: inherit; font-size: var(--t-control-size); color: var(--t-control-value-color);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); padding: 4px 6px; min-height: 30px;
+}
+.sp-name input { width: 140px; color: var(--c); font-weight: var(--t-control-value-weight); }
+.ctl.num input { width: 84px; font-variant-numeric: tabular-nums; }
+.ctl.num input:disabled, .sp-row input:disabled + span, .sp-row select:disabled { opacity: 0.45; }
+.sp-remove { margin-left: auto; min-width: 34px; }
+[data-w="compact"] .sp-remove { margin-left: 0; }
+
 /* ---------- demo: controls ---------- */
 .case-picker { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
 .case-picker button, .btn {
@@ -159,6 +190,14 @@ ol.refs .loc { font-size: var(--t-ref-loc-size); color: var(--t-ref-loc-color); 
 /* ---------- demo: panels ---------- */
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-3); }
 [data-w="compact"] .grid { grid-template-columns: 1fr; }
+.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+[data-w="mid"] .grid.three { grid-template-columns: 1fr 1fr; }
+[data-w="compact"] .grid.three { grid-template-columns: 1fr; }
+.page-demo > h2 { margin-top: var(--space-5); }
+.ctl-group { display: contents; }
+.inline-ctl { display: inline-flex; align-items: center; gap: var(--space-2); }
+.inline-ctl b { font-weight: var(--t-control-value-weight); color: var(--t-control-value-color); }
+.inline-ctl input[type=range] { width: 160px; accent-color: var(--accent); }
 .panel { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: var(--space-3) var(--space-3) var(--space-2); min-width: 0; }
 .panel h3 { font-size: var(--t-panel-title-size); font-weight: var(--t-panel-title-weight); color: var(--t-panel-title-color); margin: 0 0 2px; }
 .panel .sub { font-size: var(--t-panel-sub-size); color: var(--t-panel-sub-color); line-height: var(--t-panel-sub-lh); margin: 0 0 6px; min-height: 19px; }
@@ -197,7 +236,8 @@ html[data-view="presentation"] .site-header,
 html[data-view="presentation"] .site-footer,
 html[data-view="presentation"] .lead,
 html[data-view="presentation"] .explain,
-html[data-view="presentation"] .refs-section { display: none; }
+html[data-view="presentation"] .refs-section,
+html[data-view="presentation"] .crumbs { display: none; }
 .present-bar { display: none; }
 html[data-view="presentation"] .present-bar {
   display: flex; gap: var(--space-2); align-items: center; position: fixed; right: 10px; bottom: 10px; z-index: 10;

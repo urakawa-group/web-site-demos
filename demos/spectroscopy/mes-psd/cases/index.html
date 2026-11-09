@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<!--
+  MES-PSD: modulation excitation spectroscopy and phase-sensitive detection.
+
+  What it shows: one engine with every setting on a control, and eight cases,
+  from the simplest (one band that follows the stimulus at once) to a
+  sequence of species with a spectator. A case is a stored snapshot of the
+  settings: picking it loads the snapshot, then every control is free.
+  The transformation itself, on one trace, is the sibling page
+  ../transformation/.
+  The cases follow the MES tutorial notebooks (PhD_execute/runs_tutorials/
+  spectroscopy/mes, fig_mes_00 to 04), which follow Urakawa, Ferri and
+  Nuguid, Springer Handbook of Advanced Catalyst Characterization, Ch. 42
+  (Figs. 42.1 to 42.4, Eq. 42.1), and Weyel et al., Acc. Chem. Res. 2024
+  (Eqs. 1 and 2).
+
+  Model: a square-wave (on in the first half-period) or sine stimulus drives
+  first-order steps, dy/dt = (u - y) / tau, integrated exactly for an input
+  held over each sample. Gaussian bands, Gaussian noise. Everything is
+  folded over the kept cycles and demodulated with
+  A_k(phi) = (2/T) int_0^T A(t) sin(k w t + phi) dt.
+  All numbers are illustrative, not fitted to any measurement.
+
+  URL parameters: ?case=<id> picks a case, ?present=1 (or 1.25 to 2) opens
+  the presentation view.
+
+  Author: Julius Sommer. First version 2026-11-03 in PhD_execute, moved and
+  extended here 2026-11-04, split into transformation and cases 2026-11-09.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MES-PSD Cases: Modulation Excitation and Phase-Sensitive Detection</title>
+<link rel="stylesheet" href="../../../../assets/site.css">
+</head>
+<body>
+<main class="page-demo">
+  <div class="demo-head">
+    <div>
+      <p class="crumbs"><a href="../index.html">MES-PSD</a> · Cases</p>
+      <h1>Modulation Excitation and Phase-Sensitive Detection: Cases</h1>
+      <p class="lead">Switch a stimulus on and off, fold the cycles, demodulate. A case is a stored set of the settings below; load one, then change anything, down to every band.</p>
+    </div>
+    <div class="case-select" id="caseSelect">
+      <span class="case-select-label">case</span>
+      <button type="button" id="caseBtn" aria-haspopup="listbox" aria-expanded="false"></button>
+      <ul id="caseMenu" role="listbox" aria-label="Case" hidden></ul>
+      <div class="case-actions">
+        <button class="btn" id="resetCase" type="button" disabled>reset case</button>
+        <button class="btn" id="copySettings" type="button" title="the settings as JSON, to store as a new case">copy settings</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls" id="controls">
+    <div class="ctl"><span>time unit</span>
+      <span class="seg" id="unit"><button type="button" data-v="T">periods</button><button type="button" data-v="min">minutes</button></span></div>
+    <label class="ctl num"><span>period <i>T</i> / min</span><input id="period" type="number" min="1" max="600" step="1"></label>
+    <label class="ctl"><span>spectral axis</span><select id="axis"></select></label>
+    <label class="ctl"><span>noise: <b id="vNoise"></b></span><input id="noise" type="range" min="0" max="100" value="0"></label>
+    <label class="ctl"><span>cycles averaged: <b id="vCycles"></b></span><input id="cycles" type="range" min="1" max="12" value="4"></label>
+    <div class="ctl"><span>stimulus</span>
+      <span class="seg" id="shape"><button type="button" data-v="square">on / off</button><button type="button" data-v="sine">sine</button></span></div>
+    <div class="ctl"><span>harmonic <i>k</i></span>
+      <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="5">5</button></span></div>
+    <label class="ctl"><span>phase angle <i>φ</i>: <b id="vPhi"></b></span><input id="phi" type="range" min="0" max="355" step="5" value="0"></label>
+    <label class="ctl check"><input id="allPhi" type="checkbox"><span>all <i>φ</i> from 0 to 170°</span></label>
+    <div class="ctl-actions">
+      <button class="btn primary" id="play" type="button">▶ sweep φ</button>
+      <button class="btn" id="reseed" type="button">new noise</button>
+    </div>
+  </div>
+
+  <div class="species-panel">
+    <div class="species-head"><span>species, in drive order</span><button class="btn" id="addSpecies" type="button">+ species</button></div>
+    <div id="species"></div>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <h3>1 · Time Domain</h3>
+      <p class="sub">Band heights at their maxima. Red: stimulus on, blue: off. Dashed: the stimulus.</p>
+      <canvas id="cTime"></canvas>
+      <div class="legend" id="legTime"></div>
+    </section>
+    <section class="panel">
+      <h3>2 · Fold and Average</h3>
+      <p class="sub" id="subFold"></p>
+      <canvas id="cFold"></canvas>
+      <div class="legend" id="legFold"></div>
+    </section>
+    <section class="panel">
+      <h3>3 · Spectra, Averaged and Phase-Resolved</h3>
+      <p class="sub" id="subSpec"></p>
+      <canvas id="cSpec"></canvas>
+    </section>
+    <section class="panel">
+      <h3>4 · Phase Domain</h3>
+      <p class="sub" id="subPhase"></p>
+      <canvas id="cPhase"></canvas>
+      <div class="legend" id="legPhase"></div>
+    </section>
+  </div>
+
+  <div class="readout-wrap"><table class="readout" id="readout"></table></div>
+
+  <section class="explain">
+    <article id="caseText"></article>
+    <article id="equations"></article>
+  </section>
+
+  <section class="refs-section">
+    <h2>References</h2>
+    <ol class="refs" id="refs"></ol>
+    <p class="note">All numbers on this page are illustrative: simulated first-order kinetics, not fitted to a measurement.</p>
+  </section>
+</main>
+<script type="module" src="cases.js"></script>
+</body>
+</html>

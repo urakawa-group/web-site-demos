@@ -14,10 +14,21 @@ should understand the idea by changing something and watching the response.
 - **Concept first.** Show the idea in its most basic form: the equations as the
   concept is known by (textbook or original-paper formulation, with its
   symbols), and the simplest numbers that make the point.
-- **One topic, one page; cases inside it.** A method gets one page. Its
-  variants are cases on that page, behind a case selector, ordered from the
-  simplest (one signal, no delay, no noise) to the realistic one. A case
-  explains one idea in at most 130 words.
+- **A topic gets a hub, then the transformation, then the cases.** A method
+  is a folder with a short hub page (one card per sub-page) and two
+  sub-pages, in this order:
+  - *Transformation*: the core operation on one signal, shown several ways,
+    with an input selector (the simplest input first). It answers "what does
+    the method do to a signal".
+  - *Cases*: the method on realistic spectra. Every setting the engine reads
+    has a control, the structure of the sample included (species, bands,
+    time constants). A case is nothing but a stored snapshot of those
+    settings plus a title and a text: picking it loads the snapshot, after
+    which everything is free, and the selector marks the case as changed.
+    Cases are ordered from the simplest (one signal, no delay, no noise) to
+    the realistic one.
+  A case or an input explains one idea in at most 130 words. A small topic
+  with nothing to transform can stay one page.
 - **Short text above, explanation below.** A title and a lead of at most 50
   words on the left two thirds, the case selector on the right third beside
   them (closed it shows the current case, a click opens the menu), then the
@@ -31,6 +42,9 @@ should understand the idea by changing something and watching the response.
 
 - One folder `demos/<field>/<demo>/`: an `index.html` for the markup and a
   `<demo>.js` module for the engine. Data the demo needs sits next to them.
+  A topic with sub-pages is `demos/<field>/<topic>/index.html` (the hub) plus
+  one folder per sub-page, `<topic>/<page>/index.html` and `<page>.js`. A
+  sub-page carries a breadcrumb above its title back to the hub.
 - Plain HTML, CSS and JavaScript modules. No framework, no npm, no build step.
   A library that is really needed is a pinned copy in the repository, never a
   CDN link.
@@ -105,8 +119,9 @@ ones most often broken:
 
 ## Adding a demo, checklist
 
-1. Create `demos/<field>/<demo>/index.html` and `<demo>.js` following the rules
-   above; add its references to `references.bib`.
+1. Create `demos/<field>/<demo>/index.html` and `<demo>.js` (or the hub and
+   its sub-pages) following the rules above; add its references to
+   `references.bib`.
 2. Add a row to the table in [`README.md`](README.md) and a card on the landing
    page `index.html`.
 3. Serve the repository and open the demo at desktop width, phone width and in

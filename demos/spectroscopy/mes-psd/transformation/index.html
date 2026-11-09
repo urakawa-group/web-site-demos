@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<!--
+  MES-PSD transformation: what phase-sensitive detection does to one signal.
+
+  What it shows: one folded period A(t) at one spectral position, and the
+  transformation A(t) -> A_k(phi) five ways: multiply by the reference and
+  integrate; the in-phase and quadrature parts as one phasor; the harmonic
+  content and the period rebuilt from it; what an offset, a drift and noise do
+  to the result; and the whole spectrum as a map, time x position turned into
+  phi x position. An input selector picks the signal: the square wave itself,
+  first-order delays, a falling band, two steps in series, a response that
+  rises fast and falls slow (not linear in the stimulus), and a sine.
+  The cases built on this are the sibling page ../cases/.
+
+  Model: on/off square (on in the first half-period) or sine stimulus, first-
+  order steps dy/dt = (u - y) / tau integrated exactly for an input held over
+  each sample, run to the periodic steady state. Then
+  A_k(phi) = (2/T) int_0^T A(t) sin(k w t + phi) dt
+           = I_k cos(phi) + Q_k sin(phi),
+  I_k = (2/T) int A sin(k w t) dt, Q_k = (2/T) int A cos(k w t) dt.
+  Sources: Urakawa, Ferri and Nuguid, Springer Handbook of Advanced Catalyst
+  Characterization, Ch. 42 (Fig. 42.1, Eq. 42.1); Weyel et al., Acc. Chem.
+  Res. 2024 (Eqs. 1 and 2). The phasor form and the Fourier series are
+  standard trigonometry. All numbers are illustrative.
+
+  URL parameters: ?input=<id> picks the input, ?present=1 (or 1.25 to 2)
+  opens the presentation view.
+
+  Author: Julius Sommer, 2026-11-09.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MES-PSD Transformation: How Phase-Sensitive Detection Works</title>
+<link rel="stylesheet" href="../../../../assets/site.css">
+</head>
+<body>
+<main class="page-demo">
+  <div class="demo-head">
+    <div>
+      <p class="crumbs"><a href="../index.html">MES-PSD</a> · Transformation</p>
+      <h1>Phase-Sensitive Detection: The Transformation</h1>
+      <p class="lead">One averaged period at one wavenumber, turned into the phase domain. Pick an input, move <i>φ</i> and <i>k</i>, and watch the same transformation five ways: multiply and integrate, a phasor, harmonics, disturbances, the whole spectrum.</p>
+    </div>
+    <div class="case-select" id="caseSelect">
+      <span class="case-select-label">input</span>
+      <button type="button" id="caseBtn" aria-haspopup="listbox" aria-expanded="false"></button>
+      <ul id="caseMenu" role="listbox" aria-label="Input" hidden></ul>
+    </div>
+  </div>
+
+  <div class="controls" id="controls">
+    <span id="tauSlot" class="ctl-group"></span>
+    <div class="ctl"><span>harmonic <i>k</i></span>
+      <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button></span></div>
+    <label class="ctl"><span>phase angle <i>φ</i>: <b id="vPhi"></b></span><input id="phi" type="range" min="0" max="355" step="5" value="0"></label>
+    <label class="ctl"><span>offset: <b id="vOff"></b></span><input id="offset" type="range" min="0" max="50" value="0"></label>
+    <label class="ctl"><span>drift per period: <b id="vDrift"></b></span><input id="drift" type="range" min="-40" max="40" value="0"></label>
+    <label class="ctl"><span>noise: <b id="vNoise"></b></span><input id="noise" type="range" min="0" max="100" value="0"></label>
+    <div class="ctl-actions">
+      <button class="btn primary" id="play" type="button">▶ sweep φ</button>
+      <button class="btn" id="run" type="button">▶ integrate</button>
+      <button class="btn" id="reseed" type="button">new noise</button>
+    </div>
+  </div>
+
+  <h2>1 · Multiply, Then Integrate</h2>
+  <div class="grid three">
+    <section class="panel">
+      <h3>The Period and the Reference</h3>
+      <p class="sub">Solid: the averaged period <i>A</i>(<i>t</i>). Green dashed: the reference sin(<i>kωt</i> + <i>φ</i>). Grey dashed: the stimulus.</p>
+      <canvas id="cRef"></canvas>
+    </section>
+    <section class="panel">
+      <h3>Their Product</h3>
+      <p class="sub"><i>A</i>(<i>t</i>) · sin(<i>kωt</i> + <i>φ</i>). Amber area counts positive, purple negative.</p>
+      <canvas id="cProd"></canvas>
+    </section>
+    <section class="panel">
+      <h3>The Running Integral</h3>
+      <p class="sub" id="subInt"></p>
+      <canvas id="cInt"></canvas>
+    </section>
+  </div>
+
+  <h2>2 · The Phasor</h2>
+  <div class="grid">
+    <section class="panel">
+      <h3>Sine and Cosine Part as One Arrow</h3>
+      <p class="sub" id="subPhasor"></p>
+      <canvas id="cPhasor"></canvas>
+    </section>
+    <section class="panel">
+      <h3>Phase Domain</h3>
+      <p class="sub" id="subPhase"></p>
+      <canvas id="cPhase"></canvas>
+    </section>
+  </div>
+
+  <h2>3 · Harmonic Content</h2>
+  <div class="grid">
+    <section class="panel">
+      <h3>Amplitude at Each Harmonic</h3>
+      <p class="sub" id="subHarm"></p>
+      <canvas id="cHarm"></canvas>
+    </section>
+    <section class="panel">
+      <h3>The Period Rebuilt from Its Harmonics</h3>
+      <p class="sub"><label class="inline-ctl">harmonics used: <b id="vNh"></b> <input id="nh" type="range" min="0" max="15" value="3"></label></p>
+      <canvas id="cRebuild"></canvas>
+    </section>
+  </div>
+
+  <h2>4 · What PSD Does Not Remove</h2>
+  <div class="grid">
+    <section class="panel">
+      <h3>Clean and Disturbed Period</h3>
+      <p class="sub">Grey: the response alone. Solid: with the offset, drift and noise set above.</p>
+      <canvas id="cDist"></canvas>
+    </section>
+    <section class="panel">
+      <h3>Phase Domain, Clean and Disturbed</h3>
+      <p class="sub" id="subLeak"></p>
+      <canvas id="cLeak"></canvas>
+    </section>
+  </div>
+
+  <h2>5 · The Whole Spectrum</h2>
+  <div class="grid">
+    <section class="panel">
+      <h3>Averaged Spectra Through One Period</h3>
+      <p class="sub">A static band A at 20 and the input as band B at 40. Amber positive, purple negative.</p>
+      <canvas id="cMapT"></canvas>
+    </section>
+    <section class="panel">
+      <h3>Phase-Resolved Spectra</h3>
+      <p class="sub">The same transformation for every spectral position: A is gone, B is left as a cosine in <i>φ</i>. Green: the chosen <i>φ</i>.</p>
+      <canvas id="cMapP"></canvas>
+    </section>
+  </div>
+
+  <div class="readout-wrap"><table class="readout" id="readout"></table></div>
+
+  <section class="explain">
+    <article id="caseText"></article>
+    <article id="equations"></article>
+  </section>
+
+  <section class="refs-section">
+    <h2>References</h2>
+    <ol class="refs" id="refs"></ol>
+    <p class="note">All numbers on this page are illustrative: simulated first-order kinetics, not fitted to a measurement.</p>
+  </section>
+</main>
+<script type="module" src="transformation.js"></script>
+</body>
+</html>

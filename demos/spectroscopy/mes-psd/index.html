@@ -1,27 +1,9 @@
 <!DOCTYPE html>
 <!--
-  MES-PSD: modulation excitation spectroscopy and phase-sensitive detection.
-
-  What it shows: one engine, eight cases, from the simplest (one band that
-  follows the stimulus at once) to a sequence of species with a spectator.
-  The cases follow the MES tutorial notebooks (PhD_execute/runs_tutorials/
-  spectroscopy/mes, fig_mes_00 to 04), which follow Urakawa, Ferri and
-  Nuguid, Springer Handbook of Advanced Catalyst Characterization, Ch. 42
-  (Figs. 42.1 to 42.4, Eq. 42.1), and Weyel et al., Acc. Chem. Res. 2024
-  (Eqs. 1 and 2).
-
-  Model: a square-wave (on in the first half-period) or sine stimulus drives
-  first-order steps, dy/dt = (u - y) / tau, integrated exactly for an input
-  held over each sample. Gaussian bands, Gaussian noise. Everything is
-  folded over the kept cycles and demodulated with
-  A_k(phi) = (2/T) int_0^T A(t) sin(k w t + phi) dt.
-  All numbers are illustrative, not fitted to any measurement.
-
-  URL parameters: ?case=<id> picks a case, ?present=1 (or 1.25 to 2) opens
-  the presentation view.
-
-  Author: Julius Sommer. First version 2026-11-03 in PhD_execute, moved and
-  extended here 2026-11-04.
+  MES-PSD: the topic page. Two demos under it: the transformation itself on
+  one signal (transformation/), and the cases built on it (cases/). Old
+  links of the form mes-psd/?case=<id> are forwarded to cases/.
+  Author: Julius Sommer, 2026-11-09.
 -->
 <html lang="en">
 <head>
@@ -29,75 +11,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MES-PSD: Modulation Excitation and Phase-Sensitive Detection</title>
 <link rel="stylesheet" href="../../../assets/site.css">
+<script>
+  // links from before the split carried ?case=<id> on this address
+  (() => { const q = new URLSearchParams(location.search); if (q.has('case')) location.replace('cases/index.html' + location.search); })();
+</script>
 </head>
 <body>
-<main class="page-demo">
-  <div class="demo-head">
-    <div>
-      <h1>Modulation Excitation and Phase-Sensitive Detection</h1>
-      <p class="lead">Switch a stimulus on and off, fold the cycles, demodulate. Pick a case, from one band that follows the stimulus at once to a sequence of species with a spectator, and move the sliders.</p>
-    </div>
-    <div class="case-select" id="caseSelect">
-      <span class="case-select-label">case</span>
-      <button type="button" id="caseBtn" aria-haspopup="listbox" aria-expanded="false"></button>
-      <ul id="caseMenu" role="listbox" aria-label="Case" hidden></ul>
-    </div>
+<main class="page">
+  <p class="crumbs"><a href="../../../index.html">Demos</a> · Spectroscopy</p>
+  <h1>Modulation Excitation and Phase-Sensitive Detection</h1>
+  <p class="lead">Switch a stimulus on and off, fold the cycles, demodulate. First how the transformation works on one signal, then the cases: from one band without delay to a sequence of species with a spectator.</p>
+  <div class="cards">
+    <a class="card" href="transformation/index.html">
+      <span class="card-title">1 · The Transformation</span>
+      <span class="card-desc">One averaged period turned into the phase domain, five ways: multiply and integrate, the phasor, harmonic content, what an offset, drift or noise does, and the whole spectrum as a map. Six inputs, from the square wave itself to a response that rises fast and falls slowly.</span>
+    </a>
+    <a class="card" href="cases/index.html">
+      <span class="card-title">2 · Cases</span>
+      <span class="card-desc">Every setting on a control, down to each band and time constant. Eight stored cases, from one band that follows the stimulus at once to a sequence of species with a spectator: folding, the phase domain, time values and square-wave harmonics.</span>
+    </a>
   </div>
-
-  <div class="controls" id="controls">
-    <label class="ctl"><span>noise: <b id="vNoise"></b></span><input id="noise" type="range" min="0" max="100" value="0"></label>
-    <label class="ctl"><span>cycles averaged: <b id="vCycles"></b></span><input id="cycles" type="range" min="1" max="12" value="4"></label>
-    <div class="ctl"><span>stimulus</span>
-      <span class="seg" id="shape"><button type="button" data-v="square">on / off</button><button type="button" data-v="sine">sine</button></span></div>
-    <div class="ctl"><span>harmonic <i>k</i></span>
-      <span class="seg" id="harm"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="5">5</button></span></div>
-    <label class="ctl"><span>phase angle <i>φ</i>: <b id="vPhi"></b></span><input id="phi" type="range" min="0" max="355" step="5" value="0"></label>
-    <label class="ctl check"><input id="allPhi" type="checkbox"><span>all <i>φ</i> from 0 to 170°</span></label>
-    <div class="ctl-actions">
-      <button class="btn primary" id="play" type="button">▶ sweep φ</button>
-      <button class="btn" id="reseed" type="button">new noise</button>
-    </div>
-  </div>
-
-  <div class="grid">
-    <section class="panel">
-      <h3>1 · Time Domain</h3>
-      <p class="sub">Band heights at their maxima. Red: stimulus on, blue: off. Dashed: the stimulus.</p>
-      <canvas id="cTime"></canvas>
-      <div class="legend" id="legTime"></div>
-    </section>
-    <section class="panel">
-      <h3>2 · Fold and Average</h3>
-      <p class="sub" id="subFold"></p>
-      <canvas id="cFold"></canvas>
-      <div class="legend" id="legFold"></div>
-    </section>
-    <section class="panel">
-      <h3>3 · Spectra, Averaged and Phase-Resolved</h3>
-      <p class="sub" id="subSpec"></p>
-      <canvas id="cSpec"></canvas>
-    </section>
-    <section class="panel">
-      <h3>4 · Phase Domain</h3>
-      <p class="sub" id="subPhase"></p>
-      <canvas id="cPhase"></canvas>
-      <div class="legend" id="legPhase"></div>
-    </section>
-  </div>
-
-  <div class="readout-wrap"><table class="readout" id="readout"></table></div>
-
-  <section class="explain">
-    <article id="caseText"></article>
-    <article id="equations"></article>
-  </section>
-
-  <section class="refs-section">
-    <h2>References</h2>
-    <ol class="refs" id="refs"></ol>
-    <p class="note">All numbers on this page are illustrative: simulated first-order kinetics, not fitted to a measurement.</p>
-  </section>
 </main>
-<script type="module" src="mes-psd.js"></script>
+<script type="module">
+  import { initShell } from '../../../assets/shell.js';
+  initShell({ page: 'demos' });
+</script>
 </body>
 </html>
