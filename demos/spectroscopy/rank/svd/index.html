@@ -106,37 +106,26 @@
         </div>
         <div class="wb-center">
           <section class="panel">
-            <h3>1 · Data Matrix</h3>
-            <div class="sub-row">
-              <p class="sub" id="subData"></p>
-              <span class="seg view-seg" id="view1"><button type="button" data-v="spectra">spectra</button><button type="button" data-v="map">map</button><button type="button" data-v="truth">species</button></span>
-            </div>
+            <div class="title-row"><h3>1 · Data Matrix</h3><span class="seg view-seg" id="view1"><button type="button" data-v="spectra">spectra</button><button type="button" data-v="map">map</button><button type="button" data-v="truth">species</button></span></div>
+            <p class="sub" id="subData"></p>
             <canvas id="cData"></canvas>
             <div class="legend" id="legData"></div>
           </section>
           <section class="panel">
-            <h3>2 · Singular Values</h3>
-            <div class="sub-row">
-              <p class="sub" id="subScree"></p>
-            </div>
+            <div class="title-row"><h3>2 · Singular Values</h3><span class="seg view-seg" id="view2"><button type="button" data-v="scree">scree</button><button type="button" data-v="ftest">F-test</button></span></div>
+            <p class="sub" id="subScree"></p>
             <canvas id="cScree" class="interactive"></canvas>
             <div class="legend" id="legScree"></div>
           </section>
           <section class="panel">
-            <h3>3 · Components</h3>
-            <div class="sub-row">
-              <p class="sub" id="subComp"></p>
-              <span class="seg view-seg" id="view3"><button type="button" data-v="loadings">loadings</button><button type="button" data-v="scores">in time</button><button type="button" data-v="plane">score plots</button></span>
-            </div>
+            <div class="title-row"><h3>3 · Components</h3><span class="seg view-seg" id="view3"><button type="button" data-v="loadings">loadings</button><button type="button" data-v="scores">in time</button><button type="button" data-v="plane">score plots</button></span></div>
+            <p class="sub" id="subComp"></p>
             <canvas id="cComp"></canvas>
             <div class="legend" id="legComp"></div>
           </section>
           <section class="panel">
-            <h3>4 · Matrix Operation</h3>
-            <div class="sub-row">
-              <p class="sub" id="subFit"></p>
-              <span class="seg view-seg" id="view4"><button type="button" data-v="blocks">blocks</button><button type="button" data-v="numbers">numbers</button><button type="button" data-v="residual">residual</button><button type="button" data-v="lof">lack of fit</button></span>
-            </div>
+            <div class="title-row"><h3>4 · Rebuild</h3><span class="seg view-seg" id="view4"><button type="button" data-v="blocks">blocks</button><button type="button" data-v="numbers">numbers</button><button type="button" data-v="residual">residual</button><button type="button" data-v="lof">LoF</button></span></div>
+            <p class="sub" id="subFit"></p>
             <canvas id="cFit" class="interactive"></canvas>
             <div class="legend" id="legFit"></div>
           </section>

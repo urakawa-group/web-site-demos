@@ -8,14 +8,14 @@ import { initShell } from '../../../../assets/shell.js';
 import { C, CHART } from '../../../../assets/tokens.js';
 import { plot } from '../../../../assets/plot.js';
 import { renderCitations } from '../../../../assets/cite.js';
-import { svd, sumSq } from '../../../../assets/linalg.js';
+import { svd, sumSq, fTail } from '../../../../assets/linalg.js';
 import {
   fitWorkbench, initWorkbench, valueControls, foldingGroups, caseSelector, tooltip,
   setSeg, rail, grip, dragRuler, localIn, clamp, reserveLegends,
 } from '../../../../assets/workbench.js';
 import { T_END, build } from '../mixture.js';
 import {
-  $, clone, M, SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR,
+  $, clone, M, SOURCES as COMMON_SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR,
   residual, fmtS, fmtPct, SC, T_TICKS, XLAB_T, axOf, xRangeOf, LOG_TICKS, legend, legendHtml, heatmap, MAP_LEGEND,
   dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData,
   callout, frac, sum, EQ_BILINEAR, EQ_NOISE,
@@ -23,15 +23,17 @@ import {
 
 initShell({ page: 'demo', views: true });
 
+const SOURCES = { ...COMMON_SOURCES, malinowski: { key: 'Malinowski.StatisticalFtestsAbstract.1989', journal: 'J. Chemom.' } };
+
 /* ---------------------------------------------------------------------------
    Settings: the data (common.js) plus
      n      components kept (what the reader decides, not the data)
-     view1  'spectra' | 'map' | 'truth';  view3 'loadings' | 'scores' | 'plane'
+     view1  'spectra' | 'map' | 'truth';  view2 'scree' | 'ftest';  view3 'loadings' | 'scores' | 'plane'
      view4  'blocks' | 'numbers' | 'residual' | 'lof'
    --------------------------------------------------------------------------- */
 const NMAX = 10, NTAB = 10;
-const base = { ...clone(DATA_BASE), n: 3, view1: 'spectra', view3: 'loadings', view4: 'blocks' };
-const DISPLAY_ONLY = ['n', 'view1', 'view3', 'view4'];
+const base = { ...clone(DATA_BASE), n: 3, view1: 'spectra', view2: 'scree', view3: 'loadings', view4: 'blocks' };
+const DISPLAY_ONLY = ['n', 'view1', 'view2', 'view3', 'view4'];
 const cs = (o, f) => caseOf(base, o, f);
 
 const CASES = [
@@ -54,6 +56,11 @@ const CASES = [
     id: 'weak', title: 'A Short-Lived Intermediate', s: cs({ n: 2, k1: 0.25, k2: 1, noise: 0.008 }, { B: { h: 0.3 } }),
     text: `<p>B forms fast and is used up faster, so it reaches at most about 16 % and only in the first few spectra. Its component carries little of <b>X</b>, and its singular value sits just above the flat tail.</p>
       <p>Rank 2 or 3? Compare <i>n</i> = 2 and 3 in panel 4: the lack of fit hardly changes, but the residual at <i>n</i> = 2 has a stripe at the start of the run. The difficulty is the choice of the rank, not the SVD [@ch29, p. 628]: read the scree plot, the scores in time and the residual together.</p>`,
+  },
+  {
+    id: 'ftest', title: 'Counting by Statistics', s: cs({ n: 2, k1: 0.25, k2: 1, noise: 0.008, view2: 'ftest' }, { B: { h: 0.3 } }),
+    text: `<p>The short-lived intermediate again, with the rank counted by a test instead of by eye. Malinowski's F-test compares each eigenvalue, reduced by its degrees of freedom, with the pool of all smaller ones; the bars give the significance level of each component [@malinowski, Eq. 19, p. 52].</p>
+      <p>Read from the last component upwards and stop at the first one below the chosen level [@malinowski, p. 56]. Here component 3 sits at about 11 %: outside the "grey" region between 5 and 10 % that the paper describes, so the test says 2. Lower the noise in the measurement group and it moves below 5 %.</p>`,
   },
   {
     id: 'overlap', title: 'Overlapping Bands', s: cs({ n: 3, noise: 0.008 }, { A: { c: 1540, w: 80 }, B: { c: 1520, w: 80 }, C: { c: 1500, w: 80 } }),
@@ -106,12 +113,18 @@ const EQUATIONS = [
     text: 'The fit measure the chapter reports for MCR-ALS [@ch29, Eq. 29.2, p. 627], here for the rebuild from <i>n</i> components. The variance explained is the same ratio without the root.',
     symbols: [['<i>x<sub>ij</sub></i>', 'an element of <b>X</b>']],
   }),
+  callout({
+    title: 'An F-Test for the Rank',
+    math: `<i>F</i>(1, <i>s</i> − <i>n</i>) = ${frac('<i>λ<sub>n</sub></i> / (<i>r</i> − <i>n</i> + 1)(<i>c</i> − <i>n</i> + 1)', `${sum('<i>j</i> = <i>n</i> + 1', '<i>s</i>')} <i>λ<sub>j</sub></i> / ${sum('<i>j</i> = <i>n</i> + 1', '<i>s</i>')} (<i>r</i> − <i>j</i> + 1)(<i>c</i> − <i>j</i> + 1)`)}`,
+    text: 'Each eigenvalue <i>λ<sub>j</sub></i> = <i>σ<sub>j</sub></i>², divided by its degrees of freedom (the reduced eigenvalue), is compared with the pool of the smaller ones, weighted by theirs [@malinowski, Eqs. 13 and 19, p. 52]. The significance level is the chance of a ratio this large from noise alone. Read from the bottom up; the paper finds 5 % tends to undercount and 10 % to overcount, with a grey region between [@malinowski, p. 56]. It assumes normally distributed errors, so it says nothing about noise-free data.',
+    symbols: [['<i>r</i>, <i>c</i>', 'rows and columns of <b>X</b> (here <i>q</i> and <i>m</i>)'], ['<i>s</i>', 'the smaller of the two'], ['<i>n</i>', 'the component under test']],
+  }),
   EQ_NOISE,
 ];
 
 const GENERAL = `<h2>What This Page Shows</h2>
   <p>A series of spectra measured while a mixture changes is a matrix <b>X</b>: one row per spectrum, one column per point. If each species adds its own spectrum, scaled by its concentration, <b>X</b> = <b>C</b> <b>S</b><sup>T</sup> + <b>E</b> [@ch29, Eq. 29.1, p. 626], and MCR-ALS has to be told how many components to resolve before it starts, usually from an SVD [@ch29, p. 627] [@dejuan, p. 4970]. The SVD writes <b>X</b> as a sum of components ordered by how much of <b>X</b> each carries. Computing it is easy; deciding where signal ends and noise begins is the hard part [@ch29, p. 628].</p>
-  <p>Panel 1 is the data, and the species that made it. Panel 2 is the scree plot: the singular values on a log scale, with the cut between kept and dropped components. Panel 3 shows the components as loadings, as scores in time, and as score plots of one against the next [@ch29, Fig. 29.2]. Panel 4 is the operation itself: <b>X</b> as the product of <b>U</b>, diag(<b>σ</b>) and <b>V</b><sup>T</sup>, as blocks filled by role or with their numbers, and what is left, <b>E</b>, as a map or as the lack of fit for every <i>n</i>.</p>
+  <p>Panel 1 is the data, and the species that made it. Panel 2 is the scree plot: the singular values on a log scale, with the cut between kept and dropped components. Panel 3 shows the components as loadings, as scores in time, and as score plots of one against the next [@ch29, Fig. 29.2]. Panel 4 is the operation itself, the rebuild: <b>X</b> as the product of <b>U</b>, diag(<b>σ</b>) and <b>V</b><sup>T</sup>, as blocks filled by role or with their numbers, and what is left, <b>E</b>, as a map or as the lack of fit for every <i>n</i>.</p>
   <p>The components are not the species. They are orthogonal and ordered by size, and a loading can be negative where no spectrum is. Turning them into concentrations and pure spectra needs constraints, which is what MCR-ALS adds. The PCA page takes the same data after centring, the EFA page asks the same question in time; the technique switch on the left carries your data across.</p>
   <h2>Using the Plots</h2>
   <p>Drag the green cut in panel 2, click a point there or a bar in the lack-of-fit view, or pick <i>n</i> on the left: every plot follows. Every setting is on the left and stays there; a case only sets values, hover it for what it shows. Each species card has its own sliders. The values on the right list each component's share and the lack of fit if it were the last one kept.</p>`;
@@ -125,7 +138,16 @@ function compute() {
   const st = state.s, B = build(st, state.seed), r = svd(B.X), total = sumSq(B.X) || 1;
   const cum = []; let acc = 0;
   for (const x of r.s) { acc += x * x; cum.push(acc); }
+  const q = B.X.length, s = Math.min(q, M), lam = r.s.map(x => x * x), sl = [];
+  for (let j = 1; j < s; j++) {
+    let pool = 0, dof = 0;
+    for (let i = j + 1; i <= s; i++) { pool += lam[i - 1]; dof += (q - i + 1) * (M - i + 1); }
+    const F = (lam[j - 1] / ((q - j + 1) * (M - j + 1))) / (pool / dof);
+    sl.push(100 * fTail(F, 1, s - j));
+  }
+  const nAt = a => { for (let j = s - 1; j >= 1; j--) if (sl[j - 1] < a) return j; return 0; };
   S = {
+    sl, n5: nAt(5), n10: nAt(10),
     B, r, cum,
     lof: cum.map(c => 100 * Math.sqrt(Math.max(total - c, 0) / total)),
     noiseLof: 100 * Math.sqrt(sumSq(B.noise) / total),
@@ -154,7 +176,30 @@ function drawDataPanel() {
 
 let P2 = null;
 const screeLegend = () => [['kept', KEPT, 'dot'], ['dropped', DROPPED, 'dot'], ['the cut', CUT, 'dashed'], state.s.noise > 0 && ['noise level <i>ε</i>(√<i>q</i> + √<i>m</i>)', LEVEL, 'dashed']];
+const ftestLegend = [['significance level, kept', KEPT, 'bar'], ['dropped', DROPPED, 'bar'], ['5 % and 10 %', LEVEL, 'dashed']];
+function drawFtest() {
+  const st = state.s, cv = $('cScree'), sc = SC(), NS = Math.min(S.sl.length, 15);
+  const p = plot(cv, { x: [0.4, NS + 0.6], y: [0, 100], xlabel: 'component *n*', ylabel: 'significance / %', xticks: Array.from({ length: NS }, (_, i) => [i + 1, String(i + 1)]).filter(([v]) => NS <= 10 || v % 2 === 1), yticks: [[0, '0'], [25, '25'], [50, '50'], [75, '75'], [100, '100']], scale: sc });
+  p.ctx.fillStyle = C['data-faint']; p.ctx.globalAlpha = 0.35; p.ctx.fillRect(p.inner.l, p.Y(10), p.inner.r - p.inner.l, p.Y(5) - p.Y(10)); p.ctx.globalAlpha = 1;
+  for (const v of [5, 10]) p.line([0.4, NS + 0.6], [v, v], LEVEL, CHART.lineThin, CHART.dash);
+  const pts = [];
+  for (let i = 0; i < NS; i++) {
+    const x0 = p.X(i + 1 - 0.3), x1 = p.X(i + 1 + 0.3), y = Math.max(S.sl[i], 0.6);
+    p.ctx.fillStyle = i < st.n ? KEPT : DROPPED; p.ctx.fillRect(x0, p.Y(y), x1 - x0, p.Y(0) - p.Y(y));
+    pts.push({ i, px: (x0 + x1) / 2, py: p.Y(y) });
+  }
+  p.text(st.noise > 0 ? `the test: ${S.n5} at 5 %, ${S.n10} at 10 %` : 'no noise: nothing to test against', NS + 0.4, 80, C['ink-500'], 'right');
+  p.text('5 to 10 %', NS + 0.4, 17, C['ink-500'], 'right');
+  const rx = p.X(st.n + 0.5);
+  p.line([st.n + 0.5, st.n + 0.5], [0, 100], CUT, CHART.lineData, CHART.dash);
+  grip(p, rx, CUT);
+  p.axes();
+  P2 = { p, rx, pts, NS };
+  $('subScree').textContent = 'Malinowski\'s F-test: low is not noise. Read from the right.';
+  legend($('legScree'), ftestLegend);
+}
 function drawScree() {
+  if (state.s.view2 === 'ftest') { drawFtest(); return; }
   const st = state.s, cv = $('cScree'), sc = SC(), s = S.r.s, NS = Math.min(s.length, 15);
   const p = plot(cv, { x: [0.4, NS + 0.6], y: LOG, xlabel: 'component *i*', ylabel: 'singular value *σ*_*i*_', xticks: Array.from({ length: NS }, (_, i) => [i + 1, String(i + 1)]).filter(([v]) => NS <= 10 || v % 2 === 1), yticks: LOG_TICKS.filter(([v]) => v <= LOG[1]), scale: sc });
   const xs = Array.from({ length: NS }, (_, i) => i + 1), ys = xs.map(i => logOf(s[i - 1]));
@@ -196,7 +241,7 @@ function drawComp() {
       p.text('*t* = 0', xs[0], ys[0] + 0.12 * R, C['ink-500']);
       p.axes();
     });
-    $('subComp').textContent = 'One score against the next: a path while both are signal.';
+    $('subComp').textContent = 'Score against score: a path, then a cloud.';
     legend($('legComp'), compLegends.plane);
     return;
   }
@@ -216,7 +261,7 @@ function drawComp() {
     if (nc <= 6) p.text(`*σ*_${i + 1}_ = ${fmtS(s[i])}`, inTime ? T_END * 0.98 : ax.to, mid - 0.1, kept ? KEPT : C['ink-500'], 'right');
   }
   p.axes();
-  $('subComp').textContent = inTime ? 'Columns of U, each to its own size: smooth, then noise.' : 'Rows of Vᵀ, each to its own size. Not the species.';
+  $('subComp').textContent = inTime ? 'Columns of U, each to its own size.' : 'Rows of Vᵀ, each to its own size.';
   legend($('legComp'), compLegends.other);
 }
 
@@ -243,14 +288,14 @@ function drawFit() {
       '+',
       { label: 'E', role: 'data', rows: q, cols: M, h: 'q', w: 'm', at: (r, c) => E[r][c] },
     ], { mode: st.view4 === 'blocks' ? 'blocks' : 'numbers' });
-    $('subFit').innerHTML = st.view4 === 'blocks' ? `<b>X</b> ≈ <b>U</b> diag(<b>σ</b>) <b>V</b><sup>T</sup> + <b>E</b>, drawn to shape, ${K} components.` : `The same, every block filled with its numbers, each on its own scale.`;
+    $('subFit').innerHTML = st.view4 === 'blocks' ? `<b>X</b> ≈ <b>U</b> diag(<b>σ</b>) <b>V</b><sup>T</sup> + <b>E</b>, ${K} components.` : 'The same blocks, with their numbers.';
     legend($('legFit'), st.view4 === 'blocks' ? fitLegends().blocks : fitLegends().matrix);
     return;
   }
   if (st.view4 === 'residual') {
     const E = residual(X, S.r, st.n), ax = axOf(st);
     heatmap(cv, { x: xRangeOf(st), y: [0, T_END], xlabel: ax.label, ylabel: XLAB_T, xticks: ax.ticks, yticks: T_TICKS, scale: sc }, E.length, M, (i, j) => E[i][j], LIM.res);
-    $('subFit').textContent = `E, X minus its rebuild from ${st.n}: a pattern means one is missing.`;
+    $('subFit').innerHTML = `<b>E</b> after ${st.n}: a pattern is a missing component.`;
     legend($('legFit'), fitLegends().residual);
     return;
   }
@@ -272,7 +317,7 @@ function drawFit() {
   }
   p.axes();
   P4 = { p, bars };
-  $('subFit').innerHTML = 'Log scale, one bar per <i>n</i>. Click a bar to keep that many.';
+  $('subFit').innerHTML = 'Click a bar to keep that many.';
   legend($('legFit'), fitLegends().lof);
 }
 
@@ -285,6 +330,7 @@ function drawTable() {
     rows += `<tr style="color:${i < st.n ? C['ink-900'] : C['ink-300']}"><td>${i + 1}</td><td>${fmtS(s[i])}</td><td>${(100 * sq[i] / all).toFixed(3)}</td><td>${(100 * S.cum[i] / all).toFixed(3)}</td><td>${fmtPct(S.lof[i])}</td></tr>`;
   }
   rows += `<tr><td colspan="2">noise level</td><td colspan="3">${st.noise > 0 ? fmtS(S.level) : '–'}</td></tr>`;
+  rows += `<tr><td colspan="2">F-test, <i>n</i></td><td colspan="3">${st.noise > 0 ? `${S.n5} at 5 % · ${S.n10} at 10 %` : '–'}</td></tr>`;
   rows += `<tr><td colspan="2">noise LoF</td><td colspan="3">${st.noise > 0 ? `${S.noiseLof.toPrecision(3)} %` : '–'}</td></tr>`;
   $('readout').innerHTML = rows;
   $('sideNote').innerHTML = 'Share: <i>σ<sub>i</sub></i>² over the sum of all. LoF: Eq. 29.2 for the rebuild from 1 … <i>i</i>. The last two rows use the noise this page added, which a real measurement does not tell you.';
@@ -292,7 +338,7 @@ function drawTable() {
 
 function draw() {
   const st = state.s, f = fitLegends();
-  reserveLegends([...dataLegends(st, LIM), legendHtml(screeLegend()), legendHtml(compLegends.plane), legendHtml(compLegends.other), legendHtml(f.matrix), legendHtml(f.blocks), legendHtml(f.residual), legendHtml(f.lof)]);
+  reserveLegends([...dataLegends(st, LIM), legendHtml(screeLegend()), legendHtml(ftestLegend), legendHtml(compLegends.plane), legendHtml(compLegends.other), legendHtml(f.matrix), legendHtml(f.blocks), legendHtml(f.residual), legendHtml(f.lof)]);
   drawDataPanel(); drawScree(); drawComp(); drawFit(); drawTable();
   sums(); controls.refresh();
 }
@@ -316,7 +362,7 @@ const controls = valueControls({
   after: () => {
     if (!state.s) return;
     setSeg($('nSeg'), state.s.n);
-    for (const k of ['view1', 'view3', 'view4']) setSeg($(k), state.s[k]);
+    for (const k of ['view1', 'view2', 'view3', 'view4']) setSeg($(k), state.s[k]);
     data.refresh();
   },
 });
@@ -326,7 +372,7 @@ techniqueSwitch('svd', state);
 const setN = n => { const c = clamp(Math.round(n), 1, Math.min(NMAX, S.r.s.length)); if (c !== state.s.n) { state.s.n = c; draw(); } };
 const segClick = (id, fn) => $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (b) fn(b.dataset.v); });
 segClick('nSeg', v => setN(+v));
-for (const k of ['view1', 'view3', 'view4']) segClick(k, x => { state.s[k] = x; draw(); });
+for (const k of ['view1', 'view2', 'view3', 'view4']) segClick(k, x => { state.s[k] = x; draw(); });
 $('resetCase').addEventListener('click', () => selectCase(state.idx, false));
 
 /* panel 2: drag the cut, hover a point for its values, click it to cut after it */
@@ -339,6 +385,8 @@ const hitPt = e => {
   return best;
 };
 function ptText(i) {
+  if (state.s.view2 === 'ftest') return `<div class="tip-title">Component ${i + 1}, significance level ${S.sl[i] < 0.01 ? '< 0.01' : S.sl[i].toPrecision(2)} %</div>
+    <p>The chance that noise alone gives a reduced eigenvalue this much larger than the pool of the smaller ones. ${S.sl[i] < 5 ? 'Below 5 %: not noise.' : S.sl[i] < 10 ? 'Between 5 and 10 %: the grey region.' : 'Above 10 %: as noise.'}</p><p class="tip-hint">click to keep ${i + 1} component${i ? 's' : ''}</p>`;
   const s = S.r.s, sq = s.map(x => x * x), all = sq.reduce((a, b) => a + b, 0) || 1;
   const where = state.s.noise > 0 ? (s[i] > 1.2 * S.level ? 'above the noise level' : s[i] > 0.8 * S.level ? 'at the noise level' : 'below the noise level')
     : s[i] < 1e-6 * s[0] ? 'rounding: the data have no more independent directions' : 'a direction the data have';

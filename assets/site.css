@@ -188,7 +188,11 @@ body.wb-locked { overflow: hidden; }
 .phi-field { flex: none; white-space: nowrap; margin-right: var(--space-3); color: var(--data-highlight); font-weight: var(--t-control-value-weight); font-size: var(--t-panel-sub-size); }
 [data-w="wide"] .phi-field { font-size: calc(var(--t-panel-sub-size) * var(--wb-text-scale)); }
 .sub-row .view-seg { flex: none; margin-right: var(--space-3); }
-[data-w="wide"] .sub-row .view-seg button { font-size: calc(var(--t-control-size) * 1.2); }
+/* a view switch in the title row of a panel, where the subtitle would leave it no room */
+.wb-center .panel .title-row { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; }
+.wb-center .panel .title-row h3 { flex: 1 1 0; min-width: 0; }
+.title-row .view-seg { flex: none; margin-right: var(--space-3); }
+[data-w="wide"] .sub-row .view-seg button, [data-w="wide"] .title-row .view-seg button { font-size: calc(var(--t-control-size) * 1.2); }
 .phi-field input {
   font: inherit; color: inherit; width: 3.2em; text-align: right; font-variant-numeric: tabular-nums;
   border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); padding: 0 4px; margin: 0 1px;
@@ -196,7 +200,7 @@ body.wb-locked { overflow: hidden; }
 .phi-field input:focus { outline: none; border-color: var(--data-highlight); }
 .phi-field input.preview { border-style: dashed; }
 .wb-center .panel h3 { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wb-center .legend { flex: none; height: calc(var(--legend-lines, 2) * 1.5em + 10px); line-height: 1.5; overflow: hidden; align-content: flex-start; }
+.wb-center .legend { flex: none; height: calc(var(--legend-lines, 2) * 1.5em + (var(--legend-lines, 2) - 1) * 4px + 6px); line-height: 1.5; overflow: hidden; align-content: flex-start; }
 .wb-center .legend span { flex: none; white-space: nowrap; }
 /* the centre's text at the workbench scale, on a wide screen */
 [data-w="wide"] .wb-center .panel h3 { font-size: calc(var(--t-panel-title-size) * var(--wb-text-scale)); }

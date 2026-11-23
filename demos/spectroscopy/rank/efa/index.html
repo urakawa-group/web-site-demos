@@ -65,6 +65,7 @@
             <div class="ctl"><span>species <i>n</i></span>
               <span class="seg" id="nSeg"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button><button type="button" data-v="6">6</button><button type="button" data-v="7">7</button><button type="button" data-v="8">8</button><button type="button" data-v="9">9</button><button type="button" data-v="10">10</button></span></div>
             <div class="ctl vctl" data-k="thr"></div>
+            <div class="ctl vctl" data-k="win"></div>
           </div>
         </section>
 
@@ -106,37 +107,26 @@
         </div>
         <div class="wb-center">
           <section class="panel">
-            <h3>1 · Data Matrix</h3>
-            <div class="sub-row">
-              <p class="sub" id="subData"></p>
-              <span class="seg view-seg" id="view1"><button type="button" data-v="spectra">spectra</button><button type="button" data-v="map">map</button><button type="button" data-v="truth">species</button></span>
-            </div>
+            <div class="title-row"><h3>1 · Data Matrix</h3><span class="seg view-seg" id="view1"><button type="button" data-v="spectra">spectra</button><button type="button" data-v="map">map</button><button type="button" data-v="truth">species</button></span></div>
+            <p class="sub" id="subData"></p>
             <canvas id="cData"></canvas>
             <div class="legend" id="legData"></div>
           </section>
           <section class="panel">
-            <h3>2 · Forward and Backward</h3>
-            <div class="sub-row">
-              <p class="sub" id="subEfa"></p>
-            </div>
+            <div class="title-row"><h3>2 · Evolving Factors</h3><span class="seg view-seg" id="view2"><button type="button" data-v="evolving">evolving</button><button type="button" data-v="window">window</button></span></div>
+            <p class="sub" id="subEfa"></p>
             <canvas id="cEfa" class="interactive"></canvas>
             <div class="legend" id="legEfa"></div>
           </section>
           <section class="panel">
-            <h3>3 · Matrix Operation</h3>
-            <div class="sub-row">
-              <p class="sub" id="subMat"></p>
-              <span class="seg view-seg" id="view3"><button type="button" data-v="blocks">blocks</button><button type="button" data-v="numbers">numbers</button></span>
-            </div>
+            <div class="title-row"><h3>3 · Matrix Operation</h3><span class="seg view-seg" id="view3"><button type="button" data-v="blocks">blocks</button><button type="button" data-v="numbers">numbers</button></span></div>
+            <p class="sub" id="subMat"></p>
             <canvas id="cMat"></canvas>
             <div class="legend" id="legMat"></div>
           </section>
           <section class="panel">
-            <h3>4 · Windows and Profiles</h3>
-            <div class="sub-row">
-              <p class="sub" id="subWin"></p>
-              <span class="seg view-seg" id="view4"><button type="button" data-v="windows">windows</button><button type="button" data-v="profiles">profiles</button></span>
-            </div>
+            <div class="title-row"><h3>4 · Windows</h3><span class="seg view-seg" id="view4"><button type="button" data-v="windows">windows</button><button type="button" data-v="profiles">profiles</button><button type="button" data-v="help">HELP</button></span></div>
+            <p class="sub" id="subWin"></p>
             <canvas id="cWin"></canvas>
             <div class="legend" id="legWin"></div>
           </section>

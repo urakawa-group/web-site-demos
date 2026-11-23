@@ -171,3 +171,37 @@ export function symEigValues(A0) {
   }
   return Array.from(d).sort((x, y) => y - x);
 }
+
+/* ---------------------------------------------------------------------------
+   Statistics for a variance-ratio test
+   --------------------------------------------------------------------------- */
+/** ln Γ(x), Lanczos approximation (Numerical Recipes gammln). */
+export function lnGamma(x) {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let y = x, t = x + 5.5; t -= (x + 0.5) * Math.log(t);
+  let s = 1.000000000190015;
+  for (const v of c) s += v / ++y;
+  return -t + Math.log(2.5066282746310005 * s / x);
+}
+/** The regularised incomplete beta function I_x(a, b), by its continued fraction (Numerical Recipes betai, betacf). */
+export function betaInc(x, a, b) {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const bt = Math.exp(lnGamma(a + b) - lnGamma(a) - lnGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  const cf = (xx, aa, bb) => {
+    const tiny = 1e-300; let c = 1, d = 1 - (aa + bb) * xx / (aa + 1); if (Math.abs(d) < tiny) d = tiny; d = 1 / d; let h = d;
+    for (let m = 1; m <= 300; m++) {
+      const m2 = 2 * m;
+      let num = m * (bb - m) * xx / ((aa + m2 - 1) * (aa + m2));
+      d = 1 + num * d; if (Math.abs(d) < tiny) d = tiny; c = 1 + num / c; if (Math.abs(c) < tiny) c = tiny; d = 1 / d; h *= d * c;
+      num = -(aa + m) * (aa + bb + m) * xx / ((aa + m2) * (aa + m2 + 1));
+      d = 1 + num * d; if (Math.abs(d) < tiny) d = tiny; c = 1 + num / c; if (Math.abs(c) < tiny) c = tiny; d = 1 / d;
+      const del = d * c; h *= del;
+      if (Math.abs(del - 1) < 3e-14) break;
+    }
+    return h;
+  };
+  return x < (a + 1) / (a + b + 2) ? bt * cf(x, a, b) / a : 1 - bt * cf(1 - x, b, a) / b;
+}
+/** P(F > f) for an F distribution with d1 and d2 degrees of freedom. */
+export const fTail = (f, d1, d2) => (f <= 0 ? 1 : betaInc(d2 / (d2 + d1 * f), d2 / 2, d1 / 2));

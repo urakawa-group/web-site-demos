@@ -139,7 +139,7 @@ function drawDataPanel() {
       P1 = { p, xs: xs.map(x => p.X(x)) };
     },
   });
-  $('subData').textContent = st.view1 === 'centred' ? 'Each spectrum minus the mean spectrum: what PCA decomposes.' : o.sub;
+  $('subData').textContent = st.view1 === 'centred' ? 'Each spectrum minus the mean.' : o.sub;
   legend($('legData'), st.view1 === 'centred' ? centredLegend : view === 'spectra' ? [...o.leg, ['the two points', CUT, 'dashed']] : o.leg);
 }
 
@@ -172,7 +172,7 @@ function drawCloud() {
   const deg = th => { let d = th * 180 / Math.PI; d = ((d % 180) + 180) % 180; return d; };
   p.text(`*v*_1_ at ${deg(thRaw).toFixed(0)}°, *p*_1_ at ${deg(thPca).toFixed(0)}°`, R[0] + 0.03 * (R[1] - R[0]), R[1] - 0.12 * (R[1] - R[0]), C['ink-500'], 'left');
   p.axes();
-  $('subCloud').textContent = 'Every spectrum as one point. The raw direction starts at zero, PCA at the mean.';
+  $('subCloud').textContent = 'Each spectrum as a point, at a and b.';
   legend($('legCloud'), cloudLegend);
   void ax;
 }
@@ -203,7 +203,7 @@ function drawComp() {
     }
     p.line([st.n + 0.5, st.n + 0.5], SH_LOG, CUT, CHART.lineThin, CHART.dash);
     p.axes();
-    $('subComp').textContent = 'The same data raw, centred and autoscaled: where does the flat tail start?';
+    $('subComp').textContent = 'Raw, centred and autoscaled compared.';
     legend($('legComp'), screeLegend());
     return;
   }
@@ -221,7 +221,7 @@ function drawComp() {
     p.line(xs, Array.from(vec, x => mid + x * f), kept ? KEPT : DROPPED, kept ? CHART.lineData : CHART.lineThin);
   }
   p.axes();
-  $('subComp').textContent = `${inTime ? 'Scores' : 'Loadings'} of the ${PREP_NAME[st.prep]} data, each to its own size.`;
+  $('subComp').textContent = `${inTime ? 'Scores' : 'Loadings'}, ${PREP_NAME[st.prep]}, each to its size.`;
   legend($('legComp'), stripLegend);
 }
 
@@ -239,9 +239,9 @@ function drawMat() {
     { label: 'T', role: 'score', rows: q, cols: K, h: 'q', w: 'n', at: T, fade: { fromCol: st.n } },
     { label: 'P^T^', role: 'load', rows: K, cols: M, h: 'n', w: 'm', at: (r, c) => v[r][c], fade: { fromRow: st.n } },
     '+', { label: 'E', role: 'data', rows: q, cols: M, h: 'q', w: 'm', at: (r, c) => E[r][c] }], { mode: st.view4 });
-  $('subMat').innerHTML = st.prep === 'raw' ? '<b>X</b> ≈ <b>TP</b><sup>T</sup> + <b>E</b> without centring: the SVD itself.'
-    : st.prep === 'centre' ? '<b>X</b> − <b>1x̄</b><sup>T</sup> ≈ <b>TP</b><sup>T</sup> + <b>E</b>: the mean off every row, then the SVD.'
-      : 'Centred, every column divided by its standard deviation, then the SVD.';
+  $('subMat').innerHTML = st.prep === 'raw' ? '<b>X</b> ≈ <b>TP</b><sup>T</sup> + <b>E</b>, no centring.'
+    : st.prep === 'centre' ? '<b>X</b> − <b>1x̄</b><sup>T</sup> ≈ <b>TP</b><sup>T</sup> + <b>E</b>.'
+      : 'Centred, each column ÷ its <i>s</i>, then the SVD.';
   legend($('legMat'), st.view4 === 'blocks' ? BLOCK_LEGEND_STATIC : BLOCK_LEGEND);
 }
 

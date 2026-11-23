@@ -143,7 +143,7 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after })
   const sc = SC(), ax = axOf(st), { grid, ts, prof, pure } = B;
   if (view === 'map') {
     heatmap(cv, { x: xRangeOf(st), y: [0, T_END], xlabel: ax.label, ylabel: XLAB_T, xticks: ax.ticks, yticks: T_TICKS, scale: sc }, Xp.length, M, (i, j) => Xp[i][j], lim.map);
-    return { p: null, sub: `The same ${st.q} spectra${what}, as a map, time upwards.`, leg: MAP_LEGEND(lim.map) };
+    return { p: null, sub: `As a map${what}, time upwards.`, leg: MAP_LEGEND(lim.map) };
   }
   if (view === 'truth') {
     const W = cv.clientWidth, on = st.species.filter(sp => sp.on);
@@ -153,7 +153,7 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after })
     const p2 = plot(cv, { keep: true, x: xRangeOf(st), y: [0, lim.pure], margin: { l: W / 2 + 46 * sc }, xlabel: ax.label, xticks: ax.ticks.filter((_, i) => i % 2 === 0), yticks: ticks(0, lim.pure, 3), scale: sc });
     for (const sp of on) p2.line(grid, pure[sp.key], COLOR[sp.key]);
     p2.axes();
-    return { p: null, sub: 'What made the data: concentrations (left), pure spectra (right).', leg: on.map(sp => [sp.label, COLOR[sp.key], '']) };
+    return { p: null, sub: 'Concentrations and pure spectra.', leg: on.map(sp => [sp.label, COLOR[sp.key], '']) };
   }
   const p = plot(cv, { x: xRangeOf(st), y: lim.y, xlabel: ax.label, ylabel, xticks: ax.ticks, yticks: ticks(lim.y[0], lim.y[1], 4), scale: sc });
   p.hline(0);
@@ -162,7 +162,7 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after })
   p.line(grid, Xp[Xp.length - 1], KEPT, CHART.lineData, [2, 2]);
   after?.(p);
   p.axes();
-  return { p, sub: `${st.q} spectra over ${T_END} min${what}.`, leg: [['one spectrum', C['data-faint'], ''], ['the first', KEPT, ''], ['the last', KEPT, 'dashed']] };
+  return { p, sub: `${st.q} spectra, ${T_END} min${what}.`, leg: [['one spectrum', C['data-faint'], ''], ['the first', KEPT, ''], ['the last', KEPT, 'dashed']] };
 }
 /** Every legend panel 1 can show, for the legend reserve. */
 export const dataLegends = (st, lim) => [
