@@ -73,6 +73,11 @@ const CASES = [
       <p>No choice of <i>n</i> fixes it; the information is not in this data set. The chapter breaks it with a second run in which the two form in another ratio, analysed together with the first [@ch29, Fig. 29.6]. Set D to "grows over the run" and a fourth component appears.</p>`,
   },
   {
+    id: 'parallel', title: 'Two Products in Parallel', s: cs({ n: 2, noise: 0.004 }, { C: { src: 'from:A', k: 0.04 } }),
+    text: `<p>B and C both form from A, side by side, at their own rates. Both then follow the same curve, 1 − e<sup>−(<i>k</i><sub>B</sub> + <i>k</i><sub>C</sub>)<i>t</i></sup>, in the fixed ratio of their rates, so to the data they are one species: three species, rank 2. Parallel products are the chemist's way to co-evolving concentrations [@ch29, p. 633].</p>
+      <p>Set C back to "forms from B" in its card and the third component returns. Look at "species" in panel 1: the two products rise together.</p>`,
+  },
+  {
     id: 'shift', title: 'A Band That Moves', s: cs({ n: 4, noise: 0.004 }, { C: { shift: -15 } }),
     text: `<p>The band of C moves 15 cm⁻¹ down as C builds up, as a band can with coverage. A band that moves is not a multiple of itself, so <b>X</b> is no longer bilinear, and the shift costs a component: four above the noise for three species, with a structured score in time. It looks real.</p>
       <p>The chapter meets the same in XAS, where damping with temperature made the components outnumber the species [@ch29, p. 630]. Set the shift to 0 in the card of C and the fourth component sinks into the noise.</p>`,

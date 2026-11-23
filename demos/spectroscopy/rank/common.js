@@ -8,7 +8,7 @@
 import { C, CHART, typeFont } from '../../../assets/tokens.js';
 import { plot, ticks, richText } from '../../../assets/plot.js';
 import { clamp, setSeg } from '../../../assets/workbench.js';
-import { AXES, NPTS, T_END, spanOf, mapSpecies } from './mixture.js';
+import { AXES, NPTS, T_END, spanOf, mapSpecies, sourceOf } from './mixture.js';
 
 export const $ = id => document.getElementById(id);
 export const clone = o => JSON.parse(JSON.stringify(o));
@@ -27,19 +27,41 @@ export const SOURCES = {
 
 /* ---------------------------------------------------------------------------
    The data settings, the same on every page:
-   { axis, species: [{ key, label, on, c, w, h, shift }] × 4, k1, k2,
-     dProfile, q, noise, drift }   (see mixture.js)
+   { axis, species: [{ key, label, on, c, w, h, shift, src, k, c0 }] × 4,
+     q, noise, drift }   (see mixture.js: src is where a species comes from)
    A page adds its own keys (n, prep, views, …) on top.
    --------------------------------------------------------------------------- */
-export const DATA_KEYS = ['axis', 'species', 'k1', 'k2', 'dProfile', 'q', 'noise', 'drift'];
-const SP = (key, label, on, c, w, h) => ({ key, label, on, c, w, h, shift: 0 });
+export const DATA_KEYS = ['axis', 'species', 'q', 'noise', 'drift'];
+const SP = (key, label, on, c, w, h, src, k, c0) => ({ key, label, on, c, w, h, shift: 0, src, k, c0 });
 export const DATA_BASE = {
   axis: 'ir',
-  species: [SP('A', 'A', true, 1650, 50, 0.6), SP('B', 'B, from A', true, 1500, 60, 0.5), SP('C', 'C, from B', true, 1350, 50, 0.7), SP('D', 'D', false, 1580, 40, 0.4)],
-  k1: 0.08, k2: 0.04, dProfile: 'C', q: 60, noise: 0, drift: 0,
+  species: [
+    SP('A', 'A', true, 1650, 50, 0.6, 'start', 0.05, 1), SP('B', 'B', true, 1500, 60, 0.5, 'from:A', 0.08, 0),
+    SP('C', 'C', true, 1350, 50, 0.7, 'from:B', 0.04, 0), SP('D', 'D', false, 1580, 40, 0.4, 'as:C', 0.05, 0),
+  ],
+  q: 60, noise: 0, drift: 0,
 };
-/** A case's settings: the page's base, some values changed, some species changed. */
-export const caseOf = (base, o = {}, f = {}) => ({ ...base, ...o, species: base.species.map(s => ({ ...s, ...(f[s.key] ?? {}) })) });
+/**
+ * A case's settings: the page's base, some values changed, some species
+ * changed. k1 and k2 are short for the rates of B (from A) and C (from B).
+ */
+export function caseOf(base, o = {}, f = {}) {
+  const { k1, k2, ...rest } = o, g = { ...f };
+  if (k1 != null) g.B = { k: k1, ...(g.B ?? {}) };
+  if (k2 != null) g.C = { k: k2, ...(g.C ?? {}) };
+  return { ...base, ...rest, species: base.species.map(s => ({ ...s, ...(g[s.key] ?? {}) })) };
+}
+/** "A → B → C, D as C": the scheme the cards set, for a folded group. */
+export function schemeOf(st) {
+  const on = st.species.filter(s => s.on).map(s => s.key), parts = [];
+  st.species.forEach((s, i) => {
+    const { kind, of } = sourceOf(st, i), o = of >= 0 ? st.species[of].key : '';
+    if (kind === 'from') parts.push(`${o} → ${s.key}`);
+    else if (kind === 'as') parts.push(`${s.key} as ${o}`);
+    else if (kind === 'ramp') parts.push(`${s.key} ramp`);
+  });
+  return `${on.join(' ') || 'none on'}${parts.length ? ` · ${parts.join(', ')}` : ''}`;
+}
 /** The same species on the XAS axis, used by the XAS cases: edges 3 eV apart. */
 export const XAS_SPECIES = { A: { c: 0, w: 8, h: 0.6 }, B: { c: 3, w: 8, h: 0.3 }, C: { c: 6, w: 8, h: 0.9 }, D: { c: 10, w: 8, h: 0.4 } };
 
@@ -268,7 +290,7 @@ export const lin = (min, max, step, d) => ({ min, max, step, toR: v => v, fromR:
 export function dataControls(state, caseS) {
   const st = () => state.s;
   const caseSp = i => (st().axis === caseS().axis ? caseS().species[i] : mapSpecies(caseS().species[i], caseS().axis, st().axis));
-  const slotChanged = i => JSON.stringify(st().species[i]) !== JSON.stringify(caseSp(i)) || (i === 3 && st().dProfile !== caseS().dProfile);
+  const slotChanged = i => JSON.stringify(st().species[i]) !== JSON.stringify(caseSp(i));
   function spBind(f, i) {
     const sp = () => st().species[i], a = AXES[st().axis], span = spanOf(st().axis);
     const lo = Math.min(a.from, a.to), hi = Math.max(a.from, a.to), d = span >= 100 ? 0 : 1, unit = st().axis === 'ir' ? 'cm⁻¹' : st().axis === 'xas' ? 'eV' : '';
@@ -277,16 +299,15 @@ export function dataControls(state, caseS) {
       w: { label: 'width', unit, ...lin(span / 120, span / 2, span / 240, d), def: span / 12 },
       h: { label: st().axis === 'xas' ? 'white line' : 'height', unit: '', ...lin(0, 1.5, 0.01, 2), def: 0.5 },
       shift: { label: 'shift at full', unit, ...lin(-span / 15, span / 15, span / 240, d), def: 0 },
+      k: { label: 'forms at <i>k</i>', unit: 'min⁻¹', min: 0, max: 100, step: 1, toR: rFromK, fromR: kFromR, fmt: v => (+v).toFixed(3), def: 0.05 },
+      c0: { label: 'at the start', unit: '', ...lin(0, 1, 0.01, 2), def: 1 },
     }[f];
-    return { ...g, get: () => sp()[f], set: v => { sp()[f] = clamp(v, g.min, g.max); }, caseV: () => caseSp(i)[f], off: () => !sp().on, redraw: 'update' };
+    const kind = () => sourceOf(st(), i).kind;
+    const off = f === 'k' ? () => kind() !== 'from' : f === 'c0' ? () => kind() !== 'start' && kind() !== 'from' : () => !sp().on;
+    return { ...g, get: () => sp()[f] ?? g.def, set: v => { sp()[f] = clamp(v, g.min, f === 'k' ? 1 : g.max); }, caseV: () => caseSp(i)[f] ?? g.def, off, redraw: 'update' };
   }
   function bind(key) {
     if (key.includes(':')) { const [f, i] = key.split(':'); return spBind(f, +i); }
-    if (key === 'k1' || key === 'k2') return {
-      label: key === 'k1' ? '<i>k</i>₁, A → B' : '<i>k</i>₂, B → C', unit: 'min⁻¹', min: 0, max: 100, step: 1,
-      get: () => st()[key], set: v => { st()[key] = clamp(v, 0, 1); }, toR: rFromK, fromR: kFromR,
-      fmt: v => v.toFixed(3), caseV: () => caseS()[key], def: key === 'k1' ? 0.08 : 0.04, redraw: 'update',
-    };
     if (key === 'q') return { label: 'spectra <i>q</i>', unit: '', ...lin(10, 120, 1, 0), get: () => st().q, set: v => { st().q = clamp(Math.round(v), 10, 120); }, caseV: () => caseS().q, def: 60, redraw: 'update' };
     if (key === 'noise') return {
       label: 'noise <i>ε</i>', unit: '', min: 0, max: 40, step: 1,
@@ -301,12 +322,12 @@ export function dataControls(state, caseS) {
   const esc = t => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
   function slotCard(sp, i) {
     const f = folded.has(sp.key);
-    const prof = sp.key === 'D' ? `<label class="ctl wide"><span>concentration</span><select data-f="dProfile">
-        <option value="C"${st().dProfile === 'C' ? ' selected' : ''}>exactly as C</option>
-        <option value="ramp"${st().dProfile === 'ramp' ? ' selected' : ''}>grows over the run</option></select></label>` : '';
+    const above = st().species.slice(0, i), opt = (v, t) => `<option value="${v}"${(sp.src ?? 'start') === v ? ' selected' : ''}>${t}</option>`;
+    const prof = `<label class="ctl wide" title="Where this species comes from: there at the start, formed from a species above it (first order, at its own k), growing linearly over the run, or with exactly the profile of a species above it"><span>comes from</span><select data-f="src">
+        ${opt('start', 'there at the start')}${above.map(o => opt(`from:${o.key}`, `forms from ${o.label}`)).join('')}${opt('ramp', 'grows over the run')}${above.map(o => opt(`as:${o.key}`, `exactly as ${o.label}`)).join('')}</select></label>`;
     return `<div class="sp-card${sp.on ? '' : ' off'}${f ? ' folded' : ''}" data-i="${i}" style="--c:${COLOR[sp.key]}">
       <div class="sp-top">
-        <label class="switch" title="${sp.on ? 'in the sample: click to take it out' : 'not in the sample: click to add it'}"><input type="checkbox" data-f="on"${sp.on ? ' checked' : ''}><span></span></label>
+        <label class="switch" title="${sp.on ? 'adds to the spectra: click to make it invisible (it still takes part in the kinetics)' : 'invisible: it takes part in the kinetics but adds nothing to the spectra. Click to show it'}"><input type="checkbox" data-f="on"${sp.on ? ' checked' : ''}><span></span></label>
         <span class="sp-swatch"></span>
         ${f ? `<span class="sp-label">${esc(sp.label)}</span>` : `<input type="text" data-f="label" value="${esc(sp.label)}" aria-label="name">`}
         <button type="button" class="sp-fold" data-f="fold" aria-expanded="${!f}" title="${f ? 'Show the settings of this species' : 'Fold this species to its name'}">${f ? '▸' : '▾'}</button>
@@ -318,6 +339,8 @@ export function dataControls(state, caseS) {
         <div class="ctl vctl wide" data-k="w:${i}"></div>
         <div class="ctl vctl wide" data-k="h:${i}"></div>
         <div class="ctl vctl wide" data-k="shift:${i}"></div>
+        <div class="ctl vctl wide" data-k="k:${i}"></div>
+        <div class="ctl vctl wide" data-k="c0:${i}"></div>
       </div>
     </div>`;
   }
@@ -336,7 +359,7 @@ export function dataControls(state, caseS) {
       if (!card) return;
       const sp = st().species[+card.dataset.i];
       if (f === 'on') sp.on = t.checked;
-      else if (f === 'dProfile') st().dProfile = t.value;
+      else if (f === 'src') { sp.src = t.value; if (t.value === 'start' && !(sp.c0 > 0)) sp.c0 = 1; }
       else return;
       renderSpecies(); hooks.update();
     });
@@ -347,7 +370,6 @@ export function dataControls(state, caseS) {
       if (t?.dataset.f === 'fold') { if (folded.has(key)) folded.delete(key); else folded.add(key); renderSpecies(); hooks.changed(); return; }
       if (t?.dataset.f === 'resetSlot') {
         st().species[i] = clone(caseSp(i));
-        if (i === 3) st().dProfile = caseS().dProfile;
         renderSpecies(); hooks.update(); return;
       }
       if (card.classList.contains('folded') && !e.target.closest('.switch')) { folded.delete(key); renderSpecies(); hooks.changed(); }
@@ -372,8 +394,7 @@ export function dataControls(state, caseS) {
     });
   }
   const summaries = () => ({
-    species: st().species.filter(s => s.on).map(s => s.key).join(' ') || 'none on',
-    kinetics: `<i>k</i>₁ ${st().k1.toFixed(3)} · <i>k</i>₂ ${st().k2.toFixed(3)}`,
+    species: schemeOf(st()),
     measurement: `${st().axis === 'generic' ? 'generic' : st().axis.toUpperCase()} · <i>q</i> ${st().q} · <i>ε</i> ${st().noise.toFixed(4)} · drift ${st().drift.toFixed(2)}`,
   });
   return { bind, caseSp, slotChanged, renderSpecies, attach, refresh, summaries };

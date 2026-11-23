@@ -8,13 +8,20 @@
  *   normalised step plus a white line per species). The same three numbers
  *   describe a species on every axis: centre, width (FWHM of the band or
  *   white line) and height; switching the axis maps them across.
- *   Species A, B, C, D, each switched on or off. A species can shift with
- *   its own concentration (shift in axis units at full concentration),
- *   which breaks the bilinear model.
- *   Concentrations: A → B → C, first order with k₁ and k₂, A starting at 1:
- *     A = e^(−k₁t), B = k₁/(k₂ − k₁) (e^(−k₁t) − e^(−k₂t)), C = 1 − A − B.
- *   D follows C exactly ('C', two species with one profile) or grows
- *   linearly over the run ('ramp').
+ *   Species A, B, C, D, each switched on or off (off: it takes part in the
+ *   kinetics but adds nothing to the spectra). A species can shift with its
+ *   own concentration (shift in axis units at full concentration), which
+ *   breaks the bilinear model.
+ *   Where each species comes from (src), set per species, in slot order so
+ *   that a species can only depend on one above it:
+ *     'start'    present from the start with the amount c0
+ *     'from:X'   forms from X, first order with its own k: X → it at k·[X];
+ *                several species can form from one (branching)
+ *     'ramp'     grows linearly from 0 to 1 over the run
+ *     'as:X'     exactly the profile of X (two species, one profile)
+ *   The first-order network is integrated with fourth-order Runge–Kutta in
+ *   steps far below the fastest time constant; for A → B → C it reproduces
+ *   B = k₁/(k₂ − k₁) (e^(−k₁t) − e^(−k₂t)) to rounding.
  *   Baseline: a slope over the spectral range that grows linearly in time.
  *   Noise: Gaussian, standard deviation sigma, from a seeded generator.
  */
@@ -57,18 +64,44 @@ export function rng(seed) {
 
 export const timesOf = q => Array.from({ length: q }, (_, i) => (q > 1 ? i * T_END / (q - 1) : 0));
 
-/** Concentration of each species at the times ts: { A, B, C, D } arrays. */
+/** The source of a species: { kind: 'start' | 'from' | 'ramp' | 'as', of: index or -1 }. */
+export function sourceOf(st, i) {
+  const src = st.species[i].src ?? 'start', [kind, key] = src.split(':');
+  return { kind, of: key ? st.species.findIndex(s => s.key === key) : -1 };
+}
+/** Concentration of each species at the times ts: { A: [...], B: [...], … }. */
 export function profiles(st, ts) {
-  const { k1, k2 } = st;
-  const A = ts.map(t => Math.exp(-k1 * t));
-  const B = ts.map(t => {
-    if (k1 === 0) return 0;
-    if (Math.abs(k2 - k1) < 1e-9 * Math.max(k1, 1e-9)) return k1 * t * Math.exp(-k1 * t);
-    return k1 / (k2 - k1) * (Math.exp(-k1 * t) - Math.exp(-k2 * t));
+  const sp = st.species, n = sp.length, src = sp.map((_, i) => sourceOf(st, i));
+  const kin = src.map(s => s.kind === 'start' || s.kind === 'from');
+  const y0 = sp.map((s, i) => (kin[i] ? s.c0 ?? 0 : 0));
+  const rate = y => {
+    const d = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      const s = src[i];
+      if (s.kind !== 'from' || s.of < 0 || !kin[s.of]) continue;
+      const r = (sp[i].k ?? 0) * y[s.of];
+      d[i] += r; d[s.of] -= r;
+    }
+    return d;
+  };
+  const kmax = Math.max(1e-6, ...sp.map(s => s.k ?? 0));
+  const h0 = Math.min(0.05, 0.05 / kmax);
+  const out = sp.map(() => new Array(ts.length).fill(0));
+  let y = y0.slice(), t = 0;
+  ts.forEach((target, j) => {
+    while (t < target - 1e-12) {
+      const h = Math.min(h0, target - t);
+      const k1 = rate(y), k2 = rate(y.map((v, i) => v + h / 2 * k1[i])), k3 = rate(y.map((v, i) => v + h / 2 * k2[i])), k4 = rate(y.map((v, i) => v + h * k3[i]));
+      y = y.map((v, i) => v + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
+      t += h;
+    }
+    for (let i = 0; i < n; i++) if (kin[i]) out[i][j] = Math.max(0, y[i]);
   });
-  const C = ts.map((_, i) => Math.max(0, 1 - A[i] - B[i]));
-  const D = st.dProfile === 'C' ? C.slice() : ts.map(t => t / T_END);
-  return { A, B, C, D };
+  for (let i = 0; i < n; i++) {
+    if (src[i].kind === 'ramp') out[i] = ts.map(tt => tt / T_END);
+    else if (src[i].kind === 'as' && src[i].of >= 0 && src[i].of < i) out[i] = out[src[i].of].slice();
+  }
+  return Object.fromEntries(sp.map((s, i) => [s.key, out[i]]));
 }
 
 /** Pure spectrum of one species on the grid (zero when it is off). */
