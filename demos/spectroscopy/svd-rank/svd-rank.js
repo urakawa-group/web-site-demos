@@ -23,6 +23,8 @@ const SOURCES = {
     chapter: 'A. R. Passos, C. La Fontaine, A. Rochet and V. Briois, “Case Studies: Time-Resolved X-Ray Absorption Spectroscopy (XAS)”, Ch. 29, pp. 625–658',
     short: 'Passos et al. (Briois), Springer Handbook of Advanced Catalyst Characterization 2023, Ch. 29',
   },
+  dejuan: { key: 'DeJuan.MultivariateCurveResolution.2014', lead: 'Tauler' },
+  golshan: { key: 'Golshan.ResolutionRotationalAmbiguity.2011', lead: 'Maeder' },
 };
 
 /* ---------------------------------------------------------------------------
@@ -102,7 +104,7 @@ const EQUATIONS = [
   callout({
     title: 'The Bilinear Model',
     math: '<b>D</b> = <b>C</b> <b>S</b><sup>T</sup> + <b>E</b>',
-    text: 'Each spectrum is the sum of the pure spectra, each weighted by its concentration [@ch29, Eq. 29.1, p. 626]. It holds wherever the signal is linear in concentration, as absorbance is under the Beer–Lambert law.',
+    text: 'Each spectrum is the sum of the pure spectra, each weighted by its concentration [@ch29, Eq. 29.1, p. 626] [@dejuan, Eq. 3, p. 4964]. It holds wherever the signal is linear in concentration, as absorbance is under the Beer–Lambert law.',
     symbols: [
       ['<b>D</b>', 'the data, <i>q</i> × <i>m</i>: one row per spectrum, one column per wavenumber'],
       ['<b>C</b>', 'concentrations, <i>q</i> × <i>N</i>, one column per species'],
@@ -113,7 +115,7 @@ const EQUATIONS = [
   callout({
     title: 'Singular Value Decomposition',
     math: `<b>D</b> = <b>U</b> <b>Σ</b> <b>V</b><sup>T</sup> = ${sum('<i>i</i>', '')} <i>σ<sub>i</sub></i> <b>u</b><sub><i>i</i></sub> <b>v</b><sub><i>i</i></sub><sup>T</sup>, &emsp; <i>σ</i>₁ ≥ <i>σ</i>₂ ≥ … ≥ 0`,
-    text: 'The decomposition behind PCA [@ch29, Eq. 29.4, p. 628]. The chapter writes the diagonal matrix as S and calls its entries eigenvalues; they are the singular values, and the eigenvalues of <b>D D</b><sup>T</sup> are their squares. This page writes <b>Σ</b> and keeps <b>S</b> for the pure spectra. The sign of each pair <b>u</b><sub><i>i</i></sub>, <b>v</b><sub><i>i</i></sub> is free; the page turns each so the largest point of <b>v</b><sub><i>i</i></sub> is positive.',
+    text: 'The decomposition behind PCA [@ch29, Eq. 29.4, p. 628]. The letters differ between sources: the chapter writes the diagonal matrix as S and calls its entries eigenvalues (they are the singular values; the eigenvalues of <b>D D</b><sup>T</sup> are their squares), and Golshan et al. write <b>D</b> = <b>CA</b> = <b>USV</b>, with <b>A</b> the spectra and <b>S</b> the singular values [@golshan, Eq. 4, p. 836]. This page keeps <b>D</b>, <b>C</b> and <b>S</b> as the MCR-ALS papers write them [@dejuan, Eq. 3, p. 4964] and uses <b>Σ</b> for the singular values, so no letter means two things. The sign of each pair <b>u</b><sub><i>i</i></sub>, <b>v</b><sub><i>i</i></sub> is free; the page turns each so the largest point of <b>v</b><sub><i>i</i></sub> is positive.',
     symbols: [
       ['<b>u</b><sub><i>i</i></sub>', 'scores of component <i>i</i>, one value per spectrum, unit length (panel 3, in time)'],
       ['<b>v</b><sub><i>i</i></sub>', 'loading of component <i>i</i>, one value per wavenumber, unit length (panel 3, loadings)'],
@@ -141,7 +143,7 @@ const EQUATIONS = [
 ];
 
 const GENERAL = `<h2>What This Page Shows</h2>
-  <p>A series of spectra measured while a mixture changes is a matrix <b>D</b>: one row per spectrum, one column per wavenumber. If each species adds its own spectrum, scaled by its concentration, <b>D</b> = <b>C</b> <b>S</b><sup>T</sup> + <b>E</b> [@ch29, Eq. 29.1, p. 626], and MCR-ALS has to be told how many components to resolve before it starts [@ch29, p. 627]. The SVD writes <b>D</b> as a sum of components ordered by how much of <b>D</b> each carries. Computing it is easy; deciding where signal ends and noise begins is the hard part [@ch29, p. 628].</p>
+  <p>A series of spectra measured while a mixture changes is a matrix <b>D</b>: one row per spectrum, one column per wavenumber. If each species adds its own spectrum, scaled by its concentration, <b>D</b> = <b>C</b> <b>S</b><sup>T</sup> + <b>E</b> [@ch29, Eq. 29.1, p. 626], and MCR-ALS has to be told how many components to resolve before it starts, usually from an SVD [@ch29, p. 627] [@dejuan, p. 4970]. The SVD writes <b>D</b> as a sum of components ordered by how much of <b>D</b> each carries. Computing it is easy; deciding where signal ends and noise begins is the hard part [@ch29, p. 628].</p>
   <p>Panel 1 is the data, and the species that made it. Panel 2 is the scree plot: the singular values on a log scale, with the cut between kept and dropped components. Panel 3 shows the components as loadings (spectra), as scores in time, and as score plots of one against the next [@ch29, Fig. 29.2]. Panel 4 shows what is left after rebuilding <b>D</b> from the kept components: structure in the residual means a component is missing, speckle means only noise is left.</p>
   <p>The components are not the species. They are orthogonal and ordered by size, and a loading can be negative where no spectrum is. Turning them into concentrations and pure spectra needs constraints, which is what MCR-ALS adds.</p>
   <h2>Using the Plots</h2>
