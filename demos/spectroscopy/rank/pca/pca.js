@@ -17,7 +17,7 @@ import { AXES, T_END, build } from '../mixture.js';
 import {
   $, clone, M, SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR, PREP_NAME,
   prepare, residual, fmtS, SC, T_TICKS, XLAB_T, axOf, xRangeOf, legend, legendHtml,
-  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData,
+  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf,
   callout, frac, sum, EQ_BILINEAR, EQ_NOISE,
 } from '../common.js';
 
@@ -333,7 +333,7 @@ function renderRail() {
       `<div class="fly-title">Keep <i>n</i></div>${Array.from({ length: NMAX }, (_, i) => rail.item('n', i + 1, `n = ${i + 1}`, i + 1 === st.n)).join('')}`),
     rail.fly('prep', rail.btn('prepFly', { raw: 'X', centre: 'X̄', auto: 'Xₛ' }[st.prep], 'Data as', { text: true }),
       `<div class="fly-title">Data as</div>${PREPS.map(k => rail.item('prep', k, PREP_NAME[k], k === st.prep)).join('')}`),
-    ...st.species.map((sp, i) => rail.btn(`sp${i}`, sp.key, `${sp.label}: ${sp.on ? 'on. Click to switch off' : 'off. Click to switch on'}`, { text: true, on: sp.on, style: `--c:${COLOR[sp.key]}` })),
+    ...st.species.map((sp, i) => rail.btn(`sp${i}`, sp.key, `${nameOf(st, i)}: ${sp.on ? 'on. Click to switch off' : 'off. Click to switch on'}`, { text: true, on: sp.on, style: `--c:${COLOR[sp.key]}` })),
     rail.rule, rail.btn('reseed', '⟳', 'New noise', { text: true }),
   ].join('');
 }

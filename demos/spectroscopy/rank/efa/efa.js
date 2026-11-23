@@ -18,7 +18,7 @@ import { T_END, build } from '../mixture.js';
 import {
   $, clone, M, SOURCES as COMMON_SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR,
   fmtS, SC, T_TICKS, XLAB_T, LOG_TICKS, legend, legendHtml, lin,
-  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData,
+  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf,
   callout, EQ_BILINEAR, EQ_NOISE,
 } from '../common.js';
 
@@ -48,17 +48,17 @@ const CASES = [
   {
     id: 'three', title: 'Three Species, Forward and Backward', s: cs({ noise: 0.004 }),
     text: `<p>Forward (solid), the SVD of the first <i>k</i> spectra: each time a species starts to contribute, a new singular value rises out of its noise level [@maeder]. Backward (dashed), the SVD of the last spectra: a line drops into the noise where a species is gone for good [@ch29, p. 628].</p>
-      <p>A and B are there from the first spectra, so two forward lines rise almost at once; C builds up and is detected a little later. Backward, A's line falls first: the first species to appear is the first to go. Drag the green line through the run and watch the blocks in panel 3.</p>`,
+      <p>A and B are there from the first spectra, so two forward lines rise almost at once; C builds up and is detected a little later. Backward, A's line falls first: the first species to appear is the first to go. Drag the green line through the run and watch the blocks in panel 4.</p>`,
   },
   {
     id: 'clean', title: 'No Noise, No Window', s: cs({ noise: 0, k: 30 }),
-    text: `<p>Without noise, nothing ever drops below the floor: A decays exponentially and is never exactly zero, so every species is "there" in every spectrum, down to rounding. All windows span the whole run, and the profiles in panel 4 cannot be found, because a window only helps where a species is absent.</p>
+    text: `<p>Without noise, nothing ever drops below the floor: A decays exponentially and is never exactly zero, so every species is "there" in every spectrum, down to rounding. All windows span the whole run, and the profiles in panel 3 cannot be found, because a window only helps where a species is absent.</p>
       <p>EFA works because real data have noise: a window is where a species is detectable, not where it exists. Add noise and the windows close.</p>`,
   },
   {
     id: 'noisy', title: 'More Noise, Shorter Windows', s: cs({ noise: 0.012, view4: 'profiles' }),
     text: `<p>Three times the noise. The windows now close while a species is still clearly present: they are detection windows, not existence windows. Maeder and Zilian met the same with tailing peaks in chromatography [@maeder].</p>
-      <p>Forcing a profile to zero outside a window that closed too early pulls its tail down: compare the estimated and true profiles in panel 4. The result is a starting guess for MCR-ALS, which the chapter recommends for any evolving process [@ch29, p. 630], not the answer.</p>`,
+      <p>Forcing a profile to zero outside a window that closed too early pulls its tail down: compare the estimated and true profiles in panel 3. The result is a starting guess for MCR-ALS, which the chapter recommends for any evolving process [@ch29, p. 630], not the answer.</p>`,
   },
   {
     id: 'slow', title: 'A Slow Second Step', s: cs({ noise: 0.004, k1: 0.15, k2: 0.03 }),
@@ -124,7 +124,7 @@ const EQUATIONS = [
 
 const GENERAL = `<h2>What This Page Shows</h2>
   <p>The SVD page counts the components of the whole data set. Evolving factor analysis asks when each one is there: it repeats the SVD on growing parts of the data, from the start forward and from the end backward, and watches singular values rise out of the noise and sink back into it. Maeder and Zilian called it careful rank analysis in time [@maeder]; the chapter uses it to start MCR-ALS on evolving XAS data [@ch29, p. 628].</p>
-  <p>Panel 1 is the data. Panel 2 is EFA: forward solid, backward dashed, the threshold of each part dotted, the green line the spectrum the matrix panel shows; or a window of fixed size sliding through the run [@keller, p. 220]. Panel 3 is the operation: the part of <b>X</b> that each direction has seen at that spectrum, and its singular values. Panel 4 reads the windows off, first in, first out, and turns them into profiles, against the true concentrations; or shows the latent-projective graph of heuristic evolving latent projections, where a region with one species is a straight line through zero [@liang, p. 118].</p>
+  <p>Panel 1 is the data. Panel 2 is EFA: forward solid, backward dashed, the threshold of each part dotted, the green line the spectrum the matrix panel shows; or a window of fixed size sliding through the run [@keller, p. 220]. Panel 4 is the operation: the part of <b>X</b> that each direction has seen at that spectrum, and its singular values. Panel 3 reads the windows off, first in, first out, and turns them into profiles, against the true concentrations; or shows the latent-projective graph of heuristic evolving latent projections, where a region with one species is a straight line through zero [@liang, p. 118].</p>
   <p>The windows are where a species is detectable, which depends on the noise and on the threshold as much as on the chemistry. EFA gives a starting point, not an answer. The technique switch on the left takes your data to the SVD and PCA pages.</p>
   <h2>Using the Plots</h2>
   <p>Drag the green line in panel 2. Set the number of species and the threshold on the left. Every setting is on the left and stays there; a case only sets values, hover it for what it shows.</p>`;
@@ -301,7 +301,7 @@ function drawWin() {
     legend($('legWin'), profLegend());
     return;
   }
-  const p = plot(cv, { x: [0, T_END], y: [0, n], xlabel: XLAB_T, ylabel: 'in order of appearance', xticks: T_TICKS, yticks: Array.from({ length: n }, (_, j) => [n - j - 0.5, S.truth[j] ? S.truth[j].sp.key : String(j + 1)]), scale: sc });
+  const p = plot(cv, { x: [0, T_END], y: [0, n], xlabel: XLAB_T, ylabel: 'species', xticks: T_TICKS, yticks: Array.from({ length: n }, (_, j) => [n - j - 0.5, S.truth[j] ? S.truth[j].sp.key : String(j + 1)]), scale: sc });
   const dt = ts.length > 1 ? ts[1] - ts[0] : 1;
   for (let j = 0; j < n; j++) {
     const y = n - j - 0.5, col = colourOf(j);
@@ -398,7 +398,7 @@ function renderRail() {
     rail.btn('reset', '↺', changed ? 'Reset to the case' : 'Nothing changed from the case', { disabled: !changed }), rail.rule,
     rail.fly('n', rail.btn('nFly', `n${st.n}`, 'Species looked for', { text: true }),
       `<div class="fly-title">Species <i>n</i></div>${Array.from({ length: NMAX }, (_, i) => rail.item('n', i + 1, `n = ${i + 1}`, i + 1 === st.n)).join('')}`),
-    ...st.species.map((sp, i) => rail.btn(`sp${i}`, sp.key, `${sp.label}: ${sp.on ? 'on. Click to switch off' : 'off. Click to switch on'}`, { text: true, on: sp.on, style: `--c:${COLOR[sp.key]}` })),
+    ...st.species.map((sp, i) => rail.btn(`sp${i}`, sp.key, `${nameOf(st, i)}: ${sp.on ? 'on. Click to switch off' : 'off. Click to switch on'}`, { text: true, on: sp.on, style: `--c:${COLOR[sp.key]}` })),
     rail.rule, rail.btn('reseed', '⟳', 'New noise', { text: true }),
   ].join('');
 }

@@ -40,13 +40,21 @@ export const gridOf = axis => { const a = AXES[axis]; return Array.from({ length
 export const spanOf = axis => Math.abs(AXES[axis].to - AXES[axis].from);
 export const gauss = (x, c, w) => Math.exp(-4 * Math.LN2 * ((x - c) / w) ** 2);
 
+/** The error function, Abramowitz & Stegun 7.1.26 (absolute error below 1.5e-7). */
+export function erf(x) {
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const y = 1 - t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-x * x);
+  return x >= 0 ? y : -y;
+}
 /**
- * One species' spectrum at x. A band: h · Gaussian of FWHM w at c. An edge:
- * an arctan step of height 1 centred at c (width w/4) plus a white line of
- * height h and FWHM w just above it, at c + w/2.
+ * One species' spectrum at x. A band: h · Gaussian of FWHM w at c. An edge,
+ * normalised as XAS spectra are: an error-function step from 0 to 1 centred
+ * at c (within 0.3 % of 0 and 1 at c ∓ w/2), plus a white line of
+ * height h and FWHM w at c + w/2, which decays to zero again, so every
+ * spectrum starts at 0 and ends at 1.
  */
 export function shapeAt(axis, x, c, w, h) {
-  if (AXES[axis].shape === 'edge') return 0.5 + Math.atan((x - c) / (w / 4)) / Math.PI + h * gauss(x, c + w / 2, w);
+  if (AXES[axis].shape === 'edge') return 0.5 * (1 + erf((x - c) / (w / 4))) + h * gauss(x, c + w / 2, w);
   return h * gauss(x, c, w);
 }
 

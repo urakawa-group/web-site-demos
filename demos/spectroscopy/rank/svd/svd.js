@@ -17,7 +17,7 @@ import { T_END, build } from '../mixture.js';
 import {
   $, clone, M, SOURCES as COMMON_SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR,
   residual, fmtS, fmtPct, SC, T_TICKS, XLAB_T, axOf, xRangeOf, LOG_TICKS, legend, legendHtml, heatmap, MAP_LEGEND,
-  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData,
+  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf,
   callout, frac, sum, EQ_BILINEAR, EQ_NOISE,
 } from '../common.js';
 
@@ -427,7 +427,7 @@ function renderRail() {
     rail.btn('reset', '↺', changed ? 'Reset to the case' : 'Nothing changed from the case', { disabled: !changed }), rail.rule,
     rail.fly('n', rail.btn('nFly', `n${st.n}`, 'Components kept', { text: true }),
       `<div class="fly-title">Keep <i>n</i></div>${Array.from({ length: NMAX }, (_, i) => rail.item('n', i + 1, `n = ${i + 1}`, i + 1 === st.n)).join('')}`),
-    ...st.species.map((sp, i) => rail.btn(`sp${i}`, sp.key, `${sp.label}: ${sp.on ? 'on. Click to switch off' : 'off. Click to switch on'}`, { text: true, on: sp.on, style: `--c:${COLOR[sp.key]}` })),
+    ...st.species.map((sp, i) => rail.btn(`sp${i}`, sp.key, `${nameOf(st, i)}: ${sp.on ? 'on. Click to switch off' : 'off. Click to switch on'}`, { text: true, on: sp.on, style: `--c:${COLOR[sp.key]}` })),
     rail.rule, rail.btn('reseed', '⟳', 'New noise', { text: true }),
   ].join('');
 }

@@ -6,7 +6,8 @@
   present (backward). Paired first in, first out, they give each species a
   window; the windows fix the rotation C = U R, Maeder's non-iterative
   step, and the profiles are compared with the true concentrations. The
-  matrix panel shows the two parts at the chosen k.
+  matrix panel (panel 4, as on the SVD and PCA pages) shows the
+  parts at the chosen k.
 
   Sources: Maeder & Zilian, Chemom. Intell. Lab. Syst. 1988; Passos et
   al., Ch. 29 of the Springer Handbook of Advanced Catalyst
@@ -111,16 +112,16 @@
             <div class="legend" id="legEfa"></div>
           </section>
           <section class="panel">
-            <div class="title-row"><h3>3 · Matrix Operation</h3><span class="seg view-seg" id="view3"><button type="button" data-v="blocks">blocks</button><button type="button" data-v="numbers">numbers</button></span></div>
-            <p class="sub" id="subMat"></p>
-            <canvas id="cMat"></canvas>
-            <div class="legend" id="legMat"></div>
-          </section>
-          <section class="panel">
-            <div class="title-row"><h3>4 · Windows</h3><span class="seg view-seg" id="view4"><button type="button" data-v="windows">windows</button><button type="button" data-v="profiles">profiles</button><button type="button" data-v="help">HELP</button></span></div>
+            <div class="title-row"><h3>3 · Windows</h3><span class="seg view-seg" id="view4"><button type="button" data-v="windows">windows</button><button type="button" data-v="profiles">profiles</button><button type="button" data-v="help">HELP</button></span></div>
             <p class="sub" id="subWin"></p>
             <canvas id="cWin"></canvas>
             <div class="legend" id="legWin"></div>
+          </section>
+          <section class="panel">
+            <div class="title-row"><h3>4 · Matrix</h3><span class="seg view-seg" id="view3"><button type="button" data-v="blocks">blocks</button><button type="button" data-v="numbers">numbers</button></span></div>
+            <p class="sub" id="subMat"></p>
+            <canvas id="cMat"></canvas>
+            <div class="legend" id="legMat"></div>
           </section>
         </div>
       </div>

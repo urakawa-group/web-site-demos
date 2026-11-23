@@ -51,6 +51,16 @@ export function caseOf(base, o = {}, f = {}) {
   if (k2 != null) g.C = { k: k2, ...(g.C ?? {}) };
   return { ...base, ...rest, species: base.species.map(s => ({ ...s, ...(g[s.key] ?? {}) })) };
 }
+/**
+ * The name shown for species i: the name the reader gave it, plus where it
+ * comes from, read from the card so it never goes stale ("B, from A",
+ * "D, as C", "D, ramp"; nothing added for one there at the start).
+ */
+export function nameOf(st, i) {
+  const s = st.species[i], { kind, of } = sourceOf(st, i), o = of >= 0 ? st.species[of].key : '';
+  const tail = kind === 'from' ? `, from ${o}` : kind === 'as' ? `, as ${o}` : kind === 'ramp' ? ', ramp' : '';
+  return `${s.label}${tail}`;
+}
 /** "A → B → C, D as C": the scheme the cards set, for a folded group. */
 export function schemeOf(st) {
   const on = st.species.filter(s => s.on).map(s => s.key), parts = [];
@@ -175,7 +185,7 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after })
     const p2 = plot(cv, { keep: true, x: xRangeOf(st), y: [0, lim.pure], margin: { l: W / 2 + 46 * sc }, xlabel: ax.label, xticks: ax.ticks.filter((_, i) => i % 2 === 0), yticks: ticks(0, lim.pure, 3), scale: sc });
     for (const sp of on) p2.line(grid, pure[sp.key], COLOR[sp.key]);
     p2.axes();
-    return { p: null, sub: 'Concentrations and pure spectra.', leg: on.map(sp => [sp.label, COLOR[sp.key], '']) };
+    return { p: null, sub: 'Concentrations and pure spectra.', leg: on.map(sp => [nameOf(st, st.species.indexOf(sp)), COLOR[sp.key], '']) };
   }
   const p = plot(cv, { x: xRangeOf(st), y: lim.y, xlabel: ax.label, ylabel, xticks: ax.ticks, yticks: ticks(lim.y[0], lim.y[1], 4), scale: sc });
   p.hline(0);
@@ -190,7 +200,7 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after })
 export const dataLegends = (st, lim) => [
   legendHtml([['one spectrum', C['data-faint'], ''], ['the first', KEPT, ''], ['the last', KEPT, 'dashed']]),
   legendHtml(MAP_LEGEND(lim.map)),
-  legendHtml(st.species.filter(sp => sp.on).map(sp => [sp.label, COLOR[sp.key], ''])),
+  legendHtml(st.species.filter(sp => sp.on).map(sp => [nameOf(st, st.species.indexOf(sp)), COLOR[sp.key], ''])),
 ];
 
 /* ---------------------------------------------------------------------------
@@ -324,12 +334,12 @@ export function dataControls(state, caseS) {
     const f = folded.has(sp.key);
     const above = st().species.slice(0, i), opt = (v, t) => `<option value="${v}"${(sp.src ?? 'start') === v ? ' selected' : ''}>${t}</option>`;
     const prof = `<label class="ctl wide" title="Where this species comes from: there at the start, formed from a species above it (first order, at its own k), growing linearly over the run, or with exactly the profile of a species above it"><span>comes from</span><select data-f="src">
-        ${opt('start', 'there at the start')}${above.map(o => opt(`from:${o.key}`, `forms from ${o.label}`)).join('')}${opt('ramp', 'grows over the run')}${above.map(o => opt(`as:${o.key}`, `exactly as ${o.label}`)).join('')}</select></label>`;
+        ${opt('start', 'there at the start')}${above.map(o => opt(`from:${o.key}`, `forms from ${o.key}`)).join('')}${opt('ramp', 'grows over the run')}${above.map(o => opt(`as:${o.key}`, `exactly as ${o.key}`)).join('')}</select></label>`;
     return `<div class="sp-card${sp.on ? '' : ' off'}${f ? ' folded' : ''}" data-i="${i}" style="--c:${COLOR[sp.key]}">
       <div class="sp-top">
         <label class="switch" title="${sp.on ? 'adds to the spectra: click to make it invisible (it still takes part in the kinetics)' : 'invisible: it takes part in the kinetics but adds nothing to the spectra. Click to show it'}"><input type="checkbox" data-f="on"${sp.on ? ' checked' : ''}><span></span></label>
         <span class="sp-swatch"></span>
-        ${f ? `<span class="sp-label">${esc(sp.label)}</span>` : `<input type="text" data-f="label" value="${esc(sp.label)}" aria-label="name">`}
+        ${f ? `<span class="sp-label">${esc(nameOf(st(), i))}</span>` : `<input type="text" data-f="label" value="${esc(sp.label)}" aria-label="name" title="The name; where it comes from is added from the card">`}
         <button type="button" class="sp-fold" data-f="fold" aria-expanded="${!f}" title="${f ? 'Show the settings of this species' : 'Fold this species to its name'}">${f ? '▸' : '▾'}</button>
         <button type="button" class="rst" data-f="resetSlot" title="this species back to the case"${slotChanged(i) ? '' : ' hidden'}>↺</button>
       </div>
@@ -389,7 +399,7 @@ export function dataControls(state, caseS) {
     document.querySelectorAll('.sp-card').forEach((card, i) => {
       const sp = st().species[i];
       card.classList.toggle('off', !sp.on);
-      const lab = card.querySelector('.sp-label'); if (lab) lab.textContent = sp.label;
+      const lab = card.querySelector('.sp-label'); if (lab) lab.textContent = nameOf(st(), i);
       const rst = card.querySelector('[data-f="resetSlot"]'); if (rst) rst.hidden = !slotChanged(i);
     });
   }
