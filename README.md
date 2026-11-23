@@ -13,6 +13,7 @@ happens. Nothing to install, no account, no build step.
 | demo | field | what it shows |
 |---|---|---|
 | [MES-PSD](demos/spectroscopy/mes-psd/index.html) | spectroscopy | modulation excitation and phase-sensitive detection. [Transformation](demos/spectroscopy/mes-psd/transformation/index.html): one period turned into the phase domain (signal × reference, running integral, phase domain as cosine or phasor, harmonics or the whole spectrum as a map), seven inputs, four stimulus shapes, disturbances. [Cases](demos/spectroscopy/mes-psd/cases/index.html): every setting on a control, nine stored cases from one band without delay to a sequence of species with a spectator |
+| [SVD and Rank](demos/spectroscopy/svd-rank/index.html) | spectroscopy | how many components a series of mixture spectra holds, read before MCR-ALS: the scree plot with a draggable cut, loadings, scores in time and score plots, the residual and lack of fit for every n. Seven cases, from one species without noise to rank deficiency from co-evolving species and an extra component from a drifting baseline |
 
 ## Layout
 
@@ -27,6 +28,7 @@ assets/shell.js                     header, footer, width steps, the two views
 assets/plot.js                      canvas plots with the chart conventions built in
 assets/cite.js                      [@alias, locator] markers → numbered citations from references.bib
 assets/workbench.js                 the workbench of a page with cases: panels, rail, value controls, groups, tooltips
+assets/linalg.js                    small dense linear algebra (Jacobi eigen, SVD) for the demos on a data matrix
 assets/fonts/                       Source Sans 3 (OFL), served from here
 demos/<field>/<demo>/index.html     one demo: its page,
 demos/<field>/<demo>/<demo>.js      and its engine
