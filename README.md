@@ -13,7 +13,7 @@ happens. Nothing to install, no account, no build step.
 | demo | field | what it shows |
 |---|---|---|
 | [MES-PSD](demos/spectroscopy/mes-psd/index.html) | spectroscopy | modulation excitation and phase-sensitive detection. [Transformation](demos/spectroscopy/mes-psd/transformation/index.html): one period turned into the phase domain (signal × reference, running integral, phase domain as cosine or phasor, harmonics or the whole spectrum as a map), seven inputs, four stimulus shapes, disturbances. [Cases](demos/spectroscopy/mes-psd/cases/index.html): every setting on a control, nine stored cases from one band without delay to a sequence of species with a spectator |
-| [SVD and Rank](demos/spectroscopy/svd-rank/index.html) | spectroscopy | how many components a series of mixture spectra holds, read before MCR-ALS: the scree plot with a draggable cut, loadings, scores in time and score plots, the residual and lack of fit for every n. Seven cases, from one species without noise to rank deficiency from co-evolving species and an extra component from a drifting baseline |
+| [Rank](demos/spectroscopy/rank/index.html) | spectroscopy | how many components a series of mixture spectra holds, the step before MCR-ALS, three ways on the same mock data (generic, IR or XAS axis; a technique switch carries the data across). [SVD](demos/spectroscopy/rank/svd/index.html): scree plot with the noise level, loadings, scores, the matrix operation as blocks or numbers, residual and lack of fit; nine cases up to rank deficiency and rank inflation. [PCA](demos/spectroscopy/rank/pca/index.html): centring and autoscaling, two points as a cloud, closure costing a component. [EFA](demos/spectroscopy/rank/efa/index.html): forward and backward, windows first in first out, profiles C = UR against the truth |
 
 ## Layout
 
@@ -28,7 +28,7 @@ assets/shell.js                     header, footer, width steps, the two views
 assets/plot.js                      canvas plots with the chart conventions built in
 assets/cite.js                      [@alias, locator] markers → numbered citations from references.bib
 assets/workbench.js                 the workbench of a page with cases: panels, rail, value controls, groups, tooltips
-assets/linalg.js                    small dense linear algebra (Jacobi eigen, SVD) for the demos on a data matrix
+assets/linalg.js                    small dense linear algebra (eigenvalues, SVD) for the demos on a data matrix
 assets/fonts/                       Source Sans 3 (OFL), served from here
 demos/<field>/<demo>/index.html     one demo: its page,
 demos/<field>/<demo>/<demo>.js      and its engine

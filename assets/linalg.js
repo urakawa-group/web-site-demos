@@ -108,3 +108,66 @@ export function svd(D) {
 
 /** Sum of squares of every entry. */
 export const sumSq = A => { let t = 0; for (const row of A) for (const x of row) t += x * x; return t; };
+
+/**
+ * Eigenvalues only (descending) of a symmetric matrix: Householder reduction
+ * to tridiagonal form, then the implicit QL iteration (the tred2 and tqli
+ * routines of Numerical Recipes, without the eigenvectors). Much faster than
+ * symEig for the many small decompositions of evolving factor analysis.
+ */
+export function symEigValues(A0) {
+  const n = A0.length, a = A0.map(r => Float64Array.from(r)), d = new Float64Array(n), e = new Float64Array(n);
+  for (let i = n - 1; i > 0; i--) {
+    const l = i - 1;
+    let h = 0, scale = 0;
+    if (l > 0) {
+      for (let k = 0; k <= l; k++) scale += Math.abs(a[i][k]);
+      if (scale === 0) e[i] = a[i][l];
+      else {
+        for (let k = 0; k <= l; k++) { a[i][k] /= scale; h += a[i][k] * a[i][k]; }
+        let f = a[i][l];
+        const g0 = f >= 0 ? -Math.sqrt(h) : Math.sqrt(h);
+        e[i] = scale * g0; h -= f * g0; a[i][l] = f - g0; f = 0;
+        for (let j = 0; j <= l; j++) {
+          let g = 0;
+          for (let k = 0; k <= j; k++) g += a[j][k] * a[i][k];
+          for (let k = j + 1; k <= l; k++) g += a[k][j] * a[i][k];
+          e[j] = g / h; f += e[j] * a[i][j];
+        }
+        const hh = f / (h + h);
+        for (let j = 0; j <= l; j++) {
+          const fj = a[i][j], g = e[j] - hh * fj;
+          e[j] = g;
+          for (let k = 0; k <= j; k++) a[j][k] -= fj * e[k] + g * a[i][k];
+        }
+      }
+    } else e[i] = a[i][l];
+    d[i] = h;
+  }
+  e[0] = 0;
+  for (let i = 0; i < n; i++) d[i] = a[i][i];
+  for (let i = 1; i < n; i++) e[i - 1] = e[i];
+  if (n) e[n - 1] = 0;
+  for (let l = 0; l < n; l++) {
+    let iter = 0, m;
+    do {
+      for (m = l; m < n - 1; m++) { const dd = Math.abs(d[m]) + Math.abs(d[m + 1]); if (Math.abs(e[m]) <= 1e-15 * dd) break; }
+      if (m !== l) {
+        if (iter++ === 60) break;
+        let g = (d[l + 1] - d[l]) / (2 * e[l]), r = Math.hypot(g, 1);
+        g = d[m] - d[l] + e[l] / (g + (g >= 0 ? Math.abs(r) : -Math.abs(r)));
+        let s = 1, c = 1, p = 0, i;
+        for (i = m - 1; i >= l; i--) {
+          let f = s * e[i]; const b = c * e[i];
+          e[i + 1] = r = Math.hypot(f, g);
+          if (r === 0) { d[i + 1] -= p; e[m] = 0; break; }
+          s = f / r; c = g / r; g = d[i + 1] - p; r = (d[i] - g) * s + 2 * c * b; p = s * r; d[i + 1] = g + p; g = c * r - b;
+          f = 0;
+        }
+        if (r === 0 && i >= l) continue;
+        d[l] -= p; e[l] = g; e[m] = 0;
+      }
+    } while (m !== l);
+  }
+  return Array.from(d).sort((x, y) => y - x);
+}

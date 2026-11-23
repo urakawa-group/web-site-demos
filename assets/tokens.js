@@ -117,6 +117,21 @@ export const COLOR_GROUPS = [
       'map-neg-strong': { value: SCHEME.blue.darkest, usage: 'The most negative value of a diverging colour map' },
     },
   },
+  {
+    key: 'matrix',
+    title: 'Matrix Blocks',
+    note: 'The static view of a matrix operation, as in the phd_ui matrix figures: every block filled by its role, not by its numbers. Light tones, so a block is never read as a sign or as stimulus on or off.',
+    tokens: {
+      'block-data':      { value: SCHEME.grey.light, usage: 'A data matrix (X, its mean, a column of ones), and the residual E' },
+      'block-data-edge': { value: SCHEME.grey.dark, usage: 'Frame and name of a data block' },
+      'block-score':     { value: SCHEME.blue.light, usage: 'Scores or concentrations: one value per spectrum (U, T, C)' },
+      'block-score-edge':{ value: SCHEME.blue.dark, usage: 'Frame and name of a score block' },
+      'block-load':      { value: SCHEME.red.light, usage: 'Loadings or spectra: one value per point of the spectrum (Vᵀ, Pᵀ, Sᵀ)' },
+      'block-load-edge': { value: SCHEME.red.dark, usage: 'Frame and name of a loading block' },
+      'block-diag':      { value: SCHEME.sand.dark, usage: 'A diagonal of sizes: the singular values diag(σ)' },
+      'block-diag-edge': { value: SCHEME.sand.darkest, usage: 'Frame and name of a diagonal block' },
+    },
+  },
 ];
 
 /** Flat lookup: C['ink-700'] → '#413b34'. */

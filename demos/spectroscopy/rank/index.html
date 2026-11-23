@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<!--
+  Rank: the topic page. How many components a series of spectra holds, the
+  step before MCR-ALS, in three techniques on the same mock data: the SVD
+  itself (svd/), PCA, the SVD after centring (pca/), and evolving factor
+  analysis, the rank in time (efa/). Each page has a technique switch that
+  carries the data to the others. Shared code: common.js and mixture.js.
+  Author: Julius Sommer, 2026-11-23.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rank: How Many Components Are in a Series of Spectra</title>
+<link rel="stylesheet" href="../../../assets/site.css">
+</head>
+<body>
+<main class="page">
+  <p class="crumbs"><a href="../../../index.html">Demos</a> · Spectroscopy</p>
+  <h1>Rank: How Many Components</h1>
+  <p class="lead">A series of spectra of a changing mixture is a matrix. Before its species can be resolved, someone has to decide how many there are. Three ways to ask, on the same data.</p>
+  <div class="cards">
+    <a class="card" href="svd/index.html">
+      <span class="card-title">1 · SVD</span>
+      <span class="card-desc">The data taken apart into components ordered by size: the scree plot with its noise level, loadings and scores, the matrix operation as blocks, and what is left. Nine cases, from one species to rank deficiency and a band that moves.</span>
+    </a>
+    <a class="card" href="pca/index.html">
+      <span class="card-title">2 · PCA</span>
+      <span class="card-desc">The same after the mean spectrum is taken off. Two points of the spectra as a cloud show what centring does to a direction; raw, centred and autoscaled side by side show what it does to the rank.</span>
+    </a>
+    <a class="card" href="efa/index.html">
+      <span class="card-title">3 · EFA</span>
+      <span class="card-desc">The rank in time: the SVD of growing parts of the data, forward and backward, the window of each species read off, and the profiles they give, against the true concentrations.</span>
+    </a>
+  </div>
+</main>
+<script type="module">
+  import { initShell } from '../../../assets/shell.js';
+  initShell({ page: 'demos' });
+</script>
+</body>
+</html>

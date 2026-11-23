@@ -39,7 +39,7 @@ function header(page, views) {
 function footer() {
   const f = document.createElement('footer');
   f.className = 'site-footer';
-  f.innerHTML = `Urakawa group, Catalysis Engineering, TU Delft ·
+  f.innerHTML = `Urakawa group, CaSE section, TU Delft ·
     <a href="${ROOT}impressum.html">Impressum</a> ·
     <a href="${ROOT}style-guide.html">Style guide</a> ·
     <a href="${REPO}">Source on GitHub</a>`;

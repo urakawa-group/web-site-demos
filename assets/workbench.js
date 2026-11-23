@@ -13,6 +13,7 @@
  *   tooltip                 one floating tooltip, for case texts and points in a plot
  *   setSeg(el, v)           mark the chosen button of a segmented control
  *   markMaxima(p, …)        drop lines and labels for maxima in a phase-domain plot
+ *   reserveLegends(html[])  legend rows as tall as the widest legend the page can show needs
  *
  * Ids it expects: workbench, left, leftToggle, rail, wbMain, stage, below,
  * right, rightToggle, rightOpen, caseSelect, caseBtn, caseMenu, resetCase,
@@ -63,6 +64,29 @@ export function initWorkbench({ redraw, renderRail }) {
   $('rightOpen').addEventListener('click', () => { panels.right = true; panels.set(); });
   window.addEventListener('shell:resize', () => { fitWorkbench(); redraw(); });
   return panels;
+}
+
+/**
+ * Legends keep a fixed height, so a view switch never moves the plots. The
+ * height is the number of lines the longest legend of the page needs at the
+ * current width: the page passes the HTML of every legend it can show (all
+ * views), and each is laid out once, hidden, at the width of a legend row.
+ * Without a call the legend rows keep two lines (--legend-lines in site.css).
+ */
+export function reserveLegends(variants) {
+  const host = document.querySelector('.wb-center .legend');
+  if (!host || !variants.length) return;
+  const probe = host.cloneNode(false);
+  probe.removeAttribute('id');
+  Object.assign(probe.style, { position: 'absolute', visibility: 'hidden', height: 'auto', overflow: 'visible', left: '-10000px', top: '0', width: `${host.clientWidth}px` });
+  host.parentElement.append(probe);
+  let lines = 1;
+  for (const html of variants) {
+    probe.innerHTML = html;
+    lines = Math.max(lines, new Set([...probe.children].map(c => c.offsetTop)).size);
+  }
+  probe.remove();
+  $('workbench').style.setProperty('--legend-lines', String(lines));
 }
 
 /* ---------------------------------------------------------------------------

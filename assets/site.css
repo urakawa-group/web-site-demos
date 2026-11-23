@@ -196,7 +196,7 @@ body.wb-locked { overflow: hidden; }
 .phi-field input:focus { outline: none; border-color: var(--data-highlight); }
 .phi-field input.preview { border-style: dashed; }
 .wb-center .panel h3 { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wb-center .legend { flex: none; height: calc(3em + 10px); line-height: 1.5; overflow: hidden; align-content: flex-start; }
+.wb-center .legend { flex: none; height: calc(var(--legend-lines, 2) * 1.5em + 10px); line-height: 1.5; overflow: hidden; align-content: flex-start; }
 .wb-center .legend span { flex: none; white-space: nowrap; }
 /* the centre's text at the workbench scale, on a wide screen */
 [data-w="wide"] .wb-center .panel h3 { font-size: calc(var(--t-panel-title-size) * var(--wb-text-scale)); }

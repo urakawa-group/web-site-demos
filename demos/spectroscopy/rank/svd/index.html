@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!--
+  Rank · SVD: a series of mixture spectra X and its singular value
+  decomposition X = U Σ Vᵀ, read the ways it is read before MCR-ALS: the
+  scree plot of the singular values on a log scale with the noise level,
+  the loadings, the scores in time and as 2D score plots, the matrix
+  operation drawn live, the residual and the lack of fit for every n.
+  Cases go from one species without noise to rank deficiency (co-evolving
+  species, similar spectra) and rank inflation (a moving band, drift).
+
+  Sources: Passos et al., Ch. 29 of the Springer Handbook of Advanced
+  Catalyst Characterization (Eqs. 29.1, 29.2, 29.4, Figs. 29.2 and 29.6);
+  de Juan et al., Anal. Methods 2014 (Eq. 3); Golshan et al., Anal. Chem.
+  2011 (Eq. 4, for the notation). Eckart–Young and the noise level
+  σ(√q + √m) are standard results.
+  The data (../mixture.js): four species slots on a generic, IR or XAS
+  axis, A → B → C first order, D following C or a ramp, a band that can
+  shift with its own concentration, baseline drift, noise. Shared controls,
+  the data panel and the matrix panel live in ../common.js; the panels and
+  controls are the workbench of the MES-PSD pages (assets/workbench.js).
+  All numbers are illustrative.
+
+  URL parameters: ?case=<id> picks the case, ?data=<…> carries the data from
+  a sibling page (the technique switch), ?present=1 (or 1.25 to 2) opens the
+  presentation view.
+
+  Author: Julius Sommer, 2026-11-23.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SVD: The Singular Value Decomposition of a Series of Spectra</title>
+<link rel="stylesheet" href="../../../../assets/site.css">
+</head>
+<body>
+<main class="page-wb">
+  <div class="workbench" id="workbench">
+    <aside class="wb-side wb-left" id="left" aria-label="Settings">
+      <div class="side-open">
+        <section class="sgroup" data-g="case" id="caseSelect">
+          <div class="sg-head">
+            <button type="button" class="sg-toggle" aria-expanded="true" title="The case: a stored set of values for every setting below. Click to fold"><span class="sg-name">case</span><span class="sg-sum"></span></button>
+            <span class="changed-mark" title="A setting differs from the case">changed</span>
+            <button type="button" class="side-toggle" id="leftToggle" title="Collapse the settings to quick switches">◀</button>
+          </div>
+          <div class="sg-body">
+            <div class="case-select">
+              <button type="button" id="caseBtn" aria-haspopup="listbox" aria-expanded="false"></button>
+              <ul id="caseMenu" role="listbox" aria-label="Case" hidden></ul>
+            </div>
+            <button class="btn" id="resetCase" type="button" disabled>reset to the case</button>
+          </div>
+        </section>
+
+        <section class="sgroup" data-g="technique">
+          <div class="sg-head"><button type="button" class="sg-toggle" aria-expanded="true" title="The same data, decomposed another way: each technique has its own page and its own cases; switching keeps the data you set. Click to fold"><span class="sg-name">technique</span><span class="sg-sum"></span></button></div>
+          <div class="sg-body">
+            <div class="ctl"><span class="seg" id="techSeg"><button type="button" data-v="svd" title="singular value decomposition">SVD</button><button type="button" data-v="pca" title="principal component analysis: the SVD after centring">PCA</button><button type="button" data-v="efa" title="evolving factor analysis: the rank in time">EFA</button></span></div>
+          </div>
+        </section>
+
+        <section class="sgroup" data-g="components">
+          <div class="sg-head"><button type="button" class="sg-toggle" aria-expanded="true" title="How many components to keep: the choice this page is about. Click to fold"><span class="sg-name">components</span><span class="sg-sum"></span></button></div>
+          <div class="sg-body">
+            <div class="ctl"><span>keep <i>n</i></span>
+              <span class="seg" id="nSeg"><button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button><button type="button" data-v="6">6</button><button type="button" data-v="7">7</button><button type="button" data-v="8">8</button><button type="button" data-v="9">9</button><button type="button" data-v="10">10</button></span></div>
+          </div>
+        </section>
+
+        <section class="sgroup" data-g="species">
+          <div class="sg-head"><button type="button" class="sg-toggle" aria-expanded="true" title="Four species, each one band (or one edge). A turns into B, B into C; D follows C or grows over the run. Click to fold"><span class="sg-name">species</span><span class="sg-sum"></span></button></div>
+          <div class="sg-body">
+            <div id="species"></div>
+          </div>
+        </section>
+
+        <section class="sgroup" data-g="kinetics">
+          <div class="sg-head"><button type="button" class="sg-toggle" aria-expanded="true" title="How the composition changes: A → B → C, both steps first order. Click to fold"><span class="sg-name">kinetics</span><span class="sg-sum"></span></button></div>
+          <div class="sg-body">
+            <div class="ctl vctl" data-k="k1"></div>
+            <div class="ctl vctl" data-k="k2"></div>
+          </div>
+        </section>
+
+        <section class="sgroup closed" data-g="measurement">
+          <div class="sg-head"><button type="button" class="sg-toggle" aria-expanded="false" title="The spectral axis, the number of spectra and what a measurement adds: noise and a drifting baseline. Click to fold"><span class="sg-name">measurement</span><span class="sg-sum"></span></button></div>
+          <div class="sg-body">
+            <label class="ctl"><span>spectral axis</span><select id="axis"></select></label>
+            <div class="ctl vctl" data-k="q"></div>
+            <div class="ctl vctl" data-k="noise"></div>
+            <div class="ctl vctl" data-k="drift"></div>
+            <div class="check-row"><button class="btn" id="reseed" type="button">new noise</button></div>
+          </div>
+        </section>
+      </div>
+      <div class="rail" id="rail" aria-label="Quick switches"></div>
+    </aside>
+
+    <div class="wb-main" id="wbMain">
+      <div class="wb-stage" id="stage">
+        <div class="wb-head">
+          <p class="crumbs"><a href="../index.html">Rank</a> · SVD</p>
+          <h1>Singular Value Decomposition: How Many Components</h1>
+          <p class="lead">A series of mixture spectra, taken apart into components ordered by how much of the data they carry. Choose how many are signal: drag the cut in the scree plot and watch what is left.</p>
+        </div>
+        <div class="wb-center">
+          <section class="panel">
+            <h3>1 · Data Matrix</h3>
+            <div class="sub-row">
+              <p class="sub" id="subData"></p>
+              <span class="seg view-seg" id="view1"><button type="button" data-v="spectra">spectra</button><button type="button" data-v="map">map</button><button type="button" data-v="truth">species</button></span>
+            </div>
+            <canvas id="cData"></canvas>
+            <div class="legend" id="legData"></div>
+          </section>
+          <section class="panel">
+            <h3>2 · Singular Values</h3>
+            <div class="sub-row">
+              <p class="sub" id="subScree"></p>
+            </div>
+            <canvas id="cScree" class="interactive"></canvas>
+            <div class="legend" id="legScree"></div>
+          </section>
+          <section class="panel">
+            <h3>3 · Components</h3>
+            <div class="sub-row">
+              <p class="sub" id="subComp"></p>
+              <span class="seg view-seg" id="view3"><button type="button" data-v="loadings">loadings</button><button type="button" data-v="scores">in time</button><button type="button" data-v="plane">score plots</button></span>
+            </div>
+            <canvas id="cComp"></canvas>
+            <div class="legend" id="legComp"></div>
+          </section>
+          <section class="panel">
+            <h3>4 · Matrix Operation</h3>
+            <div class="sub-row">
+              <p class="sub" id="subFit"></p>
+              <span class="seg view-seg" id="view4"><button type="button" data-v="blocks">blocks</button><button type="button" data-v="numbers">numbers</button><button type="button" data-v="residual">residual</button><button type="button" data-v="lof">lack of fit</button></span>
+            </div>
+            <canvas id="cFit" class="interactive"></canvas>
+            <div class="legend" id="legFit"></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="wb-below" id="below">
+        <section class="explain">
+          <article id="general"></article>
+          <article id="equations"></article>
+        </section>
+        <section class="refs-section">
+          <h2>References</h2>
+          <ol class="refs" id="refs"></ol>
+          <p class="note">All numbers on this page are illustrative: simulated spectra and first-order kinetics, not a measurement.</p>
+        </section>
+      </div>
+    </div>
+
+    <aside class="wb-side wb-right" id="right" aria-label="Values">
+      <div class="side-head">
+        <span class="side-title">values, <i>n</i> = <span id="vN"></span></span>
+        <button type="button" class="side-toggle" id="rightToggle" title="Hide the values">▶</button>
+      </div>
+      <div class="readout-wrap"><table class="readout side" id="readout"></table></div>
+      <p class="side-note" id="sideNote"></p>
+    </aside>
+    <button type="button" class="right-tab" id="rightOpen" title="Show the values" hidden>◀ values</button>
+  </div>
+
+  <div id="caseTexts" hidden></div>
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+</main>
+<script type="module" src="svd.js"></script>
+</body>
+</html>
