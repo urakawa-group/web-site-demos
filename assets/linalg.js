@@ -205,3 +205,31 @@ export function betaInc(x, a, b) {
 }
 /** P(F > f) for an F distribution with d1 and d2 degrees of freedom. */
 export const fTail = (f, d1, d2) => (f <= 0 ? 1 : betaInc(d2 / (d2 + d1 * f), d2 / 2, d1 / 2));
+
+/** A⁻¹ B for a small square A, by Gaussian elimination with partial pivoting. */
+export function solve(A, B) {
+  const n = A.length, k = B[0].length, M = A.map((r, i) => [...r, ...B[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    const d = M[c][c] || 1e-300;
+    for (let j = c; j < n + k; j++) M[c][j] /= d;
+    for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c]; if (f) for (let j = c; j < n + k; j++) M[r][j] -= f * M[c][j]; }
+  }
+  return M.map(r => r.slice(n));
+}
+/** Determinant of a small square matrix. */
+export function det(A) {
+  const n = A.length, M = A.map(r => [...r]);
+  let d = 1;
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (p !== c) { [M[c], M[p]] = [M[p], M[c]]; d = -d; }
+    if (Math.abs(M[c][c]) < 1e-300) return 0;
+    d *= M[c][c];
+    for (let r = c + 1; r < n; r++) { const f = M[r][c] / M[c][c]; for (let j = c; j < n; j++) M[r][j] -= f * M[c][j]; }
+  }
+  return d;
+}

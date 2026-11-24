@@ -6,9 +6,9 @@
  */
 import { initShell } from '../../../../assets/shell.js';
 import { C, CHART } from '../../../../assets/tokens.js';
-import { plot } from '../../../../assets/plot.js';
+import { plot, ticks } from '../../../../assets/plot.js';
 import { renderCitations } from '../../../../assets/cite.js';
-import { svd, sumSq, fTail } from '../../../../assets/linalg.js';
+import { svd, sumSq, fTail, mul, transpose, solve, det } from '../../../../assets/linalg.js';
 import {
   fitWorkbench, initWorkbench, valueControls, foldingGroups, caseSelector, tooltip,
   setSeg, rail, grip, dragRuler, localIn, clamp, reserveLegends,
@@ -17,22 +17,27 @@ import { T_END, build } from '../mixture.js';
 import {
   $, clone, M, SOURCES as COMMON_SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR,
   residual, fmtS, fmtPct, SC, T_TICKS, XLAB_T, axOf, xRangeOf, LOG_TICKS, legend, legendHtml, heatmap, MAP_LEGEND,
-  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf,
+  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf, lin,
   callout, frac, sum, EQ_BILINEAR, EQ_NOISE,
 } from '../common.js';
 
 initShell({ page: 'demo', views: true });
 
-const SOURCES = { ...COMMON_SOURCES, malinowski: { key: 'Malinowski.StatisticalFtestsAbstract.1989', journal: 'J. Chemom.' } };
+const SOURCES = {
+  ...COMMON_SOURCES,
+  malinowski: { key: 'Malinowski.StatisticalFtestsAbstract.1989', journal: 'J. Chemom.' },
+  hao: { key: 'Hao.DeterminingNumberPrincipal.2015', journal: 'Chemom. Intell. Lab. Syst.', lead: 'Shao' },
+};
 
 /* ---------------------------------------------------------------------------
    Settings: the data (common.js) plus
      n      components kept (what the reader decides, not the data)
-     view1  'spectra' | 'map' | 'truth';  view2 'scree' | 'ftest';  view3 'loadings' | 'scores' | 'plane'
+     kv     key spectra OPALS selects (OPA), p
+     view1  'spectra' | 'map' | 'truth';  view2 'scree' | 'ftest' | 'opals';  view3 'loadings' | 'scores' | 'plane'
      view4  'blocks' | 'numbers' | 'residual' | 'lof'
    --------------------------------------------------------------------------- */
 const NMAX = 10, NTAB = 10;
-const base = { ...clone(DATA_BASE), n: 3, view1: 'spectra', view2: 'scree', view3: 'loadings', view4: 'blocks' };
+const base = { ...clone(DATA_BASE), n: 3, kv: 10, view1: 'spectra', view2: 'scree', view3: 'loadings', view4: 'blocks' };
 const DISPLAY_ONLY = ['n', 'view1', 'view2', 'view3', 'view4'];
 const cs = (o, f) => caseOf(base, o, f);
 
@@ -61,6 +66,11 @@ const CASES = [
     id: 'ftest', title: 'Counting by Statistics', s: cs({ n: 2, k1: 0.25, k2: 1, noise: 0.008, view2: 'ftest' }, { B: { h: 0.3 } }),
     text: `<p>The short-lived intermediate again, with the rank counted by a test instead of by eye. Malinowski's F-test compares each eigenvalue, reduced by its degrees of freedom, with the pool of all smaller ones; the bars give the significance level of each component [@malinowski, Eq. 19, p. 52].</p>
       <p>Read from the last component upwards and stop at the first one below the chosen level [@malinowski, p. 56]. Here component 3 sits at about 11 %: outside the "grey" region between 5 and 10 % that the paper describes, so the test says 2. Lower the noise in the measurement group and it moves below 5 %.</p>`,
+  },
+  {
+    id: 'opals', title: 'Counting by Eigenvectors', s: cs({ n: 3, k1: 0.25, k2: 1, noise: 0.008, view2: 'opals' }, { B: { h: 0.3 } }),
+    text: `<p>The short-lived intermediate a third time. OPALS picks the most dissimilar spectra, makes one least-squares guess of the species from them, rebuilds the data from that guess and compares the loadings of both: a chemical component looks the same in both, noise does not [@hao, p. 18].</p>
+      <p>Here the third congruence is still close to 1: OPALS counts B, where the F-test, at about 11 %, did not. Two criteria, one data set, two answers. Switch panel 2 between the three views; that disagreement is the honest state of the art for a weak species.</p>`,
   },
   {
     id: 'overlap', title: 'Overlapping Bands', s: cs({ n: 3, noise: 0.008 }, { A: { c: 1540, w: 80 }, B: { c: 1520, w: 80 }, C: { c: 1500, w: 80 } }),
@@ -119,6 +129,12 @@ const EQUATIONS = [
     symbols: [['<i>x<sub>ij</sub></i>', 'an element of <b>X</b>']],
   }),
   callout({
+    title: 'Eigenvectors Compared (OPALS)',
+    math: `<i>c<sub>k</sub></i> = |<b>v</b><sub><i>k</i></sub><sup>T</sup> <b>v</b><sub><i>k</i></sub><sup>*</sup>|, &emsp; <b>X</b><sup>*</sup> = <b>C</b><sup>*</sup> <b>S</b><sup>*T</sup>`,
+    text: 'The orthogonal projection approach picks the <i>p</i> most dissimilar spectra as a first guess of <b>S</b>; one least-squares step with non-negative, unimodal profiles gives <b>C</b><sup>*</sup> and <b>S</b><sup>*</sup>, and the rebuilt <b>X</b><sup>*</sup> keeps the chemistry but not the noise. The congruence <i>c<sub>k</sub></i> of the <i>k</i>-th loadings of <b>X</b> and <b>X</b><sup>*</sup> is close to 1 for a principal factor and drops for the first one that is not [@hao, Eqs. 3–7, p. 18]. The paper reads the drop by eye; this page counts the leading run above 0.9. The absolute value only removes the free sign.',
+    symbols: [['<b>v</b><sub><i>k</i></sub>, <b>v</b><sub><i>k</i></sub><sup>*</sup>', 'the <i>k</i>-th loadings of <b>X</b> and of <b>X</b><sup>*</sup>'], ['<i>p</i>', 'key spectra, more than the rank (the paper uses 10 to 40)']],
+  }),
+  callout({
     title: 'An F-Test for the Rank',
     math: `<i>F</i>(1, <i>s</i> − <i>n</i>) = ${frac('<i>λ<sub>n</sub></i> / (<i>r</i> − <i>n</i> + 1)(<i>c</i> − <i>n</i> + 1)', `${sum('<i>j</i> = <i>n</i> + 1', '<i>s</i>')} <i>λ<sub>j</sub></i> / ${sum('<i>j</i> = <i>n</i> + 1', '<i>s</i>')} (<i>r</i> − <i>j</i> + 1)(<i>c</i> − <i>j</i> + 1)`)}`,
     text: 'Each eigenvalue <i>λ<sub>j</sub></i> = <i>σ<sub>j</sub></i>², divided by its degrees of freedom (the reduced eigenvalue), is compared with the pool of the smaller ones, weighted by theirs [@malinowski, Eqs. 13 and 19, p. 52]. The significance level is the chance of a ratio this large from noise alone. Read from the bottom up; the paper finds 5 % tends to undercount and 10 % to overcount, with a grey region between [@malinowski, p. 56]. It assumes normally distributed errors, so it says nothing about noise-free data.',
@@ -151,13 +167,46 @@ function compute() {
     sl.push(100 * fTail(F, 1, s - j));
   }
   const nAt = a => { for (let j = s - 1; j >= 1; j--) if (sl[j - 1] < a) return j; return 0; };
+  const cong = opals(B.X, Math.min(st.kv, q - 1), r);
+  let nOp = 0; while (nOp < cong.length && cong[nOp] >= 0.9) nOp++;
   S = {
-    sl, n5: nAt(5), n10: nAt(10),
+    sl, n5: nAt(5), n10: nAt(10), cong, nOp,
     B, r, cum,
     lof: cum.map(c => 100 * Math.sqrt(Math.max(total - c, 0) / total)),
     noiseLof: 100 * Math.sqrt(sumSq(B.noise) / total),
     level: st.noise * (Math.sqrt(st.q) + Math.sqrt(M)),
   };
+}
+/**
+ * OPALS: key spectra by the orthogonal projection approach, one
+ * least-squares step with non-negative, unimodal profiles, the rebuilt
+ * matrix, and the congruence of its loadings with those of X.
+ */
+function opals(X, p, r) {
+  const q = X.length, m = X[0].length, unit = v => { const L = Math.hypot(...v) || 1; return Array.from(v, x => x / L); };
+  const R = X.map(unit), mean = unit(Array.from({ length: m }, (_, j) => X.reduce((s, row) => s + row[j], 0) / q)), sel = [];
+  const dot = (a, b) => { let s = 0; for (let j = 0; j < m; j++) s += a[j] * b[j]; return s; };
+  for (let t = 0; t < p; t++) {
+    const refs = t ? sel.map(i => R[i]) : [mean];
+    let best = -1, bd = -1;
+    for (let i = 0; i < q; i++) {
+      if (sel.includes(i)) continue;
+      const Y = [...refs, R[i]], d = det(Y.map(a => Y.map(b => dot(a, b))));
+      if (d > bd) { bd = d; best = i; }
+    }
+    sel.push(best);
+  }
+  const S0 = transpose(sel.map(i => Array.from(X[i])));
+  let Cs = mul(X, transpose(solve(mul(transpose(S0), S0), transpose(S0))));
+  Cs = transpose(transpose(Cs).map(col => {   // non-negative, then unimodal about its maximum
+    const c = col.map(x => Math.max(0, x)), top = c.indexOf(Math.max(...c));
+    for (let i = top + 1; i < c.length; i++) c[i] = Math.min(c[i], c[i - 1]);
+    for (let i = top - 1; i >= 0; i--) c[i] = Math.min(c[i], c[i + 1]);
+    return c;
+  }));
+  const Ss = transpose(mul(solve(mul(transpose(Cs), Cs), transpose(Cs)), X));
+  const r2 = svd(mul(Cs, transpose(Ss)));
+  return r.v.slice(0, Math.min(NTAB, r2.v.length)).map((v, k) => Math.abs(dot(v, r2.v[k])));
 }
 function limits() {
   const st = state.s, L = dataLimits(S.B.X, S.B.pure);
@@ -203,8 +252,29 @@ function drawFtest() {
   $('subScree').textContent = 'Malinowski\'s F-test: low is not noise. Read from the right.';
   legend($('legScree'), ftestLegend);
 }
+const opalsLegend = [['congruence, kept', KEPT, 'bar'], ['dropped', DROPPED, 'bar'], ['0.9', LEVEL, 'dashed']];
+function drawOpals() {
+  const st = state.s, cv = $('cScree'), sc = SC(), NS = S.cong.length;
+  const p = plot(cv, { x: [0.4, NS + 0.6], y: [0, 1.08], xlabel: 'component *k*', ylabel: 'congruence *c*_*k*_ / –', xticks: Array.from({ length: NS }, (_, i) => [i + 1, String(i + 1)]), yticks: ticks(0, 1, 4), scale: sc });
+  p.line([0.4, NS + 0.6], [0.9, 0.9], LEVEL, CHART.lineThin, CHART.dash);
+  const pts = [];
+  for (let i = 0; i < NS; i++) {
+    const x0 = p.X(i + 1 - 0.3), x1 = p.X(i + 1 + 0.3), y = Math.max(S.cong[i], 0.006);
+    p.ctx.fillStyle = i < st.n ? KEPT : DROPPED; p.ctx.fillRect(x0, p.Y(y), x1 - x0, p.Y(0) - p.Y(y));
+    pts.push({ i, px: (x0 + x1) / 2, py: p.Y(y) });
+  }
+  p.text(`above 0.9: the first ${S.nOp}`, NS + 0.4, 1.0, C['ink-500'], 'right');
+  const rx = p.X(st.n + 0.5);
+  p.line([st.n + 0.5, st.n + 0.5], [0, 1.08], CUT, CHART.lineData, CHART.dash);
+  grip(p, rx, CUT);
+  p.axes();
+  P2 = { p, rx, pts, NS };
+  $('subScree').textContent = `OPALS, ${Math.min(st.kv, st.q - 1)} key spectra: near 1 is chemistry, a drop is not.`;
+  legend($('legScree'), opalsLegend);
+}
 function drawScree() {
   if (state.s.view2 === 'ftest') { drawFtest(); return; }
+  if (state.s.view2 === 'opals') { drawOpals(); return; }
   const st = state.s, cv = $('cScree'), sc = SC(), s = S.r.s, NS = Math.min(s.length, 15);
   const p = plot(cv, { x: [0.4, NS + 0.6], y: LOG, xlabel: 'component *i*', ylabel: 'singular value *σ*_*i*_', xticks: Array.from({ length: NS }, (_, i) => [i + 1, String(i + 1)]).filter(([v]) => NS <= 10 || v % 2 === 1), yticks: LOG_TICKS.filter(([v]) => v <= LOG[1]), scale: sc });
   const xs = Array.from({ length: NS }, (_, i) => i + 1), ys = xs.map(i => logOf(s[i - 1]));
@@ -336,6 +406,7 @@ function drawTable() {
   }
   rows += `<tr><td colspan="2">noise level</td><td colspan="3">${st.noise > 0 ? fmtS(S.level) : '–'}</td></tr>`;
   rows += `<tr><td colspan="2">F-test, <i>n</i></td><td colspan="3">${st.noise > 0 ? `${S.n5} at 5 % · ${S.n10} at 10 %` : '–'}</td></tr>`;
+  rows += `<tr><td colspan="2">OPALS, <i>n</i></td><td colspan="3">${S.nOp} above 0.9</td></tr>`;
   rows += `<tr><td colspan="2">noise LoF</td><td colspan="3">${st.noise > 0 ? `${S.noiseLof.toPrecision(3)} %` : '–'}</td></tr>`;
   $('readout').innerHTML = rows;
   $('sideNote').innerHTML = 'Share: <i>σ<sub>i</sub></i>² over the sum of all. LoF: Eq. 29.2 for the rebuild from 1 … <i>i</i>. The last two rows use the noise this page added, which a real measurement does not tell you.';
@@ -343,7 +414,7 @@ function drawTable() {
 
 function draw() {
   const st = state.s, f = fitLegends();
-  reserveLegends([...dataLegends(st, LIM), legendHtml(screeLegend()), legendHtml(ftestLegend), legendHtml(compLegends.plane), legendHtml(compLegends.other), legendHtml(f.matrix), legendHtml(f.blocks), legendHtml(f.residual), legendHtml(f.lof)]);
+  reserveLegends([...dataLegends(st, LIM), legendHtml(screeLegend()), legendHtml(ftestLegend), legendHtml(opalsLegend), legendHtml(compLegends.plane), legendHtml(compLegends.other), legendHtml(f.matrix), legendHtml(f.blocks), legendHtml(f.residual), legendHtml(f.lof)]);
   drawDataPanel(); drawScree(); drawComp(); drawFit(); drawTable();
   sums(); controls.refresh();
 }
@@ -362,8 +433,9 @@ const sums = foldingGroups(() => ({
   components: `<i>n</i> = ${state.s.n}`,
   ...data.summaries(),
 }));
+const bindOf = key => data.bind(key) ?? (key === 'kv' ? { label: 'OPALS key spectra <i>p</i>', unit: '', ...lin(4, 30, 1, 0), get: () => state.s.kv, set: v => { state.s.kv = clamp(Math.round(v), 2, 60); }, caseV: () => caseS().kv, def: 10, redraw: 'update' } : null);
 const controls = valueControls({
-  bindOf: key => data.bind(key), update, draw,
+  bindOf, update, draw,
   after: () => {
     if (!state.s) return;
     setSeg($('nSeg'), state.s.n);
@@ -390,6 +462,7 @@ const hitPt = e => {
   return best;
 };
 function ptText(i) {
+  if (state.s.view2 === 'opals') return `<div class="tip-title">Component ${i + 1}, congruence ${S.cong[i].toFixed(3)}</div>\n    <p>How alike the ${i + 1}. loading of the data and of the rebuilt data are: 1 is the same direction, 0 unrelated.</p><p class="tip-hint">click to keep ${i + 1} component${i ? 's' : ''}</p>`;
   if (state.s.view2 === 'ftest') return `<div class="tip-title">Component ${i + 1}, significance level ${S.sl[i] < 0.01 ? '< 0.01' : S.sl[i].toPrecision(2)} %</div>
     <p>The chance that noise alone gives a reduced eigenvalue this much larger than the pool of the smaller ones. ${S.sl[i] < 5 ? 'Below 5 %: not noise.' : S.sl[i] < 10 ? 'Between 5 and 10 %: the grey region.' : 'Above 10 %: as noise.'}</p><p class="tip-hint">click to keep ${i + 1} component${i ? 's' : ''}</p>`;
   const s = S.r.s, sq = s.map(x => x * x), all = sq.reduce((a, b) => a + b, 0) || 1;
