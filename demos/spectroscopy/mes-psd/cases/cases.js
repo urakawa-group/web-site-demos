@@ -521,15 +521,17 @@ function drawFold() {
   for (const s of S.banded) { const ci = S.centre[s.key]; p.line(tp, S.fold.map(r => r[ci]), colorOf(s)); }
   p.axes();
   // the chosen φ in the time domain: the delay it reads, t = (360° − φ)/360° · T/k.
-  // The reference repeats every T/k, so later copies of that delay exist; only
-  // the first, the time value itself, is drawn
-  const mark = (phi, w, dash) => p.vline(((360 - phi) % 360) / 360 * T / st.k, C['data-highlight'], w, dash);
-  if (state.preview) mark(state.preview.phi, 1, [1, 3]);
-  mark(st.phi, 1.5, [4, 3]);
-  // a grip on top of the line, to grab the ruler by
-  const g = 6, xs = [p.X(((360 - st.phi) % 360) / 360 * T / st.k)];
+  // The reference repeats every T/k, so at harmonic k the same delay sits k
+  // times in the period: all k copies are drawn, each with a grip, and they
+  // move together. The first, the time value itself, is drawn a little bolder
+  const per = T / st.k;
+  const at = phi => Array.from({ length: st.k }, (_, j) => ((360 - phi) % 360) / 360 * per + j * per);
+  if (state.preview) for (const t of at(state.preview.phi)) p.vline(t, C['data-highlight'], 1, [1, 3]);
+  at(st.phi).forEach((t, j) => p.vline(t, C['data-highlight'], j ? 1 : 1.5, [4, 3]));
+  // a grip on top of each line, to grab the ruler by
+  const g = 6, xs = at(st.phi).map(t => p.X(t));
   p.ctx.fillStyle = C['data-highlight'];
-  p.ctx.beginPath(); p.ctx.moveTo(xs[0] - g, p.inner.t); p.ctx.lineTo(xs[0] + g, p.inner.t); p.ctx.lineTo(xs[0], p.inner.t + g * 1.4); p.ctx.closePath(); p.ctx.fill();
+  for (const x of xs) { p.ctx.beginPath(); p.ctx.moveTo(x - g, p.inner.t); p.ctx.lineTo(x + g, p.inner.t); p.ctx.lineTo(x, p.inner.t + g * 1.4); p.ctx.closePath(); p.ctx.fill(); }
   FD = { p, xs, T, k: st.k };
   p.axes();
   $('subFold').innerHTML = `${st.cycles} cycle${st.cycles > 1 ? 's' : ''} folded and averaged: the noise drops by about √${st.cycles}.`;
