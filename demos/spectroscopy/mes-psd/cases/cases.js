@@ -87,7 +87,7 @@ function slots(list, axis) {
     return { key, on: false, ...d, band: axis === 'generic' ? d.band : mapAxis(d.band, 'generic', axis) };
   });
 }
-const base = { unit: 'T', T: 1, axis: 'generic', noise: 0, cycles: 4, shape: 'square', duty: 0.5, k: 1, kUpTo: false, phi: 0, allPhi: false, absSpec: false };
+const base = { unit: 'T', T: 1, axis: 'generic', noise: 0, cycles: 4, shape: 'square', duty: 0.5, k: 1, kUpTo: false, phi: 0, allPhi: true, absSpec: true };
 const settings = (extra, list) => ({ ...base, ...extra, species: slots(list, extra.axis ?? 'generic') });
 
 const CASES = [
