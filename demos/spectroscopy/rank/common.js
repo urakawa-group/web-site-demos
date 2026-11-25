@@ -77,6 +77,7 @@ export const XAS_SPECIES = { A: { c: 0, w: 8, h: 0.6 }, B: { c: 3, w: 8, h: 0.3 
 
 export const COLOR = { A: C['data-a'], B: C['data-b'], C: C['data-c'], D: C['data-d'] };
 export const PREP_NAME = { raw: 'raw', centre: 'centred', auto: 'autoscaled' };
+export const FIRST_LAST = C['data-highlight'];
 export const KEPT = C['ink-700'], DROPPED = C['data-static'], CUT = C['data-highlight'], LEVEL = C['ink-300'];
 
 /* ---------------------------------------------------------------------------
@@ -190,15 +191,18 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after })
   const p = plot(cv, { x: xRangeOf(st), y: lim.y, xlabel: ax.label, ylabel, xticks: ax.ticks, yticks: ticks(lim.y[0], lim.y[1], 4), scale: sc });
   p.hline(0);
   for (const row of Xp) p.line(grid, row, C['data-faint'], CHART.lineFaint);
-  p.line(grid, Xp[0], KEPT, CHART.lineData);
-  p.line(grid, Xp[Xp.length - 1], KEPT, CHART.lineData, [2, 2]);
+  // the first and the last spectrum in green, the colour of what to look at:
+  // not a species colour and not the ink of the components, so neither is
+  // read as a species or as a component. Same on all three pages
+  p.line(grid, Xp[0], FIRST_LAST, CHART.lineHighlight);
+  p.line(grid, Xp[Xp.length - 1], FIRST_LAST, CHART.lineHighlight, [5, 3]);
   after?.(p);
   p.axes();
-  return { p, sub: `${st.q} spectra, ${T_END} min${what}.`, leg: [['one spectrum', C['data-faint'], ''], ['the first', KEPT, ''], ['the last', KEPT, 'dashed']] };
+  return { p, sub: `${st.q} spectra, ${T_END} min${what}.`, leg: [['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed']] };
 }
 /** Every legend panel 1 can show, for the legend reserve. */
 export const dataLegends = (st, lim) => [
-  legendHtml([['one spectrum', C['data-faint'], ''], ['the first', KEPT, ''], ['the last', KEPT, 'dashed']]),
+  legendHtml([['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed']]),
   legendHtml(MAP_LEGEND(lim.map)),
   legendHtml(st.species.filter(sp => sp.on).map(sp => [nameOf(st, st.species.indexOf(sp)), COLOR[sp.key], ''])),
 ];

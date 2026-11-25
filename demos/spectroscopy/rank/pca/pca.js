@@ -15,7 +15,7 @@ import {
 } from '../../../../assets/workbench.js';
 import { AXES, T_END, build } from '../mixture.js';
 import {
-  $, clone, M, SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR, PREP_NAME,
+  $, clone, M, SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR, PREP_NAME, FIRST_LAST,
   prepare, residual, fmtS, SC, T_TICKS, XLAB_T, axOf, xRangeOf, legend, legendHtml,
   dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf,
   callout, frac, sum, EQ_BILINEAR, EQ_NOISE,
@@ -122,7 +122,7 @@ const idxOf = v => { const g = S.B.grid; let best = 0; for (let j = 1; j < g.len
    Drawing
    --------------------------------------------------------------------------- */
 let P1 = null;
-const centredLegend = [['spectrum − mean', C['data-faint'], ''], ['the first', KEPT, ''], ['the last', KEPT, 'dashed'], ['the two points', CUT, 'dashed']];
+const centredLegend = [['spectrum − mean', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed'], ['the two points', CUT, 'dashed']];
 function drawDataPanel() {
   const st = state.s, cv = $('cData');
   P1 = null;
@@ -259,7 +259,7 @@ function drawTable() {
 
 function draw() {
   const st = state.s;
-  reserveLegends([...dataLegends(st, LIM.raw), legendHtml(centredLegend), legendHtml([['one spectrum', C['data-faint'], ''], ['the first', KEPT, ''], ['the last', KEPT, 'dashed'], ['the two points', CUT, 'dashed']]), legendHtml(cloudLegend), legendHtml(screeLegend()), legendHtml(stripLegend), legendHtml(BLOCK_LEGEND), legendHtml(BLOCK_LEGEND_STATIC)]);
+  reserveLegends([...dataLegends(st, LIM.raw), legendHtml(centredLegend), legendHtml([['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed'], ['the two points', CUT, 'dashed']]), legendHtml(cloudLegend), legendHtml(screeLegend()), legendHtml(stripLegend), legendHtml(BLOCK_LEGEND), legendHtml(BLOCK_LEGEND_STATIC)]);
   drawDataPanel(); drawCloud(); drawComp(); drawMat(); drawTable();
   sums(); controls.refresh();
 }
