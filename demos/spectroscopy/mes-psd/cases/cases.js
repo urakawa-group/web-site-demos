@@ -217,9 +217,9 @@ const EQ = {
   lag: callout({
     title: 'One First-Order Step',
     math: `<i>δ</i> = arctan(<i>ωτ</i>), &emsp; ${frac('|<i>A</i><sub>1</sub>|', '|<i>A</i><sub>1</sub>|<sub><i>τ</i> = 0</sub>')} = ${frac('1', '√(1 + (<i>ωτ</i>)²)')}`,
-    text: 'A linear step d<i>y</i>/d<i>t</i> = (<i>u</i> − <i>y</i>)/<i>τ</i> driven at <i>ω</i> lags its input by <i>δ</i> and loses amplitude. Derived for this page, not taken from a source; the table checks it against the simulation.',
+    text: 'A linear step d<i>y</i>/d<i>t</i> = (<i>u</i> − <i>y</i>)/<i>τ</i> driven at <i>ω</i> lags its input by <i>δ</i> and loses amplitude. The standard frequency response of a linear first-order system, not from the cited sources; the table checks it against the simulation.',
     symbols: [
-      ['<i>δ</i>', 'phase lag of the response behind the stimulus, in rad'],
+      ['<i>δ</i>', 'phase lag of the response behind the stimulus, in °, as in the table'],
       ['<i>τ</i>', 'time constant of the step'],
       ['<i>u</i>, <i>y</i>', 'input and response of the step'],
       ['|<i>A</i><sub>1</sub>|<sub><i>τ</i> = 0</sub>', 'amplitude of a response without delay (2/π for an on/off square wave of height 1)'],

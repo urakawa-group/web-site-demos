@@ -461,5 +461,5 @@ export const EQ_NOISE = callout({
   title: 'The Noise Level',
   math: '<i>σ</i><sub>noise</sub> ≈ <i>ε</i> (√<i>q</i> + √<i>m</i>)',
   text: 'The largest singular value of a <i>q</i> × <i>m</i> matrix of independent Gaussian noise with standard deviation <i>ε</i>, for large <i>q</i> and <i>m</i>: a standard result of random-matrix theory, not from the chapter. It holds for independent noise only, and not after autoscaling, which weights the noise differently at every point.',
-  symbols: [['<i>q</i>, <i>m</i>', 'number of spectra and of points per spectrum (here 241)']],
+  symbols: [['<i>q</i>, <i>m</i>', 'number of spectra (set under measurement) and of points per spectrum (here 241)']],
 });
