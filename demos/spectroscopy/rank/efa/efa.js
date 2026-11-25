@@ -18,7 +18,7 @@ import { T_END, build } from '../mixture.js';
 import {
   $, clone, M, SOURCES as COMMON_SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR,
   fmtS, SC, T_TICKS, XLAB_T, LOG_TICKS, legend, legendHtml, lin,
-  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf,
+  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf, dragDataK,
   callout, EQ_BILINEAR, EQ_NOISE,
 } from '../common.js';
 
@@ -187,7 +187,7 @@ const colourOf = j => (S.truth[j] ? COLOR[S.truth[j].sp.key] : DROPPED);
    Drawing
    --------------------------------------------------------------------------- */
 function drawDataPanel() {
-  const st = state.s, o = drawData($('cData'), { st, B: S.B, Xp: S.B.X, lim: LIM, view: st.view1, ylabel: 'signal / –' });
+  const st = state.s, o = drawData($('cData'), { st, B: S.B, Xp: S.B.X, lim: LIM, view: st.view1, ylabel: 'signal / –', k: kIdx() });
   $('subData').textContent = o.sub; legend($('legData'), o.leg);
 }
 
@@ -257,15 +257,23 @@ function drawMat() {
   legend($('legMat'), st.view3 === 'blocks' ? BLOCK_LEGEND_STATIC : BLOCK_LEGEND);
 }
 
-const winLegend = () => [['EFA window', KEPT, 'bar'], ['true: above 2 % of its maximum', C['data-faint'], 'bar']];
-const profLegend = () => [['EFA profile', KEPT, ''], ['true profile', KEPT, 'dashed']];
-const helpLegend = [['one spectrum', C['ink-300'], 'dot'], ['local rank 1: selective', KEPT, 'dot'], ['its line through zero', KEPT, 'dashed']];
+const winLegend = () => [['EFA window', KEPT, 'bar'], ['true: above 2 % of its maximum', C['data-faint'], 'bar'], ['spectrum <i>k</i>', CUT, 'dashed']];
+const profLegend = () => [['EFA profile', KEPT, ''], ['true profile', KEPT, 'dashed'], ['spectrum <i>k</i>', CUT, 'dashed']];
+/* panel 3: the same spectrum k as panel 2, a ruler with a grip in the windows and the profiles */
+let P3 = null;
+function rulerK(p, y) {
+  const tk = S.B.ts[kIdx()];
+  p.line([tk, tk], y, CUT, CHART.lineData, CHART.dash);
+  grip(p, p.X(tk), CUT);
+  P3 = { p, rx: p.X(tk) };
+}
+const helpLegend = [['one spectrum, scores uncentred', C['ink-300'], 'dot'], ['local rank 1: selective', KEPT, 'dot'], ['its line through zero', KEPT, 'dashed']];
 function drawHelp() {
   const st = state.s, cv = $('cWin'), sc = SC(), q = S.B.ts.length, w = S.w, { u, s } = S.r;
   const t1 = Array.from(u[0], x => x * s[0]), t2 = u[1] ? Array.from(u[1], x => x * s[1]) : t1.map(() => 0);
   const local = i => S.nw[clamp(i + Math.floor(w / 2), w - 1, q - 1)];
   const { x: XR, y: YR } = LIM.lpg;
-  const p = plot(cv, { x: XR, y: YR, xlabel: 'score 1 (→) and score 2 (↑), uncentred', xticks: ticks(XR[0], XR[1], 4), yticks: ticks(YR[0], YR[1], 4), scale: sc });
+  const p = plot(cv, { x: XR, y: YR, xlabel: 'score 1 / –', ylabel: 'score 2 / –', xticks: ticks(XR[0], XR[1], 4), yticks: ticks(YR[0], YR[1], 4), scale: sc });
   p.hline(0); p.line([0, 0], YR, C['line-zero'], 1);
   p.line(t1, t2, C['line'], CHART.lineThin);
   // runs of local rank 1, each with its direction from the origin
@@ -285,6 +293,7 @@ function drawHelp() {
   legend($('legWin'), helpLegend);
 }
 function drawWin() {
+  P3 = null;
   if (state.s.view4 === 'help') { drawHelp(); return; }
   const st = state.s, cv = $('cWin'), sc = SC(), ts = S.B.ts, n = S.n;
   if (st.view4 === 'profiles') {
@@ -296,6 +305,7 @@ function drawWin() {
       if (S.profiles[j]) p.line(ts, S.profiles[j], col, CHART.lineData);
     }
     if (S.profiles.every(c => !c)) p.text('every window spans the run: no profile can be fixed', T_END / 2, 0.5, C['ink-500']);
+    rulerK(p, [-0.15, 1.12]);
     p.axes();
     $('subWin').textContent = 'C = UR from the windows.';
     legend($('legWin'), profLegend());
@@ -312,8 +322,7 @@ function drawWin() {
     const w = spanOf(S.present[j]);
     if (w) { p.ctx.fillStyle = col; p.ctx.fillRect(p.X(ts[w[0]]), p.Y(y), p.X(Math.min(ts[w[1]] + dt, T_END)) - p.X(ts[w[0]]), p.Y(y - 0.3) - p.Y(y)); }
   }
-  const tk = ts[kIdx()];
-  p.line([tk, tk], [0, n], CUT, CHART.lineThin, CHART.dash);
+  rulerK(p, [0, n]);
   p.axes();
   $('subWin').textContent = 'First in, first out; grey is the truth.';
   legend($('legWin'), winLegend());
@@ -379,10 +388,16 @@ for (const k of ['view1', 'view2', 'view3', 'view4']) segClick(k, x => { state.s
 $('resetCase').addEventListener('click', () => selectCase(state.idx, false));
 
 /* panel 2: drag the green line through the run */
-const setK = k => { const c = clamp(Math.round(k), 0, state.s.q - 1); if (c !== state.s.k) { state.s.k = c; drawEfa(); drawMat(); drawWin(); drawTable(); } };
+const setK = k => { const c = clamp(Math.round(k), 0, state.s.q - 1); if (c !== state.s.k) { state.s.k = c; drawDataPanel(); drawEfa(); drawMat(); drawWin(); drawTable(); } };
+dragDataK($('cData'), setK);
 dragRuler($('cEfa'), {
   rulerXs: () => (P2 ? [P2.rx] : []), plotOf: () => P2?.p,
   onDrag: x => { const { inner } = P2.p, t = clamp((x - inner.l) / (inner.r - inner.l), 0, 1) * T_END; setK(t / T_END * (state.s.q - 1)); },
+});
+/* panel 3: the same ruler in the windows and the profiles */
+dragRuler($('cWin'), {
+  rulerXs: () => (P3 ? [P3.rx] : []), plotOf: () => P3?.p,
+  onDrag: x => { const { inner } = P3.p, t = clamp((x - inner.l) / (inner.r - inner.l), 0, 1) * T_END; setK(t / T_END * (state.s.q - 1)); },
 });
 
 /* ---------------------------------------------------------------------------

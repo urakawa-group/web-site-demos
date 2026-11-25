@@ -17,7 +17,7 @@ import { T_END, build } from '../mixture.js';
 import {
   $, clone, M, SOURCES as COMMON_SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR,
   residual, fmtS, fmtPct, SC, T_TICKS, XLAB_T, axOf, xRangeOf, LOG_TICKS, legend, legendHtml, heatmap, MAP_LEGEND,
-  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf, lin,
+  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf, dragDataK, lin,
   callout, frac, sum, EQ_BILINEAR, EQ_NOISE,
 } from '../common.js';
 
@@ -37,8 +37,8 @@ const SOURCES = {
      view4  'blocks' | 'numbers' | 'residual' | 'lof'
    --------------------------------------------------------------------------- */
 const NMAX = 10, NTAB = 10;
-const base = { ...clone(DATA_BASE), n: 3, kv: 10, view1: 'spectra', view2: 'scree', view3: 'loadings', view4: 'blocks' };
-const DISPLAY_ONLY = ['n', 'view1', 'view2', 'view3', 'view4'];
+const base = { ...clone(DATA_BASE), n: 3, kv: 10, k: 20, view1: 'spectra', view2: 'scree', view3: 'loadings', view4: 'blocks' };
+const DISPLAY_ONLY = ['n', 'k', 'view1', 'view2', 'view3', 'view4'];
 const cs = (o, f) => caseOf(base, o, f);
 
 const CASES = [
@@ -223,8 +223,11 @@ let LOG = [-4, 2];
 const logOf = v => clamp(Math.log10(Math.max(v, 1e-300)), LOG[0], LOG[1]);
 const strips = st => Math.min(NMAX, Math.max(st.n + 2, 3), S.r.s.length);
 
+/* spectrum k: the row the rulers in panel 1 point at */
+const KK = () => clamp(state.s.k ?? 20, 0, state.s.q - 1);
+dragDataK($('cData'), k => { const c = clamp(k, 0, state.s.q - 1); if (c !== state.s.k) { state.s.k = c; drawDataPanel(); } });
 function drawDataPanel() {
-  const st = state.s, o = drawData($('cData'), { st, B: S.B, Xp: S.B.X, lim: LIM, view: st.view1, ylabel: 'signal / –' });
+  const st = state.s, o = drawData($('cData'), { st, B: S.B, Xp: S.B.X, lim: LIM, view: st.view1, ylabel: 'signal / –', k: KK() });
   $('subData').textContent = o.sub; legend($('legData'), o.leg);
 }
 
@@ -240,7 +243,7 @@ function drawFtest() {
   for (let i = 0; i < NS; i++) {
     const x0 = p.X(i + 1 - 0.3), x1 = p.X(i + 1 + 0.3), y = Math.max(S.sl[i], 0.6);
     p.ctx.fillStyle = i < st.n ? KEPT : DROPPED; p.ctx.fillRect(x0, p.Y(y), x1 - x0, p.Y(0) - p.Y(y));
-    pts.push({ i, px: (x0 + x1) / 2, py: p.Y(y) });
+    pts.push({ i, px: (x0 + x1) / 2, py: p.Y(y), bar: { l: x0, r: x1, t: p.Y(y), b: p.Y(0) } });
   }
   p.text(st.noise > 0 ? `the test: ${S.n5} at 5 %, ${S.n10} at 10 %` : 'no noise: nothing to test against', NS + 0.4, 80, C['ink-500'], 'right');
   p.text('5 to 10 %', NS + 0.4, 17, C['ink-500'], 'right');
@@ -261,7 +264,7 @@ function drawOpals() {
   for (let i = 0; i < NS; i++) {
     const x0 = p.X(i + 1 - 0.3), x1 = p.X(i + 1 + 0.3), y = Math.max(S.cong[i], 0.006);
     p.ctx.fillStyle = i < st.n ? KEPT : DROPPED; p.ctx.fillRect(x0, p.Y(y), x1 - x0, p.Y(0) - p.Y(y));
-    pts.push({ i, px: (x0 + x1) / 2, py: p.Y(y) });
+    pts.push({ i, px: (x0 + x1) / 2, py: p.Y(y), bar: { l: x0, r: x1, t: p.Y(y), b: p.Y(0) } });
   }
   p.text(`above 0.9: the first ${S.nOp}`, NS + 0.4, 1.0, C['ink-500'], 'right');
   const rx = p.X(st.n + 0.5);
@@ -308,7 +311,7 @@ function drawComp() {
     const tk = [[-Math.floor(R), String(-Math.floor(R))], [0, '0'], [Math.floor(R), String(Math.floor(R))]];
     pairs.forEach(([a, b], k) => {
       const kept = a < st.n && b < st.n;
-      const p = plot(cv, { keep: k === 1, x: [-R, R], y: [-R, R], margin: k ? { l: W / 2 + 44 * sc } : { r: W / 2 + 8 }, xlabel: `scores ${a + 1} (→) and ${b + 1} (↑)`, xticks: tk, yticks: tk, scale: sc });
+      const p = plot(cv, { keep: k === 1, x: [-R, R], y: [-R, R], margin: k ? { l: W / 2 + 52 * sc } : { r: W / 2 + 8 }, ylabelX: k ? W / 2 + 13 * sc : undefined, xlabel: `score ${a + 1} × √*q* / –`, ylabel: `score ${b + 1} × √*q* / –`, xticks: tk, yticks: tk, scale: sc });
       p.hline(0);
       const f = Math.sqrt(st.q), xs = Array.from(u[a], x => x * f), ys = Array.from(u[b], x => x * f);
       p.line(xs, ys, kept ? C['ink-300'] : C['data-faint'], CHART.lineThin);
@@ -458,7 +461,12 @@ const hitPt = e => {
   if (!P2) return null;
   const { x, y } = localIn(cScree, e);
   let best = null, bd = 10;
-  for (const q of P2.pts) { const d = Math.hypot(q.px - x, q.py - y); if (d < bd) { bd = d; best = q; } }
+  // a bar (F-test, OPALS) answers anywhere on it, its full width and height
+  // plus a few px; a point (scree) within 10 px
+  for (const q of P2.pts) {
+    if (q.bar && x >= q.bar.l - 3 && x <= q.bar.r + 3 && y >= Math.min(q.bar.t, q.bar.b - 6) - 3 && y <= q.bar.b + 3) return q;
+    const d = Math.hypot(q.px - x, q.py - y); if (d < bd) { bd = d; best = q; }
+  }
   return best;
 };
 function ptText(i) {

@@ -17,7 +17,7 @@ import { AXES, T_END, build } from '../mixture.js';
 import {
   $, clone, M, SOURCES, DATA_BASE, caseOf, XAS_SPECIES, KEPT, DROPPED, CUT, LEVEL, COLOR, PREP_NAME, FIRST_LAST,
   prepare, residual, fmtS, SC, T_TICKS, XLAB_T, axOf, xRangeOf, legend, legendHtml,
-  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf,
+  dataLimits, drawData, dataLegends, drawBlocks, BLOCK_LEGEND, BLOCK_LEGEND_STATIC, dataControls, techniqueSwitch, carriedData, nameOf, dragDataK,
   callout, frac, sum, EQ_BILINEAR, EQ_NOISE,
 } from '../common.js';
 
@@ -30,8 +30,8 @@ initShell({ page: 'demo', views: true });
      view1  'spectra' | 'centred' | 'map' | 'truth';  view3 'scree' | 'loadings' | 'scores';  view4 'blocks' | 'numbers'
    --------------------------------------------------------------------------- */
 const NMAX = 10, NTAB = 10, PREPS = ['raw', 'centre', 'auto'];
-const base = { ...clone(DATA_BASE), n: 2, prep: 'centre', pa: 1650, pb: 1500, view1: 'spectra', view3: 'scree', view4: 'blocks' };
-const DISPLAY_ONLY = ['n', 'pa', 'pb', 'view1', 'view3', 'view4'];
+const base = { ...clone(DATA_BASE), n: 2, prep: 'centre', pa: 1650, pb: 1500, k: 20, view1: 'spectra', view3: 'scree', view4: 'blocks' };
+const DISPLAY_ONLY = ['n', 'pa', 'pb', 'k', 'view1', 'view3', 'view4'];
 const cs = (o, f) => caseOf(base, o, f);
 
 const CASES = [
@@ -122,7 +122,7 @@ const idxOf = v => { const g = S.B.grid; let best = 0; for (let j = 1; j < g.len
    Drawing
    --------------------------------------------------------------------------- */
 let P1 = null;
-const centredLegend = [['spectrum − mean', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed'], ['the two points', CUT, 'dashed']];
+const centredLegend = [['spectrum − mean', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed'], ['spectrum <i>k</i>', CUT, ''], ['the two points', CUT, 'dashed']];
 function drawDataPanel() {
   const st = state.s, cv = $('cData');
   P1 = null;
@@ -130,7 +130,7 @@ function drawDataPanel() {
   const Xp = st.view1 === 'centred' ? S.ways.centre.Xp : st.view1 === 'map' ? cur().Xp : S.B.X;
   const lim = st.view1 === 'centred' ? LIM.cen : st.view1 === 'map' ? { ...LIM.raw, map: LIM.map } : LIM.raw;
   const o = drawData(cv, {
-    st, B: S.B, Xp, lim, view, ylabel: st.view1 === 'centred' ? 'signal − mean / –' : 'signal / –',
+    st, B: S.B, Xp, lim, view, k: clamp(st.k ?? 20, 0, st.q - 1), ylabel: st.view1 === 'centred' ? 'signal − mean / –' : 'signal / –',
     what: st.view1 === 'centred' ? ', centred' : st.view1 === 'map' && st.prep !== 'raw' ? `, ${PREP_NAME[st.prep]}` : '',
     after: p => {
       const xs = [st.pa, st.pb];
@@ -143,7 +143,17 @@ function drawDataPanel() {
   legend($('legData'), st.view1 === 'centred' ? centredLegend : view === 'spectra' ? [...o.leg, ['the two points', CUT, 'dashed']] : o.leg);
 }
 
-/* panel 2: two points of every spectrum, as a cloud */
+/* panel 2: two points of every spectrum, as a cloud.
+   The range snaps to round values and keeps them while the points still fill
+   more than 40 % of it, so dragging a or b does not rescale at every step;
+   it grows at once when a point would leave the plot */
+let cloudR = null;
+const niceUp = v => { const e = 10 ** Math.floor(Math.log10(v)); return [1, 2, 2.5, 5, 10].map(m => m * e).find(x => x >= v); };
+function cloudRange(lo, hi) {
+  const keep = cloudR && lo >= cloudR[0] && hi <= cloudR[1] && hi - lo > 0.4 * (cloudR[1] - cloudR[0]);
+  if (!keep) cloudR = [lo < 0 ? -niceUp(-lo * 1.08) : 0, niceUp(Math.max(hi, 1e-3) * 1.08)];
+  return cloudR;
+}
 const cloudLegend = [['one spectrum', C['ink-300'], 'dot'], ['the mean', KEPT, 'ring'], ['<b>v</b>₁, raw SVD', C['ink-500'], 'dashed'], ['<b>p</b>₁, <b>p</b>₂, PCA', KEPT, '']];
 function drawCloud() {
   const st = state.s, cv = $('cCloud'), sc = SC(), X = S.B.X, a = idxOf(st.pa), b = idxOf(st.pb);
@@ -155,9 +165,9 @@ function drawCloud() {
   const thRaw = ang(sxx, syy, sxy);
   const cxx = sxx - q * mx * mx, cyy = syy - q * my * my, cxy = sxy - q * mx * my, thPca = ang(cxx, cyy, cxy);
   const tr = cxx + cyy, det = cxx * cyy - cxy * cxy, l1 = tr / 2 + Math.sqrt(Math.max(tr * tr / 4 - det, 0)), l2 = Math.max(tr - l1, 0);
-  const lo = Math.min(0, ...xs, ...ys), hi = Math.max(...xs, ...ys, 0.05), pad = 0.08 * (hi - lo);
-  const R = [lo - pad, hi + pad], ax = axOf(st), unit = st.axis === 'ir' ? ' cm⁻¹' : st.axis === 'xas' ? ' eV' : '';
-  const p = plot(cv, { x: R, y: R, xlabel: `at *a* = ${st.pa.toFixed(0)}${unit} (→) and *b* = ${st.pb.toFixed(0)}${unit} (↑)`, xticks: ticks(R[0], R[1], 4), yticks: ticks(R[0], R[1], 4), scale: sc });
+  const lo = Math.min(0, ...xs, ...ys), hi = Math.max(...xs, ...ys, 0.05);
+  const R = cloudRange(lo, hi), ax = axOf(st), unit = st.axis === 'ir' ? ' cm⁻¹' : st.axis === 'xas' ? ' eV' : '';
+  const p = plot(cv, { x: R, y: R, xlabel: 'signal at *a* / –', ylabel: 'signal at *b* / –', xticks: ticks(R[0], R[1], 4), yticks: ticks(R[0], R[1], 4), scale: sc });
   p.hline(0); p.line([0, 0], R, C['line-zero'], 1);
   p.line(xs, ys, C['line'], CHART.lineThin);
   for (let i = 0; i < q; i++) p.dot(xs[i], ys[i], C['ink-300'], 2.5);
@@ -172,17 +182,19 @@ function drawCloud() {
   const deg = th => { let d = th * 180 / Math.PI; d = ((d % 180) + 180) % 180; return d; };
   p.text(`*v*_1_ at ${deg(thRaw).toFixed(0)}°, *p*_1_ at ${deg(thPca).toFixed(0)}°`, R[0] + 0.03 * (R[1] - R[0]), R[1] - 0.12 * (R[1] - R[0]), C['ink-500'], 'left');
   p.axes();
-  $('subCloud').textContent = 'Each spectrum as a point, at a and b.';
+  $('subCloud').innerHTML = `Each spectrum as a point, at <i>a</i> = ${st.pa.toFixed(0)} and <i>b</i> = ${st.pb.toFixed(0)}${unit}.`;
   legend($('legCloud'), cloudLegend);
   void ax;
 }
 
 /* panel 3: singular values of the three ways, or the loadings and scores of the chosen one */
-const screeLegend = () => [['chosen', KEPT, ''], ['the others', DROPPED, ''], ['kept', KEPT, 'dot'], state.s.noise > 0 && state.s.prep !== 'auto' && ['noise level', LEVEL, 'dashed']];
+const screeLegend = () => [['chosen', KEPT, ''], ['the others', DROPPED, ''], ['kept', KEPT, 'dot'], ['the cut', CUT, 'dashed'], state.s.noise > 0 && state.s.prep !== 'auto' && ['noise level', LEVEL, 'dashed']];
 const stripLegend = [['kept', KEPT, ''], ['dropped', DROPPED, '']];
 const SH_LOG = [-6, 2], SH_TICKS = [[-6, '10⁻⁶'], [-4, '10⁻⁴'], [-2, '0.01'], [0, '1'], [2, '100']];
+let P3 = null;
 function drawComp() {
   const st = state.s, cv = $('cComp'), sc = SC(), ax = axOf(st);
+  P3 = null;
   if (st.view3 === 'scree') {
     const NS = 12, lg = v => clamp(Math.log10(Math.max(v, 1e-300)), SH_LOG[0], SH_LOG[1]);
     const p = plot(cv, { x: [0.4, NS + 0.9], y: SH_LOG, xlabel: 'component *i*', ylabel: 'share / %', xticks: Array.from({ length: NS }, (_, i) => [i + 1, String(i + 1)]).filter(([v]) => v % 2 === 1), yticks: SH_TICKS, scale: sc });
@@ -201,9 +213,11 @@ function drawComp() {
       const ly = lg(100 * S.level * S.level / cur().total);
       p.line([0.4, NS + 0.9], [ly, ly], LEVEL, CHART.lineThin, CHART.dash);
     }
-    p.line([st.n + 0.5, st.n + 0.5], SH_LOG, CUT, CHART.lineThin, CHART.dash);
+    p.line([st.n + 0.5, st.n + 0.5], SH_LOG, CUT, CHART.lineData, CHART.dash);
+    grip(p, p.X(st.n + 0.5), CUT);
     p.axes();
-    $('subComp').textContent = 'Raw, centred and autoscaled compared.';
+    P3 = { p, rx: p.X(st.n + 0.5), NS };
+    $('subComp').textContent = 'Raw, centred and autoscaled compared. Drag the green cut.';
     legend($('legComp'), screeLegend());
     return;
   }
@@ -259,7 +273,7 @@ function drawTable() {
 
 function draw() {
   const st = state.s;
-  reserveLegends([...dataLegends(st, LIM.raw), legendHtml(centredLegend), legendHtml([['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed'], ['the two points', CUT, 'dashed']]), legendHtml(cloudLegend), legendHtml(screeLegend()), legendHtml(stripLegend), legendHtml(BLOCK_LEGEND), legendHtml(BLOCK_LEGEND_STATIC)]);
+  reserveLegends([...dataLegends(st, LIM.raw), legendHtml(centredLegend), legendHtml([['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed'], ['spectrum <i>k</i>', CUT, ''], ['the two points', CUT, 'dashed']]), legendHtml(cloudLegend), legendHtml(screeLegend()), legendHtml(stripLegend), legendHtml(BLOCK_LEGEND), legendHtml(BLOCK_LEGEND_STATIC)]);
   drawDataPanel(); drawCloud(); drawComp(); drawMat(); drawTable();
   sums(); controls.refresh();
 }
@@ -305,8 +319,15 @@ segClick('prepSeg', v => { state.s.prep = v; limits(); draw(); markChanged(); })
 for (const k of ['view1', 'view3', 'view4']) segClick(k, x => { state.s[k] = x; draw(); });
 $('resetCase').addEventListener('click', () => selectCase(state.idx, false));
 
-/* panel 1: drag the two points */
+/* panel 3: drag the cut in the scree view */
+dragRuler($('cComp'), {
+  rulerXs: () => (P3 ? [P3.rx] : []), plotOf: () => P3?.p,
+  onDrag: x => { const { inner } = P3.p; setN(0.4 + (x - inner.l) / (inner.r - inner.l) * (P3.NS + 0.5) - 0.5); },
+});
+
+/* panel 1: drag the two points, or spectrum k in the map and the species */
 const cData = $('cData');
+dragDataK(cData, k => { const c = clamp(k, 0, state.s.q - 1); if (c !== state.s.k) { state.s.k = c; drawDataPanel(); } });
 let dragK = 0;
 dragRuler(cData, {
   rulerXs: () => P1?.xs ?? [], plotOf: () => P1?.p,

@@ -155,7 +155,8 @@ export function plot(canvas, o) {
       ctx.font = axis.font; ctx.fillStyle = axis.color; ctx.textAlign = 'center';
       if (o.xlabel) richText(ctx, o.xlabel, (inner.l + inner.r) / 2, H - 5, axis.font, 'center');
       if (o.ylabel) {
-        ctx.save(); ctx.translate(13 * sc, (inner.t + inner.b) / 2); ctx.rotate(-Math.PI / 2);
+        // ylabelX: where the y label sits, for a second plot beside the first on one canvas
+        ctx.save(); ctx.translate(o.ylabelX ?? 13 * sc, (inner.t + inner.b) / 2); ctx.rotate(-Math.PI / 2);
         richText(ctx, o.ylabel, 0, 0, axis.font, 'center'); ctx.restore();
       }
     },

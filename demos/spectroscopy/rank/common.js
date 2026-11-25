@@ -7,7 +7,7 @@
  */
 import { C, CHART, typeFont } from '../../../assets/tokens.js';
 import { plot, ticks, richText } from '../../../assets/plot.js';
-import { clamp, setSeg } from '../../../assets/workbench.js';
+import { clamp, setSeg, grip, localIn } from '../../../assets/workbench.js';
 import { AXES, NPTS, T_END, spanOf, mapSpecies, sourceOf } from './mixture.js';
 
 export const $ = id => document.getElementById(id);
@@ -77,7 +77,7 @@ export const XAS_SPECIES = { A: { c: 0, w: 8, h: 0.6 }, B: { c: 3, w: 8, h: 0.3 
 
 export const COLOR = { A: C['data-a'], B: C['data-b'], C: C['data-c'], D: C['data-d'] };
 export const PREP_NAME = { raw: 'raw', centre: 'centred', auto: 'autoscaled' };
-export const FIRST_LAST = C['data-highlight'];
+export const FIRST_LAST = C['ink-900'];
 export const KEPT = C['ink-700'], DROPPED = C['data-static'], CUT = C['data-highlight'], LEVEL = C['ink-300'];
 
 /* ---------------------------------------------------------------------------
@@ -172,39 +172,88 @@ export function dataLimits(Xp, pure) {
  * or a map, or the species that made them. Returns the plot (spectra view)
  * so a page can draw on top, and fills the subtitle and legend.
  */
-export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after }) {
-  const sc = SC(), ax = axOf(st), { grid, ts, prof, pure } = B;
+export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after, k = null }) {
+  const sc = SC(), ax = axOf(st), { grid, ts, prof, pure } = B, q = Xp.length;
+  const kk = k == null ? null : clamp(Math.round(k), 0, q - 1);
+  DR.delete(cv);
   if (view === 'map') {
-    heatmap(cv, { x: xRangeOf(st), y: [0, T_END], xlabel: ax.label, ylabel: XLAB_T, xticks: ax.ticks, yticks: T_TICKS, scale: sc }, Xp.length, M, (i, j) => Xp[i][j], lim.map);
-    return { p: null, sub: `As a map${what}, time upwards.`, leg: MAP_LEGEND(lim.map) };
+    const p = heatmap(cv, { x: xRangeOf(st), y: [0, T_END], xlabel: ax.label, ylabel: XLAB_T, xticks: ax.ticks, yticks: T_TICKS, scale: sc }, q, M, (i, j) => Xp[i][j], lim.map);
+    if (kk != null) {
+      // spectrum k as a row of the map: a horizontal ruler, its grip on the left
+      const y = (kk + 0.5) * T_END / q, py = p.Y(y), x0 = p.inner.l, x1 = p.inner.r;
+      p.ctx.save(); p.ctx.strokeStyle = SPEC_K; p.ctx.lineWidth = CHART.lineData; p.ctx.setLineDash(CHART.dash);
+      p.ctx.beginPath(); p.ctx.moveTo(x0, py); p.ctx.lineTo(x1, py); p.ctx.stroke(); p.ctx.restore();
+      gripLeft(p, py, SPEC_K);
+      DR.set(cv, { p, dir: 'h', at: py, toK: (x, yy) => Math.floor((p.inner.b - yy) / (p.inner.b - p.inner.t) * q) });
+    }
+    return { p: null, sub: `As a map${what}, time upwards.`, leg: kk == null ? MAP_LEGEND(lim.map) : [...MAP_LEGEND(lim.map), ['spectrum <i>k</i>', SPEC_K, 'dashed']] };
   }
   if (view === 'truth') {
     const W = cv.clientWidth, on = st.species.filter(sp => sp.on);
     const p = plot(cv, { x: [0, T_END], y: [0, 1.08], margin: { r: W / 2 + 8 }, xlabel: XLAB_T, ylabel: 'concentration / –', xticks: ticks(0, T_END, 3, v => v.toFixed(0)).filter(([v]) => v < T_END), yticks: ticks(0, 1, 4), scale: sc });
     for (const sp of on) p.line(ts, prof[sp.key], COLOR[sp.key]);
+    if (kk != null) {
+      // spectrum k in time: a vertical ruler on the concentrations
+      p.line([ts[kk], ts[kk]], [0, 1.08], SPEC_K, CHART.lineData, CHART.dash);
+      grip(p, p.X(ts[kk]), SPEC_K);
+      DR.set(cv, { p, dir: 'v', at: p.X(ts[kk]), toK: x => Math.round((x - p.inner.l) / (p.inner.r - p.inner.l) * (q - 1)) });
+    }
     p.axes();
     const p2 = plot(cv, { keep: true, x: xRangeOf(st), y: [0, lim.pure], margin: { l: W / 2 + 46 * sc }, xlabel: ax.label, xticks: ax.ticks.filter((_, i) => i % 2 === 0), yticks: ticks(0, lim.pure, 3), scale: sc });
     for (const sp of on) p2.line(grid, pure[sp.key], COLOR[sp.key]);
     p2.axes();
-    return { p: null, sub: 'Concentrations and pure spectra.', leg: on.map(sp => [nameOf(st, st.species.indexOf(sp)), COLOR[sp.key], '']) };
+    const legT = on.map(sp => [nameOf(st, st.species.indexOf(sp)), COLOR[sp.key], '']);
+    return { p: null, sub: 'Concentrations and pure spectra.', leg: kk == null ? legT : [...legT, ['spectrum <i>k</i>', SPEC_K, 'dashed']] };
   }
   const p = plot(cv, { x: xRangeOf(st), y: lim.y, xlabel: ax.label, ylabel, xticks: ax.ticks, yticks: ticks(lim.y[0], lim.y[1], 4), scale: sc });
   p.hline(0);
   for (const row of Xp) p.line(grid, row, C['data-faint'], CHART.lineFaint);
-  // the first and the last spectrum in green, the colour of what to look at:
-  // not a species colour and not the ink of the components, so neither is
-  // read as a species or as a component. Same on all three pages
-  p.line(grid, Xp[0], FIRST_LAST, CHART.lineHighlight);
-  p.line(grid, Xp[Xp.length - 1], FIRST_LAST, CHART.lineHighlight, [5, 3]);
+  // the first and the last spectrum in ink, the last a little thicker with
+  // long dashes; spectrum k, the one the rulers point at, solid green
+  p.line(grid, Xp[0], FIRST_LAST, CHART.lineData);
+  p.line(grid, Xp[Xp.length - 1], FIRST_LAST, CHART.lineHighlight, [9, 4]);
+  if (kk != null) p.line(grid, Xp[kk], SPEC_K, CHART.lineHighlight);
   after?.(p);
   p.axes();
-  return { p, sub: `${st.q} spectra, ${T_END} min${what}.`, leg: [['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed']] };
+  const leg = [['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed']];
+  return { p, sub: `${st.q} spectra, ${T_END} min${what}.`, leg: kk == null ? leg : [...leg, ['spectrum <i>k</i>', SPEC_K, '']] };
+}
+
+/* Spectrum k in panel 1: drawData leaves a ruler per canvas in the map
+   (horizontal, time upwards) and in the species view (vertical, on the
+   concentrations); dragDataK makes it grabbable. The spectra view has no
+   time axis, so there spectrum k is drawn as a green spectrum. */
+const SPEC_K = C['data-highlight'];
+const DR = new Map();
+/** A grip for a horizontal ruler: a small triangle on the left edge, pointing right. */
+function gripLeft(p, py, color) {
+  const g = 6, { ctx, inner } = p;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(inner.l, py - g); ctx.lineTo(inner.l, py + g); ctx.lineTo(inner.l + g * 1.4, py); ctx.closePath(); ctx.fill();
+}
+/** Drag spectrum k in panel 1 by its ruler; setK(k) gets the new index. */
+export function dragDataK(cv, setK) {
+  let dragging = false;
+  const near = e => {
+    const r = DR.get(cv); if (!r) return false;
+    const { x, y } = localIn(cv, e), { inner } = r.p;
+    return r.dir === 'h'
+      ? Math.abs(y - r.at) <= 7 && x >= inner.l - 2 && x <= inner.r
+      : Math.abs(x - r.at) <= 7 && y >= inner.t - 4 && y <= inner.b;
+  };
+  cv.addEventListener('pointermove', e => {
+    const r = DR.get(cv);
+    if (dragging && r) { const { x, y } = localIn(cv, e); setK(r.toK(x, y)); return; }
+    if (r) cv.style.cursor = near(e) ? (r.dir === 'h' ? 'ns-resize' : 'ew-resize') : 'default';
+  });
+  cv.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointerup', e => { dragging = false; try { cv.releasePointerCapture(e.pointerId); } catch { /* released */ } });
 }
 /** Every legend panel 1 can show, for the legend reserve. */
 export const dataLegends = (st, lim) => [
-  legendHtml([['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed']]),
-  legendHtml(MAP_LEGEND(lim.map)),
-  legendHtml(st.species.filter(sp => sp.on).map(sp => [nameOf(st, st.species.indexOf(sp)), COLOR[sp.key], ''])),
+  legendHtml([['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed'], ['spectrum <i>k</i>', SPEC_K, '']]),
+  legendHtml([...MAP_LEGEND(lim.map), ['spectrum <i>k</i>', SPEC_K, 'dashed']]),
+  legendHtml([...st.species.filter(sp => sp.on).map(sp => [nameOf(st, st.species.indexOf(sp)), COLOR[sp.key], '']), ['spectrum <i>k</i>', SPEC_K, 'dashed']]),
 ];
 
 /* ---------------------------------------------------------------------------
