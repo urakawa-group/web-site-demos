@@ -123,6 +123,14 @@ const idxOf = v => { const g = S.B.grid; let best = 0; for (let j = 1; j < g.len
    --------------------------------------------------------------------------- */
 let P1 = null;
 const centredLegend = [['spectrum − mean', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed'], ['spectrum <i>k</i>', CUT, ''], ['the two points', CUT, 'dashed']];
+/** The two points a and b as green rulers with grips, on any plot whose x is the spectral axis; returns their pixel x. */
+function abRulers(p, yr) {
+  const st = state.s, xs = [st.pa, st.pb];
+  for (const x of xs) { p.line([x, x], yr, CUT, CHART.lineData, CHART.dash); grip(p, p.X(x), CUT); }
+  const ty = yr[1] - 0.12 * (yr[1] - yr[0]);
+  p.text('a', st.pa, ty, CUT); p.text('b', st.pb, ty, CUT);
+  return xs.map(x => p.X(x));
+}
 function drawDataPanel() {
   const st = state.s, cv = $('cData');
   P1 = null;
@@ -132,29 +140,14 @@ function drawDataPanel() {
   const o = drawData(cv, {
     st, B: S.B, Xp, lim, view, k: clamp(st.k ?? 20, 0, st.q - 1), ylabel: st.view1 === 'centred' ? 'signal − mean / –' : 'signal / –',
     what: st.view1 === 'centred' ? ', centred' : st.view1 === 'map' && st.prep !== 'raw' ? `, ${PREP_NAME[st.prep]}` : '',
-    after: p => {
-      const xs = [st.pa, st.pb];
-      for (const x of xs) { p.line([x, x], lim.y, CUT, CHART.lineData, CHART.dash); grip(p, p.X(x), CUT); }
-      p.text('a', st.pa, lim.y[1] - 0.12 * (lim.y[1] - lim.y[0]), CUT); p.text('b', st.pb, lim.y[1] - 0.12 * (lim.y[1] - lim.y[0]), CUT);
-      P1 = { p, xs: xs.map(x => p.X(x)) };
-    },
+    after: (p, yr) => { P1 = { p, xs: abRulers(p, yr) }; },
   });
   $('subData').textContent = st.view1 === 'centred' ? 'Each spectrum minus the mean.' : o.sub;
-  legend($('legData'), st.view1 === 'centred' ? centredLegend : view === 'spectra' ? [...o.leg, ['the two points', CUT, 'dashed']] : o.leg);
+  legend($('legData'), st.view1 === 'centred' ? centredLegend : view !== 'truth' ? [...o.leg, ['the two points', CUT, 'dashed']] : o.leg);
 }
 
-/* panel 2: two points of every spectrum, as a cloud.
-   The range snaps to round values and keeps them while the points still fill
-   more than 40 % of it, so dragging a or b does not rescale at every step;
-   it grows at once when a point would leave the plot */
-let cloudR = null;
-const niceUp = v => { const e = 10 ** Math.floor(Math.log10(v)); return [1, 2, 2.5, 5, 10].map(m => m * e).find(x => x >= v); };
-function cloudRange(lo, hi) {
-  const keep = cloudR && lo >= cloudR[0] && hi <= cloudR[1] && hi - lo > 0.4 * (cloudR[1] - cloudR[0]);
-  if (!keep) cloudR = [lo < 0 ? -niceUp(-lo * 1.08) : 0, niceUp(Math.max(hi, 1e-3) * 1.08)];
-  return cloudR;
-}
-const cloudLegend = [['one spectrum', C['ink-300'], 'dot'], ['the mean', KEPT, 'ring'], ['<b>v</b>₁, raw SVD', C['ink-500'], 'dashed'], ['<b>p</b>₁, <b>p</b>₂, PCA', KEPT, '']];
+/* panel 2: two points of every spectrum, as a cloud */
+const cloudLegend = [['one spectrum', C['ink-300'], 'dot'], ['the mean', KEPT, 'ring'], ['<b>v</b>₁, raw SVD', CUT, 'dashed'], ['<b>p</b>₁, <b>p</b>₂, PCA', CUT, '']];
 function drawCloud() {
   const st = state.s, cv = $('cCloud'), sc = SC(), X = S.B.X, a = idxOf(st.pa), b = idxOf(st.pb);
   const xs = X.map(r => r[a]), ys = X.map(r => r[b]), q = xs.length;
@@ -165,22 +158,23 @@ function drawCloud() {
   const thRaw = ang(sxx, syy, sxy);
   const cxx = sxx - q * mx * mx, cyy = syy - q * my * my, cxy = sxy - q * mx * my, thPca = ang(cxx, cyy, cxy);
   const tr = cxx + cyy, det = cxx * cyy - cxy * cxy, l1 = tr / 2 + Math.sqrt(Math.max(tr * tr / 4 - det, 0)), l2 = Math.max(tr - l1, 0);
-  const lo = Math.min(0, ...xs, ...ys), hi = Math.max(...xs, ...ys, 0.05);
-  const R = cloudRange(lo, hi), ax = axOf(st), unit = st.axis === 'ir' ? ' cm⁻¹' : st.axis === 'xas' ? ' eV' : '';
+  const lo = Math.min(0, ...xs, ...ys), hi = Math.max(...xs, ...ys, 0.05), pad = 0.08 * (hi - lo);
+  const R = [lo - pad, hi + pad], ax = axOf(st), unit = st.axis === 'ir' ? ' cm⁻¹' : st.axis === 'xas' ? ' eV' : '';
   const p = plot(cv, { x: R, y: R, xlabel: 'signal at *a* / –', ylabel: 'signal at *b* / –', xticks: ticks(R[0], R[1], 4), yticks: ticks(R[0], R[1], 4), scale: sc });
   p.hline(0); p.line([0, 0], R, C['line-zero'], 1);
   p.line(xs, ys, C['line'], CHART.lineThin);
   for (let i = 0; i < q; i++) p.dot(xs[i], ys[i], C['ink-300'], 2.5);
   const L = (hi - lo) * 2, dir = th => [Math.cos(th), Math.sin(th)];
   const [ux, uy] = dir(thRaw); const sgn = ux * mx + uy * my < 0 ? -1 : 1;
-  p.line([0, sgn * ux * L], [0, sgn * uy * L], C['ink-500'], CHART.lineData, CHART.dash);
+  // v₁ and p₁, p₂ in green: they belong to the chosen points a and b
+  p.line([0, sgn * ux * L], [0, sgn * uy * L], CUT, CHART.lineData, CHART.dash);
   const [px, py] = dir(thPca), [qx, qy] = [-py, px], s1 = 2 * Math.sqrt(l1 / (q - 1)), s2 = 2 * Math.sqrt(l2 / (q - 1));
-  p.line([mx - px * s1, mx + px * s1], [my - py * s1, my + py * s1], KEPT, CHART.lineHighlight);
-  p.line([mx - qx * s2, mx + qx * s2], [my - qy * s2, my + qy * s2], KEPT, CHART.lineThin);
+  p.line([mx - px * s1, mx + px * s1], [my - py * s1, my + py * s1], CUT, CHART.lineHighlight);
+  p.line([mx - qx * s2, mx + qx * s2], [my - qy * s2, my + qy * s2], CUT, CHART.lineThin);
   p.ctx.strokeStyle = KEPT; p.ctx.lineWidth = 2; p.ctx.fillStyle = C.surface;
   p.ctx.beginPath(); p.ctx.arc(p.X(mx), p.Y(my), CHART.marker, 0, 2 * Math.PI); p.ctx.fill(); p.ctx.stroke();
   const deg = th => { let d = th * 180 / Math.PI; d = ((d % 180) + 180) % 180; return d; };
-  p.text(`*v*_1_ at ${deg(thRaw).toFixed(0)}°, *p*_1_ at ${deg(thPca).toFixed(0)}°`, R[0] + 0.03 * (R[1] - R[0]), R[1] - 0.12 * (R[1] - R[0]), C['ink-500'], 'left');
+  p.text(`*v*_1_ at ${deg(thRaw).toFixed(0)}°, *p*_1_ at ${deg(thPca).toFixed(0)}°`, R[0] + 0.03 * (R[1] - R[0]), R[1] - 0.12 * (R[1] - R[0]), CUT, 'left');
   p.axes();
   $('subCloud').innerHTML = `Each spectrum as a point, at <i>a</i> = ${st.pa.toFixed(0)} and <i>b</i> = ${st.pb.toFixed(0)}${unit}.`;
   legend($('legCloud'), cloudLegend);
@@ -234,9 +228,10 @@ function drawComp() {
     p.hline(mid, C['line-zero']);
     p.line(xs, Array.from(vec, x => mid + x * f), kept ? KEPT : DROPPED, kept ? CHART.lineData : CHART.lineThin);
   }
+  if (!inTime) P3 = { p, ab: abRulers(p, [0, nc]) };
   p.axes();
   $('subComp').textContent = `${inTime ? 'Scores' : 'Loadings'}, ${PREP_NAME[st.prep]}, each to its size.`;
-  legend($('legComp'), stripLegend);
+  legend($('legComp'), inTime ? stripLegend : [...stripLegend, ['the two points', CUT, 'dashed']]);
 }
 
 /* panel 4: the operation as blocks */
@@ -319,15 +314,24 @@ segClick('prepSeg', v => { state.s.prep = v; limits(); draw(); markChanged(); })
 for (const k of ['view1', 'view3', 'view4']) segClick(k, x => { state.s[k] = x; draw(); });
 $('resetCase').addEventListener('click', () => selectCase(state.idx, false));
 
-/* panel 3: drag the cut in the scree view */
+/* panel 3: drag the cut in the scree view, or a and b in the loadings */
+let dragK3 = 0;
+const setAB = (which, x, p) => {
+  const { inner } = p, a = AXES[state.s.axis], f = clamp((x - inner.l) / (inner.r - inner.l), 0, 1);
+  state.s[which ? 'pb' : 'pa'] = a.from + f * (a.to - a.from);
+  drawDataPanel(); drawCloud(); drawComp();
+};
 dragRuler($('cComp'), {
-  rulerXs: () => (P3 ? [P3.rx] : []), plotOf: () => P3?.p,
-  onDrag: x => { const { inner } = P3.p; setN(0.4 + (x - inner.l) / (inner.r - inner.l) * (P3.NS + 0.5) - 0.5); },
+  rulerXs: () => (P3 ? (P3.ab ?? [P3.rx]) : []), plotOf: () => P3?.p,
+  down: e => { if (P3?.ab) { const { x } = localIn($('cComp'), e); dragK3 = Math.abs(x - P3.ab[0]) <= Math.abs(x - P3.ab[1]) ? 0 : 1; } return false; },
+  onDrag: x => {
+    if (P3.ab) { setAB(dragK3, x, P3.p); return; }
+    const { inner } = P3.p; setN(0.4 + (x - inner.l) / (inner.r - inner.l) * (P3.NS + 0.5) - 0.5);
+  },
 });
 
 /* panel 1: drag the two points, or spectrum k in the map and the species */
 const cData = $('cData');
-dragDataK(cData, k => { const c = clamp(k, 0, state.s.q - 1); if (c !== state.s.k) { state.s.k = c; drawDataPanel(); } });
 let dragK = 0;
 dragRuler(cData, {
   rulerXs: () => P1?.xs ?? [], plotOf: () => P1?.p,
@@ -335,9 +339,10 @@ dragRuler(cData, {
   onDrag: x => {
     const { inner } = P1.p, a = AXES[state.s.axis], f = clamp((x - inner.l) / (inner.r - inner.l), 0, 1);
     state.s[dragK ? 'pb' : 'pa'] = a.from + f * (a.to - a.from);
-    drawDataPanel(); drawCloud();
+    drawDataPanel(); drawCloud(); drawComp();
   },
 });
+dragDataK(cData, k => { const c = clamp(k, 0, state.s.q - 1); if (c !== state.s.k) { state.s.k = c; drawDataPanel(); } });
 
 /* ---------------------------------------------------------------------------
    Panels and the rail

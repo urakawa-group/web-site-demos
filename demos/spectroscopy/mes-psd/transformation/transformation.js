@@ -804,13 +804,13 @@ const cHarm = $('cHarm');
   const near = e => {
     if (state.s.view4 === 'bars' || !P4) return false;
     const { x, y } = localIn(cHarm, e), { inner } = P4.p;
-    return x >= inner.l - 8 && x <= inner.r && P4.ys.some(yy => Math.abs(y - yy) <= 7);
+    return x >= inner.l - 8 && x <= inner.r && P4.ys.some(yy => Math.abs(y - yy) <= 10);
   };
   cHarm.addEventListener('pointermove', e => {
     if (dragging) { setPhi(P4.toPhi(localIn(cHarm, e).y)); return; }
-    cHarm.style.cursor = near(e) ? 'ns-resize' : 'default';
+    cHarm.style.cursor = near(e) ? 'grab' : 'default';
   });
-  cHarm.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cHarm.setPointerCapture(e.pointerId); });
+  cHarm.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cHarm.setPointerCapture(e.pointerId); cHarm.style.cursor = 'grabbing'; });
   cHarm.addEventListener('pointerup', e => { dragging = false; try { cHarm.releasePointerCapture(e.pointerId); } catch { /* released */ } });
 }
 

@@ -331,18 +331,18 @@ export function dragRuler(cv, { rulerXs, plotOf, onDrag, hover = () => false, do
   const near = e => {
     const p = plotOf(); if (!p) return false;
     const { x, y } = localIn(cv, e);
-    return y >= p.inner.t - 4 && y <= p.inner.b && rulerXs().some(rx => Math.abs(x - rx) <= 7);
+    return y >= p.inner.t - 4 && y <= p.inner.b && rulerXs().some(rx => Math.abs(x - rx) <= 10);
   };
   cv.addEventListener('pointermove', e => {
     if (dragging) { onDrag(localIn(cv, e).x); return; }
     if (hover(e)) { cv.style.cursor = 'pointer'; return; }
-    cv.style.cursor = near(e) ? 'ew-resize' : 'default';
+    cv.style.cursor = near(e) ? 'grab' : 'default';
   });
   cv.addEventListener('pointerdown', e => {
     if (down(e)) return;
     if (!near(e)) return;
-    dragging = true; cv.setPointerCapture(e.pointerId);
+    dragging = true; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing';
   });
-  cv.addEventListener('pointerup', e => { dragging = false; try { cv.releasePointerCapture(e.pointerId); } catch { /* released */ } });
+  cv.addEventListener('pointerup', e => { if (dragging) cv.style.cursor = 'grab'; dragging = false; try { cv.releasePointerCapture(e.pointerId); } catch { /* released */ } });
   cv.addEventListener('pointerleave', () => { if (!dragging) leave(); });
 }

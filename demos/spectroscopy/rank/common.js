@@ -186,6 +186,7 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after, k
       gripLeft(p, py, SPEC_K);
       DR.set(cv, { p, dir: 'h', at: py, toK: (x, yy) => Math.floor((p.inner.b - yy) / (p.inner.b - p.inner.t) * q) });
     }
+    after?.(p, [0, T_END]);
     return { p: null, sub: `As a map${what}, time upwards.`, leg: kk == null ? MAP_LEGEND(lim.map) : [...MAP_LEGEND(lim.map), ['spectrum <i>k</i>', SPEC_K, 'dashed']] };
   }
   if (view === 'truth') {
@@ -210,10 +211,10 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after, k
   for (const row of Xp) p.line(grid, row, C['data-faint'], CHART.lineFaint);
   // the first and the last spectrum in ink, the last a little thicker with
   // long dashes; spectrum k, the one the rulers point at, solid green
-  p.line(grid, Xp[0], FIRST_LAST, CHART.lineData);
-  p.line(grid, Xp[Xp.length - 1], FIRST_LAST, CHART.lineHighlight, [9, 4]);
+  p.line(grid, Xp[0], FIRST_LAST, CHART.lineHighlight);
+  p.line(grid, Xp[Xp.length - 1], FIRST_LAST, CHART.lineHighlight + 0.5, [9, 4]);
   if (kk != null) p.line(grid, Xp[kk], SPEC_K, CHART.lineHighlight);
-  after?.(p);
+  after?.(p, lim.y);
   p.axes();
   const leg = [['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed']];
   return { p, sub: `${st.q} spectra, ${T_END} min${what}.`, leg: kk == null ? leg : [...leg, ['spectrum <i>k</i>', SPEC_K, '']] };
@@ -233,21 +234,23 @@ function gripLeft(p, py, color) {
 }
 /** Drag spectrum k in panel 1 by its ruler; setK(k) gets the new index. */
 export function dragDataK(cv, setK) {
-  let dragging = false;
+  let dragging = false, mine = false;
   const near = e => {
     const r = DR.get(cv); if (!r) return false;
     const { x, y } = localIn(cv, e), { inner } = r.p;
     return r.dir === 'h'
-      ? Math.abs(y - r.at) <= 7 && x >= inner.l - 2 && x <= inner.r
-      : Math.abs(x - r.at) <= 7 && y >= inner.t - 4 && y <= inner.b;
+      ? Math.abs(y - r.at) <= 10 && x >= inner.l - 2 && x <= inner.r
+      : Math.abs(x - r.at) <= 10 && y >= inner.t - 4 && y <= inner.b;
   };
   cv.addEventListener('pointermove', e => {
     const r = DR.get(cv);
     if (dragging && r) { const { x, y } = localIn(cv, e); setK(r.toK(x, y)); return; }
-    if (r) cv.style.cursor = near(e) ? (r.dir === 'h' ? 'ns-resize' : 'ew-resize') : 'default';
+    // only touch the cursor for this ruler, so a second handler on the same
+    // canvas (PCA's a and b) keeps its own; register this one after it
+    if (near(e)) { cv.style.cursor = 'grab'; mine = true; } else if (mine) { cv.style.cursor = 'default'; mine = false; }
   });
-  cv.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cv.setPointerCapture(e.pointerId); });
-  cv.addEventListener('pointerup', e => { dragging = false; try { cv.releasePointerCapture(e.pointerId); } catch { /* released */ } });
+  cv.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; e.stopImmediatePropagation(); });
+  cv.addEventListener('pointerup', e => { if (dragging) cv.style.cursor = 'grab'; dragging = false; try { cv.releasePointerCapture(e.pointerId); } catch { /* released */ } });
 }
 /** Every legend panel 1 can show, for the legend reserve. */
 export const dataLegends = (st, lim) => [

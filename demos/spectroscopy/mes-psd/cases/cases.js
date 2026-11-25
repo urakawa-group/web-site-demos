@@ -1144,13 +1144,13 @@ function phiAt(e) {
 function onRuler(e) {
   if (!PH) return false;
   const { x, y } = local(e), { inner } = PH.p;
-  return Math.abs(x - PH.rx) <= 7 && y >= inner.t - 4 && y <= inner.b;
+  return Math.abs(x - PH.rx) <= 10 && y >= inner.t - 4 && y <= inner.b;
 }
 let dragging = false;
 cPhase.addEventListener('pointermove', e => {
   if (dragging) { setPhi(phiAt(e)); return; }
   const q = hit(e);
-  cPhase.style.cursor = q ? 'pointer' : onRuler(e) ? 'ew-resize' : 'default';
+  cPhase.style.cursor = q ? 'pointer' : onRuler(e) ? 'grab' : 'default';
   const prev = state.preview?.poi;
   if (q !== prev) {
     state.preview = q ? { phi: q.phi, poi: q } : null;
@@ -1165,7 +1165,7 @@ const localIn = (cv, e) => { const r = cv.getBoundingClientRect(), f = cv.client
 const onFoldRuler = e => {
   if (!FD) return false;
   const { x, y } = localIn(cFold, e), { inner } = FD.p;
-  return y >= inner.t - 4 && y <= inner.b && FD.xs.some(rx => Math.abs(x - rx) <= 7);
+  return y >= inner.t - 4 && y <= inner.b && FD.xs.some(rx => Math.abs(x - rx) <= 10);
 };
 const phiFromFold = e => {
   const { x } = localIn(cFold, e), { inner } = FD.p;
@@ -1175,11 +1175,11 @@ const phiFromFold = e => {
 let foldDrag = false;
 cFold.addEventListener('pointermove', e => {
   if (foldDrag) { setPhi(phiFromFold(e)); return; }
-  cFold.style.cursor = onFoldRuler(e) ? 'ew-resize' : 'default';
+  cFold.style.cursor = onFoldRuler(e) ? 'grab' : 'default';
 });
 cFold.addEventListener('pointerdown', e => {
   if (!onFoldRuler(e)) return;
-  foldDrag = true; cFold.setPointerCapture(e.pointerId);
+  foldDrag = true; cFold.setPointerCapture(e.pointerId); cFold.style.cursor = 'grabbing';
 });
 cFold.addEventListener('pointerup', e => { foldDrag = false; try { cFold.releasePointerCapture(e.pointerId); } catch { /* already released */ } });
 
@@ -1188,7 +1188,7 @@ cPhase.addEventListener('pointerdown', e => {
   const q = hit(e);
   if (q) { state.preview = null; hideTip(); setPhi(q.phi); return; }
   if (!onRuler(e)) return;
-  dragging = true; cPhase.setPointerCapture(e.pointerId); hideTip(); state.preview = null;
+  dragging = true; cPhase.setPointerCapture(e.pointerId); cPhase.style.cursor = 'grabbing'; hideTip(); state.preview = null;
 });
 cPhase.addEventListener('pointerup', e => { dragging = false; try { cPhase.releasePointerCapture(e.pointerId); } catch { /* already released */ } });
 
