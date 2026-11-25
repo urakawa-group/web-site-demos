@@ -143,11 +143,11 @@ function drawDataPanel() {
     after: (p, yr) => { P1 = { p, xs: abRulers(p, yr) }; },
   });
   $('subData').textContent = st.view1 === 'centred' ? 'Each spectrum minus the mean.' : o.sub;
-  legend($('legData'), st.view1 === 'centred' ? centredLegend : view !== 'truth' ? [...o.leg, ['the two points', CUT, 'dashed']] : o.leg);
+  legend($('legData'), st.view1 === 'centred' ? centredLegend : [...o.leg, ['the two points', CUT, 'dashed']]);
 }
 
 /* panel 2: two points of every spectrum, as a cloud */
-const cloudLegend = [['one spectrum', C['ink-300'], 'dot'], ['the mean', KEPT, 'ring'], ['<b>v</b>₁, raw SVD', CUT, 'dashed'], ['<b>p</b>₁, <b>p</b>₂, PCA', CUT, '']];
+const cloudLegend = [['one spectrum', C['ink-300'], 'dot'], ['the mean', KEPT, 'ring'], ['<b>v</b>₁, raw SVD', KEPT, 'dashed'], ['<b>p</b>₁, <b>p</b>₂, PCA', KEPT, ''], ['spectrum <i>k</i>', CUT, 'dot']];
 function drawCloud() {
   const st = state.s, cv = $('cCloud'), sc = SC(), X = S.B.X, a = idxOf(st.pa), b = idxOf(st.pb);
   const xs = X.map(r => r[a]), ys = X.map(r => r[b]), q = xs.length;
@@ -160,23 +160,25 @@ function drawCloud() {
   const tr = cxx + cyy, det = cxx * cyy - cxy * cxy, l1 = tr / 2 + Math.sqrt(Math.max(tr * tr / 4 - det, 0)), l2 = Math.max(tr - l1, 0);
   const lo = Math.min(0, ...xs, ...ys), hi = Math.max(...xs, ...ys, 0.05), pad = 0.08 * (hi - lo);
   const R = [lo - pad, hi + pad], ax = axOf(st), unit = st.axis === 'ir' ? ' cm⁻¹' : st.axis === 'xas' ? ' eV' : '';
-  const p = plot(cv, { x: R, y: R, xlabel: 'signal at *a* / –', ylabel: 'signal at *b* / –', xticks: ticks(R[0], R[1], 4), yticks: ticks(R[0], R[1], 4), scale: sc });
+  const p = plot(cv, { x: R, y: R, xlabel: `signal at *a* = ${st.pa.toFixed(0)}${unit} / –`, ylabel: `*b* = ${st.pb.toFixed(0)}${unit} / –`, xticks: ticks(R[0], R[1], 4), yticks: ticks(R[0], R[1], 4), scale: sc });
   p.hline(0); p.line([0, 0], R, C['line-zero'], 1);
   p.line(xs, ys, C['line'], CHART.lineThin);
   for (let i = 0; i < q; i++) p.dot(xs[i], ys[i], C['ink-300'], 2.5);
   const L = (hi - lo) * 2, dir = th => [Math.cos(th), Math.sin(th)];
   const [ux, uy] = dir(thRaw); const sgn = ux * mx + uy * my < 0 ? -1 : 1;
-  // v₁ and p₁, p₂ in green: they belong to the chosen points a and b
-  p.line([0, sgn * ux * L], [0, sgn * uy * L], CUT, CHART.lineData, CHART.dash);
+  p.line([0, sgn * ux * L], [0, sgn * uy * L], KEPT, CHART.lineData, CHART.dash);
   const [px, py] = dir(thPca), [qx, qy] = [-py, px], s1 = 2 * Math.sqrt(l1 / (q - 1)), s2 = 2 * Math.sqrt(l2 / (q - 1));
-  p.line([mx - px * s1, mx + px * s1], [my - py * s1, my + py * s1], CUT, CHART.lineHighlight);
-  p.line([mx - qx * s2, mx + qx * s2], [my - qy * s2, my + qy * s2], CUT, CHART.lineThin);
+  p.line([mx - px * s1, mx + px * s1], [my - py * s1, my + py * s1], KEPT, CHART.lineHighlight);
+  p.line([mx - qx * s2, mx + qx * s2], [my - qy * s2, my + qy * s2], KEPT, CHART.lineThin);
   p.ctx.strokeStyle = KEPT; p.ctx.lineWidth = 2; p.ctx.fillStyle = C.surface;
   p.ctx.beginPath(); p.ctx.arc(p.X(mx), p.Y(my), CHART.marker, 0, 2 * Math.PI); p.ctx.fill(); p.ctx.stroke();
+  // spectrum k, the one picked in panel 1, on top of everything
+  const kk = clamp(st.k ?? 20, 0, q - 1);
+  p.dot(xs[kk], ys[kk], CUT, 5.5);
   const deg = th => { let d = th * 180 / Math.PI; d = ((d % 180) + 180) % 180; return d; };
-  p.text(`*v*_1_ at ${deg(thRaw).toFixed(0)}°, *p*_1_ at ${deg(thPca).toFixed(0)}°`, R[0] + 0.03 * (R[1] - R[0]), R[1] - 0.12 * (R[1] - R[0]), CUT, 'left');
+  p.text(`*v*_1_ at ${deg(thRaw).toFixed(0)}°, *p*_1_ at ${deg(thPca).toFixed(0)}°`, R[0] + 0.03 * (R[1] - R[0]), R[1] - 0.12 * (R[1] - R[0]), C['ink-500'], 'left');
   p.axes();
-  $('subCloud').innerHTML = `Each spectrum as a point, at <i>a</i> = ${st.pa.toFixed(0)} and <i>b</i> = ${st.pb.toFixed(0)}${unit}.`;
+  $('subCloud').innerHTML = 'Each spectrum as a point: its signal at <i>a</i> and at <i>b</i>.';
   legend($('legCloud'), cloudLegend);
   void ax;
 }
@@ -342,7 +344,7 @@ dragRuler(cData, {
     drawDataPanel(); drawCloud(); drawComp();
   },
 });
-dragDataK(cData, k => { const c = clamp(k, 0, state.s.q - 1); if (c !== state.s.k) { state.s.k = c; drawDataPanel(); } });
+dragDataK(cData, k => { const c = clamp(k, 0, state.s.q - 1); if (c !== state.s.k) { state.s.k = c; drawDataPanel(); drawCloud(); } });
 
 /* ---------------------------------------------------------------------------
    Panels and the rail

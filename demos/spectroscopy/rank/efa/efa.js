@@ -180,6 +180,9 @@ function limits() {
   LIM = { ...L, log: [-4, top], lpg: { x: rng(t1), y: rng(t2) } };
 }
 const kIdx = () => clamp(state.s.k, 0, state.s.q - 1);
+/* the moving window centred on spectrum k (its last spectrum, as S.fsmw is
+   indexed), so the ruler drawn at the window's centre stays under the pointer */
+const winEnd = () => clamp(kIdx() + Math.floor((S.w - 1) / 2), S.w - 1, state.s.q - 1);
 const spanOf = pres => { const a = pres.indexOf(true), b = pres.lastIndexOf(true); return a < 0 ? null : [a, b]; };
 const colourOf = j => (S.truth[j] ? COLOR[S.truth[j].sp.key] : DROPPED);
 
@@ -206,7 +209,7 @@ function drawEfa() {
       for (let k = w - 1; k < q; k++) { xs.push((ts[k - w + 1] + ts[k]) / 2); ys.push(lg(S.fsmw[k][i])); }
       p.line(xs, ys, kept ? KEPT : DROPPED, kept ? CHART.lineData : CHART.lineThin);
     }
-    const k = Math.max(kIdx(), w - 1), tk = (ts[k - w + 1] + ts[k]) / 2;
+    const k = winEnd(), tk = (ts[k - w + 1] + ts[k]) / 2;
     p.line([tk, tk], L, CUT, CHART.lineData, CHART.dash);
     grip(p, p.X(tk), CUT);
     p.axes();
@@ -238,7 +241,7 @@ function drawMat() {
   const st = state.s, X = S.B.X, q = X.length, k = kIdx(), f = S.fwd[k], b = S.bwd[k];
   const sv = (vals, nsig) => ({ label: 'diag(σ)', role: 'diag', rows: NE, cols: NE, h: 'n', w: 'n', scale: 'log', max: S.r.s[0], floor: S.r.s[0] * 1e-4, at: (r) => vals[r] ?? 0, fade: { fromCol: nsig, fromRow: nsig }, dim: `${nsig} above` });
   if (st.view2 === 'window') {
-    const w = S.w, kk = Math.max(k, w - 1);
+    const w = S.w, kk = winEnd();
     drawBlocks($('cMat'), [
       { label: `X_${kk - w + 2}:${kk + 1}_`, role: 'data', rows: q, cols: M, h: 'q', w: 'm', at: (r, c) => X[r][c], fade: { rows: [kk - w + 1, kk + 1] } },
       '→', sv(S.fsmw[kk], S.nw[kk]),

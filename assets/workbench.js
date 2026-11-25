@@ -321,7 +321,25 @@ export function localIn(cv, e) {
 }
 
 /**
- * Make a canvas drag a value by a vertical ruler: grabbed within 7 px of one
+ * Double-click to jump: every ruler on a canvas registers how far a point is
+ * from it (null when the point is not in its plot) and what to do there; a
+ * double-click moves the closest one to the pointer.
+ */
+const JUMPS = new WeakMap();
+export function onJump(cv, dist, act) {
+  if (!JUMPS.has(cv)) {
+    JUMPS.set(cv, []);
+    cv.addEventListener('dblclick', e => {
+      let best = null, bd = Infinity;
+      for (const j of JUMPS.get(cv)) { const d = j.dist(e); if (d != null && d < bd) { bd = d; best = j; } }
+      best?.act(e);
+    });
+  }
+  JUMPS.get(cv).push({ dist, act });
+}
+
+/**
+ * Make a canvas drag a value by a vertical ruler: grabbed within 10 px of one
  * of the x positions rulerXs() returns, it calls onDrag(x in canvas px) while
  * the pointer moves. hover(e) may claim the pointer first (a point of
  * interest) by returning true.
@@ -336,13 +354,20 @@ export function dragRuler(cv, { rulerXs, plotOf, onDrag, hover = () => false, do
   cv.addEventListener('pointermove', e => {
     if (dragging) { onDrag(localIn(cv, e).x); return; }
     if (hover(e)) { cv.style.cursor = 'pointer'; return; }
-    cv.style.cursor = near(e) ? 'grab' : 'default';
+    cv.style.cursor = near(e) ? 'ew-resize' : 'default';
   });
   cv.addEventListener('pointerdown', e => {
     if (down(e)) return;
     if (!near(e)) return;
-    dragging = true; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing';
+    dragging = true; cv.setPointerCapture(e.pointerId);
   });
-  cv.addEventListener('pointerup', e => { if (dragging) cv.style.cursor = 'grab'; dragging = false; try { cv.releasePointerCapture(e.pointerId); } catch { /* released */ } });
+  // a double-click anywhere in the plot moves the closest ruler there
+  onJump(cv, e => {
+    const p = plotOf(), xs = rulerXs(); if (!p || !xs.length) return null;
+    const { x, y } = localIn(cv, e);
+    if (x < p.inner.l || x > p.inner.r || y < p.inner.t || y > p.inner.b) return null;
+    return Math.min(...xs.map(rx => Math.abs(x - rx)));
+  }, e => { if (down(e)) return; onDrag(localIn(cv, e).x); });
+  cv.addEventListener('pointerup', e => { dragging = false; try { cv.releasePointerCapture(e.pointerId); } catch { /* released */ } });
   cv.addEventListener('pointerleave', () => { if (!dragging) leave(); });
 }

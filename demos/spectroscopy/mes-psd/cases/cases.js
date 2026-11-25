@@ -1150,7 +1150,7 @@ let dragging = false;
 cPhase.addEventListener('pointermove', e => {
   if (dragging) { setPhi(phiAt(e)); return; }
   const q = hit(e);
-  cPhase.style.cursor = q ? 'pointer' : onRuler(e) ? 'grab' : 'default';
+  cPhase.style.cursor = q ? 'pointer' : onRuler(e) ? 'ew-resize' : 'default';
   const prev = state.preview?.poi;
   if (q !== prev) {
     state.preview = q ? { phi: q.phi, poi: q } : null;
@@ -1175,20 +1175,25 @@ const phiFromFold = e => {
 let foldDrag = false;
 cFold.addEventListener('pointermove', e => {
   if (foldDrag) { setPhi(phiFromFold(e)); return; }
-  cFold.style.cursor = onFoldRuler(e) ? 'grab' : 'default';
+  cFold.style.cursor = onFoldRuler(e) ? 'ew-resize' : 'default';
 });
 cFold.addEventListener('pointerdown', e => {
   if (!onFoldRuler(e)) return;
-  foldDrag = true; cFold.setPointerCapture(e.pointerId); cFold.style.cursor = 'grabbing';
+  foldDrag = true; cFold.setPointerCapture(e.pointerId);
 });
 cFold.addEventListener('pointerup', e => { foldDrag = false; try { cFold.releasePointerCapture(e.pointerId); } catch { /* already released */ } });
+
+/* a double-click in either plot moves the ruler there */
+const inPlot = (cv, P, e) => { if (!P) return false; const { x, y } = localIn(cv, e), { inner } = P.p; return x >= inner.l && x <= inner.r && y >= inner.t && y <= inner.b; };
+cFold.addEventListener('dblclick', e => { if (inPlot(cFold, FD, e)) setPhi(phiFromFold(e)); });
+cPhase.addEventListener('dblclick', e => { if (inPlot(cPhase, PH, e)) setPhi(phiAt(e)); });
 
 /* the ruler moves only when grabbed, or when a marked point is clicked; a click elsewhere does nothing */
 cPhase.addEventListener('pointerdown', e => {
   const q = hit(e);
   if (q) { state.preview = null; hideTip(); setPhi(q.phi); return; }
   if (!onRuler(e)) return;
-  dragging = true; cPhase.setPointerCapture(e.pointerId); cPhase.style.cursor = 'grabbing'; hideTip(); state.preview = null;
+  dragging = true; cPhase.setPointerCapture(e.pointerId); hideTip(); state.preview = null;
 });
 cPhase.addEventListener('pointerup', e => { dragging = false; try { cPhase.releasePointerCapture(e.pointerId); } catch { /* already released */ } });
 

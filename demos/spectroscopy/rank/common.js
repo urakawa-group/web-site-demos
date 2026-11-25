@@ -7,7 +7,7 @@
  */
 import { C, CHART, typeFont } from '../../../assets/tokens.js';
 import { plot, ticks, richText } from '../../../assets/plot.js';
-import { clamp, setSeg, grip, localIn } from '../../../assets/workbench.js';
+import { clamp, setSeg, grip, localIn, onJump } from '../../../assets/workbench.js';
 import { AXES, NPTS, T_END, spanOf, mapSpecies, sourceOf } from './mixture.js';
 
 export const $ = id => document.getElementById(id);
@@ -202,13 +202,16 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after, k
     p.axes();
     const p2 = plot(cv, { keep: true, x: xRangeOf(st), y: [0, lim.pure], margin: { l: W / 2 + 46 * sc }, xlabel: ax.label, xticks: ax.ticks.filter((_, i) => i % 2 === 0), yticks: ticks(0, lim.pure, 3), scale: sc });
     for (const sp of on) p2.line(grid, pure[sp.key], COLOR[sp.key]);
+    after?.(p2, [0, lim.pure]);
     p2.axes();
     const legT = on.map(sp => [nameOf(st, st.species.indexOf(sp)), COLOR[sp.key], '']);
     return { p: null, sub: 'Concentrations and pure spectra.', leg: kk == null ? legT : [...legT, ['spectrum <i>k</i>', SPEC_K, 'dashed']] };
   }
   const p = plot(cv, { x: xRangeOf(st), y: lim.y, xlabel: ax.label, ylabel, xticks: ax.ticks, yticks: ticks(lim.y[0], lim.y[1], 4), scale: sc });
   p.hline(0);
-  for (const row of Xp) p.line(grid, row, C['data-faint'], CHART.lineFaint);
+  // at most ten spectra, evenly through the run, so the panel stays readable
+  const shown = q <= SHOWN ? Xp : Array.from({ length: SHOWN }, (_, j) => Xp[Math.round(j * (q - 1) / (SHOWN - 1))]);
+  for (const row of shown) p.line(grid, row, C['data-faint'], CHART.lineFaint);
   // the first and the last spectrum in ink, the last a little thicker with
   // long dashes; spectrum k, the one the rulers point at, solid green
   p.line(grid, Xp[0], FIRST_LAST, CHART.lineHighlight);
@@ -216,7 +219,7 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after, k
   if (kk != null) p.line(grid, Xp[kk], SPEC_K, CHART.lineHighlight);
   after?.(p, lim.y);
   p.axes();
-  const leg = [['one spectrum', C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed']];
+  const leg = [[q <= SHOWN ? 'one spectrum' : `${SHOWN} of the ${q}`, C['data-faint'], ''], ['the first', FIRST_LAST, ''], ['the last', FIRST_LAST, 'dashed']];
   return { p, sub: `${st.q} spectra, ${T_END} min${what}.`, leg: kk == null ? leg : [...leg, ['spectrum <i>k</i>', SPEC_K, '']] };
 }
 
@@ -225,6 +228,7 @@ export function drawData(cv, { st, B, Xp, lim, view, ylabel, what = '', after, k
    concentrations); dragDataK makes it grabbable. The spectra view has no
    time axis, so there spectrum k is drawn as a green spectrum. */
 const SPEC_K = C['data-highlight'];
+const SHOWN = 10;
 const DR = new Map();
 /** A grip for a horizontal ruler: a small triangle on the left edge, pointing right. */
 function gripLeft(p, py, color) {
@@ -247,10 +251,17 @@ export function dragDataK(cv, setK) {
     if (dragging && r) { const { x, y } = localIn(cv, e); setK(r.toK(x, y)); return; }
     // only touch the cursor for this ruler, so a second handler on the same
     // canvas (PCA's a and b) keeps its own; register this one after it
-    if (near(e)) { cv.style.cursor = 'grab'; mine = true; } else if (mine) { cv.style.cursor = 'default'; mine = false; }
+    if (near(e)) { cv.style.cursor = DR.get(cv).dir === 'h' ? 'ns-resize' : 'ew-resize'; mine = true; } else if (mine) { cv.style.cursor = 'default'; mine = false; }
   });
-  cv.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; e.stopImmediatePropagation(); });
-  cv.addEventListener('pointerup', e => { if (dragging) cv.style.cursor = 'grab'; dragging = false; try { cv.releasePointerCapture(e.pointerId); } catch { /* released */ } });
+  cv.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cv.setPointerCapture(e.pointerId); });
+  // a double-click in the plot moves spectrum k there
+  onJump(cv, e => {
+    const r = DR.get(cv); if (!r) return null;
+    const { x, y } = localIn(cv, e), { inner } = r.p;
+    if (x < inner.l || x > inner.r || y < inner.t || y > inner.b) return null;
+    return r.dir === 'h' ? Math.abs(y - r.at) : Math.abs(x - r.at);
+  }, e => { const r = DR.get(cv), { x, y } = localIn(cv, e); setK(r.toK(x, y)); });
+  cv.addEventListener('pointerup', e => { dragging = false; try { cv.releasePointerCapture(e.pointerId); } catch { /* released */ } });
 }
 /** Every legend panel 1 can show, for the legend reserve. */
 export const dataLegends = (st, lim) => [

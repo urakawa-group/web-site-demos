@@ -808,9 +808,14 @@ const cHarm = $('cHarm');
   };
   cHarm.addEventListener('pointermove', e => {
     if (dragging) { setPhi(P4.toPhi(localIn(cHarm, e).y)); return; }
-    cHarm.style.cursor = near(e) ? 'grab' : 'default';
+    cHarm.style.cursor = near(e) ? 'ns-resize' : 'default';
   });
-  cHarm.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cHarm.setPointerCapture(e.pointerId); cHarm.style.cursor = 'grabbing'; });
+  cHarm.addEventListener('pointerdown', e => { if (!near(e)) return; dragging = true; cHarm.setPointerCapture(e.pointerId); });
+  cHarm.addEventListener('dblclick', e => {
+    if (state.s.view4 === 'bars' || !P4) return;
+    const { x, y } = localIn(cHarm, e), { inner } = P4.p;
+    if (x >= inner.l && x <= inner.r && y >= inner.t && y <= inner.b) setPhi(P4.toPhi(y));
+  });
   cHarm.addEventListener('pointerup', e => { dragging = false; try { cHarm.releasePointerCapture(e.pointerId); } catch { /* released */ } });
 }
 
